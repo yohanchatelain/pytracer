@@ -2,8 +2,8 @@ import json
 import os
 import sys
 
-import utils
-import utils.singleton
+import pytracer.core.utils as ptutils
+from pytracer.core.utils.singleton import Singleton
 
 
 class PytracerError(Exception):
@@ -23,6 +23,15 @@ class DictAtKeyError(Exception):
             return self.__dict__[attr]
         else:
             return DictAtKeyError(attr)
+
+
+class NoneDict:
+
+    def __getattr__(self, attr):
+        return self
+
+    def __bool__(self):
+        return False
 
 
 class DictAt:
@@ -45,26 +54,40 @@ class DictAt:
 
     def __getattr__(self, attr):
         if attr in self._attributes:
-            return self._dict.__getattr__(attr)
+            return getattr(self._dict, attr, NoneDict())
         if attr in self._dict:
             return self._dict[attr]
-        return None
+        return NoneDict()
+
+    def __repr__(self):
+        return repr(self._dict)
+
+    def __str__(self):
+        return str(self._dict)
 
 
-class _Constant(metaclass=utils.singleton.Singleton):
+class _Constant(metaclass=Singleton):
     __attributes = {
-        "cache": ".__pytracer_cache__",
+        "cache": {"root": ".__pytracercache__",
+                  "traces": "traces",
+                  "stats": "stats"},
         "text_ext": ".txt",
         "json_ext": ".json",
         "pickle_ext": ".pkl",
-        "iotypes": ["text", "json", "pickle"]
+        "iotypes": ["text", "json", "pickle"],
+        "export": {"dat": "stats.pkl",
+                   "header": "header.pkl"}
+
     }
 
+    def __init__(self):
+        self.__dict = DictAt(self.__attributes)
+
     def __getitem__(self, item):
-        if item in self.__attributes:
-            return self.__attributes[item]
+        if item in self.__dict:
+            return self.__dict[item]
         else:
-            raise KeyError
+            return None
 
     def __setitem__(self, item, value):
         return NotImplementedError
@@ -76,17 +99,18 @@ class _Constant(metaclass=utils.singleton.Singleton):
             self.__dict__[attr] = value
 
     def __getattr__(self, attr):
-        if attr in self.__attributes:
-            return self.__attributes[attr]
+        if attr in self.__dict:
+            return self.__dict[attr]
         else:
-            return self.__dict__[attr]
+            return None
 
 
-class _Config(metaclass=utils.singleton.Singleton):
+class _Config(object, metaclass=Singleton):
 
     pytracer_config = "PYTRACER_CONFIG"
 
-    _attributes = ["modules_to_load",
+    _attributes = ["python_modules_path",
+                   "modules_to_load",
                    "include_file",
                    "exclude_file",
                    "logger",
@@ -94,17 +118,25 @@ class _Config(metaclass=utils.singleton.Singleton):
                    "logger.output",
                    "logger.color",
                    "io",
-                   "io.cache",
                    "io.type",
-                   "io.filename"
+                   "io.filename",
+                   "io.cache",
+                   "io.cache.root",
+                   "io.cache.stats",
+                   "io.cache.traces",
+                   "io.export.dat",
+                   "io.export.header",
+                   "numpy",
+                   "numpy.ufunc"
                    ]
 
+    _data = dict()
+
     def __init__(self):
-        self._data = dict()
         self.read_config()
 
     def __bool__(self):
-        return len(self._data()) != 0
+        return len(_Config._data()) != 0
 
     def __getitem__(self, key):
         return NotImplementedError
@@ -115,7 +147,7 @@ class _Config(metaclass=utils.singleton.Singleton):
     def __getattr__(self, name):
         if name in self._attributes:
             try:
-                return self._data[name]
+                return getattr(_Config._data, name)
             except KeyError:
                 raise DictAtKeyError(name)
         raise KeyError(self.key_error(name))
@@ -125,12 +157,12 @@ class _Config(metaclass=utils.singleton.Singleton):
         return msg
 
     def read_config(self):
-        config = utils.getenv(self.pytracer_config)
+        config = ptutils.getenv(self.pytracer_config)
         try:
             config_file = open(config)
         except FileNotFoundError as e:
             sys.exit(f"Error while opening file {config}:{os.linesep} {e}")
-        self._data = DictAt(json.load(config_file))
+        _Config._data = DictAt(json.load(config_file))
 
 
 config = _Config()

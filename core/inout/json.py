@@ -1,14 +1,15 @@
 import datetime
 import json
+from multiprocessing import get_logger
 import os
 
-import utils.log
-import utils.singleton
-from config import constant
+import pytracer.core.utils as ptutils
+from pytracer.core.utils.log import get_logger
+from pytracer.core.utils.singleton import Singleton
+from pytracer.core.config import constant
+from pytracer.core.inout import IOInitializer
 
-import inout
-
-logger = utils.log.get_log()
+logger = get_logger()
 
 
 def split_filename(filename):
@@ -29,14 +30,14 @@ def handle_not_json_serializable(self, args):
     return str(args)
 
 
-class Reader(metaclass=utils.singleton.Singleton):
+class Reader(metaclass=Singleton):
 
     def __init__(self):
-        self.parameters = inout.IOInitializer()
+        self.parameters = IOInitializer()
 
     def read(self, filename):
         try:
-            utils.utils.check_extension(filename, constant.json_ext)
+            ptutils.check_extension(filename, constant.json_ext)
             fi = open(filename)
             data = json.load(fi)
             return data
@@ -48,13 +49,13 @@ class Reader(metaclass=utils.singleton.Singleton):
             logger.critical("Unexpected error", e)
 
 
-class Writer(metaclass=utils.singleton.Singleton):
+class Writer(metaclass=Singleton):
 
     count_ofile = 0
     buffer_max = 1024
 
     def __init__(self):
-        self.parameters = inout.IOInitializer()
+        self.parameters = IOInitializer()
         self.datefmt = "%y%m%d%H%M%S"
         self._init_ostream()
         self.buffer = []
@@ -77,7 +78,7 @@ class Writer(metaclass=utils.singleton.Singleton):
             logger.critical("Unexpected error", e)
 
     def get_filename_path(self, filename):
-        utils.check_extension(filename, constant.json_ext)
+        ptutils.check_extension(filename, constant.json_ext)
         filename, ext = os.path.splitext(filename)
         ext = ext if ext else constant.json_ext
         return (f"{self.parameters.cache_path}{os.sep}"

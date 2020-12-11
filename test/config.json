@@ -1,0 +1,30 @@
+{
+    "modules_to_load": [
+        "math",
+        "numpy",
+        "sklearn"
+    ],
+    "include_file": "",
+    "exclude_file": [
+        "/home/yohan/Work/pytracer/exclude.default.txt",
+        "/home/yohan/Work/pytracer/exclude.numpy.default.txt",
+        "/home/yohan/Work/pytracer/exclude.sklearn.default.txt"
+    ],
+    "filter_alias": true,
+    "logger": {
+        "format": "print",
+        "output": "pytracer.log",
+        "color": false,
+        "level": "debug"
+    },
+    "io": {
+        "type": "pickle",
+        "backtrace": true,
+        "cache": {
+            "root": ".__pytracercache__"
+        }
+    },
+    "numpy": {
+        "ufunc": true
+    }
+}
