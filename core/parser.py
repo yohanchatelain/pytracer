@@ -241,13 +241,9 @@ def init_module(subparser, pytracer_modules):
     pytracer_modules["parse"] = main
 
 
-def main(args, extra_args=None):
+def main(args):
 
     parser = Parser(args)
-
-    if args.clean:
-        clean(args)
-        return
 
     stats_values = parser.parse_directory()
 

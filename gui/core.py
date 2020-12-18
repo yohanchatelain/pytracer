@@ -1,10 +1,8 @@
 import numpy as np
-import pandas as pd
 import tables
 import os
 import re
 
-from tables.node import NotLoggedMixin
 
 ylabel = {"mean": "Mean", "sig": "Significant bits",
           "std": "Standard deviation"}

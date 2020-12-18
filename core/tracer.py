@@ -193,7 +193,7 @@ def run():
         importlib.import_module(module)
 
 
-def exec_module(module_name, extra_args):
+def exec_module(module_name):
     spec = importlib.util.spec_from_file_location("__main__", module_name)
     module = importlib.util.module_from_spec(spec)
     # Pass arguments to program
@@ -202,12 +202,12 @@ def exec_module(module_name, extra_args):
     spec.loader.exec_module(module)
 
 
-def main(args, extra_args):
+def main(args):
 
     if os.path.isfile(args.module):
         if not args.dry_run:
             run()
-        exec_module(args.module, extra_args)
+        exec_module(args.module)
     else:
         logger.error(f"File {args.module} not found")
 

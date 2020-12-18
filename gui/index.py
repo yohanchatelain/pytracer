@@ -43,7 +43,7 @@ def init_module(subparser, pytracer_modules):
     pytracer_modules["visualize"] = main
 
 
-def main(args, extra_args):
+def main(args):
     global data
     import pytracer.gui.callbacks
     from pytracer.gui.app import app

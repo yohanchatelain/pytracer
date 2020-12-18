@@ -30,12 +30,12 @@ def main():
     ps_init_module(subparser, pytracer_modules)
     pg_init_module(subparser, pytracer_modules)
 
-    args, extra_args = parser.parse_known_args()
+    args, _ = parser.parse_known_args()
 
     if args.clean:
         clean()
     elif args.pytracer_module:
-        pytracer_modules[args.pytracer_module](args, extra_args)
+        pytracer_modules[args.pytracer_module](args)
     else:
         parser.print_help()
 
