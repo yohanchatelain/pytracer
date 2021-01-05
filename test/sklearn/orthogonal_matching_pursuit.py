@@ -3,6 +3,8 @@ from sklearn.linear_model import OrthogonalMatchingPursuit
 from sklearn.linear_model import OrthogonalMatchingPursuitCV
 from sklearn.datasets import make_sparse_coded_signal
 
+np.random.seed(0)
+
 
 def orthogonal_matching_pursuit():
 
