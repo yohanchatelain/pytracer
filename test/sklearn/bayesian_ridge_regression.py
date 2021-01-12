@@ -1,4 +1,3 @@
-from core.parser import main
 import numpy as np
 from scipy import stats
 from sklearn.linear_model import BayesianRidge, LinearRegression

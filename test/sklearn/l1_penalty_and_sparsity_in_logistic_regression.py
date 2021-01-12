@@ -73,3 +73,4 @@ def l1_penalty_and_sparsity_in_logistic_regression():
 
 if __name__ == "__main__":
     l1_penalty_and_sparsity_in_logistic_regression()
+    print("End")

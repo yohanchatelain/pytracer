@@ -78,3 +78,4 @@ def digits_classification():
 
 if __name__ == "__main__":
     digits_classification()
+    print("End")

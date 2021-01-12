@@ -41,3 +41,4 @@ def basic_tests():
 
 if __name__ == "__main__":
     basic_tests()
+    print("End")

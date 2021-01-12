@@ -63,3 +63,4 @@ def mnist_classification_using_multinomial_logistic_l1():
 
 if __name__ == "__main__":
     mnist_classification_using_multinomial_logistic_l1()
+    print("End")

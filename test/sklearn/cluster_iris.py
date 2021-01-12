@@ -93,4 +93,4 @@ def cluster_iris():
 
 if __name__ == "__main__":
     cluster_iris()
-    print("Test finished")
+    print("End")

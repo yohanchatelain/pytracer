@@ -103,3 +103,4 @@ def segmentation_toy():
 
 if __name__ == "__main__":
     segmentation_toy()
+    print("End")
