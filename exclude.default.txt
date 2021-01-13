@@ -2,3 +2,4 @@ functools* *
 matplotlib* *
 ctypes *
 typing *
+itertools *

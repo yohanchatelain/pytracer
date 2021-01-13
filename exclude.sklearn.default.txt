@@ -1,1 +1,3 @@
 clone *
+sklearn* fetch_openml
+sklearn.utils* *
