@@ -175,14 +175,6 @@ def get_active_row(selected_rows, data):
             for selected_row in selected_rows]
 
 
-# def get_sig(value):
-#     sig = value
-#     if hasattr(value, "ndim"):
-#         if value.ndim > 0:
-#             sig = np.mean(value)
-#     return sig
-
-
 def filter_data(data, _filter):
     return [_data for _data in data if _filter(_data)]
 
@@ -197,12 +189,4 @@ def is_scalar(value):
         _is_scalar = value.ndim == 0
     return _is_scalar
 
-
-# Data
-# header_path = ".__pytracercache__/stats/header.0.pkl"
-# stats_path = ".__pytracercache__/stats/stats.0.pkl"
-
 bt_to_id = dict()
-# stats_data = read_stats(stats_path)
-# header_data = read_header(header_path)
-# header_table = get_table(header_data)
