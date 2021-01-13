@@ -5,7 +5,6 @@ import io
 import os
 import pickle
 import traceback
-import atomicwrites
 
 import pytracer.core.utils as ptutils
 from pytracer.core.config import config as cfg
