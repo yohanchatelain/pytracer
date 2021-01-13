@@ -51,8 +51,9 @@ def update_table_active_cell(selected_rows, data):
 @app.callback(
     dash.dependencies.Output("info-data-timeline-heatmap", "figure"),
     dash.dependencies.Output("info-timeline", "style"),
-    dash.dependencies.Input("timeline", "hoverData"))
-def print_heatmap(hover_data):
+    [dash.dependencies.Input("timeline", "hoverData"),
+     dash.dependencies.Input("timeline-mode", "value")])
+def print_heatmap(hover_data, mode):
     b = time.perf_counter()
     figure = dict()
     display = {"display": "none"}
@@ -65,32 +66,24 @@ def print_heatmap(hover_data):
                 ndim = _ndarray.ndim
 
                 if ndim == 1:
-                    (_size,) = _ndarray.shape
-                    _x = [str(i) for i in range(_size)]
-                    heatmap = go.Figure(data=go.Heatmap(x=_x,
-                                                        y=["1"],
-                                                        z=_ndarray,
-                                                        xgap=1,
-                                                        ygap=1,
-                                                        zmin=0,
-                                                        zmax=64))
-                    figure = heatmap
-                    figure.update_layout(width=700, height=700)
-                    display = {"display": "flex", "display-direction": "row"}
-                elif ndim == 2:
-                    _row, _col = _ndarray.shape
-                    _x = [str(i) for i in range(_row)]
-                    _y = [str(i) for i in range(_col)]
+                    _ndarray = _ndarray.reshape(_ndarray.shape+(1,))
+                _row, _col = _ndarray.shape
+                _x = [i for i in range(_row)]
+                _y = [i for i in range(_col)]
+                if mode == "sig":
                     heatmap = go.Figure(data=go.Heatmap(x=_x,
                                                         y=_y,
                                                         z=_ndarray,
-                                                        xgap=1,
-                                                        ygap=1,
                                                         zmin=0,
                                                         zmax=64))
-                    figure = heatmap
-                    figure.update_layout(width=700, height=700)
-                    display = {"display": "flex", "display-direction": "row"}
+                else:
+                    heatmap = go.Figure(data=go.Heatmap(x=_x,
+                                                        y=_y,
+                                                        z=_ndarray))
+
+                figure = heatmap
+                figure.update_layout(width=700, height=700)
+                display = {"display": "flex", "display-direction": "row"}
 
     e = time.perf_counter()
     print("print_heatmap", e-b)
