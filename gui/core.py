@@ -1,4 +1,3 @@
-import numpy as np
 import tables
 import os
 import re
@@ -176,12 +175,12 @@ def get_active_row(selected_rows, data):
             for selected_row in selected_rows]
 
 
-def get_sig(value):
-    sig = value
-    if hasattr(value, "ndim"):
-        if value.ndim > 0:
-            sig = np.mean(value)
-    return sig
+# def get_sig(value):
+#     sig = value
+#     if hasattr(value, "ndim"):
+#         if value.ndim > 0:
+#             sig = np.mean(value)
+#     return sig
 
 
 def filter_data(data, _filter):
@@ -207,14 +206,3 @@ bt_to_id = dict()
 # stats_data = read_stats(stats_path)
 # header_data = read_header(header_path)
 # header_table = get_table(header_data)
-
-__max_sig = {
-    np.dtype("int8"): 8,
-    np.dtype("int16"): 16,
-    np.dtype("int32"): 32,
-    np.dtype("int64"): 64,
-    np.dtype("float16"): 11,
-    np.dtype("float32"): 24,
-    np.dtype("float64"): 53,
-    np.dtype("float128"): 112
-}
