@@ -24,7 +24,8 @@ class StatisticNumpy:
         np.dtype("float16"): 11,
         np.dtype("float32"): 24,
         np.dtype("float64"): 53,
-        np.dtype("float128"): 112
+        # Warning: float128 in numpy means fp80!
+        np.dtype("float128"): 80
     }
 
     def __init__(self, values, empty=False):

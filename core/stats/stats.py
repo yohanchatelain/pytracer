@@ -1,14 +1,9 @@
 from enum import IntEnum, auto
 from types import FunctionType
 
-import numpy as np
-
 from core.utils.log import get_logger
-from core.stats.numpy import StatisticNumpy
 
 logger = get_logger()
-
-types = (StatisticNumpy,)
 
 
 class TypeValue(IntEnum):
@@ -51,6 +46,8 @@ class TypeValue(IntEnum):
 
 
 def get_type(value):
+    from core.stats.numpy import StatisticNumpy
+    import numpy as np
     _type = None
     if isinstance(value, int):
         _type = TypeValue.INT
@@ -82,6 +79,8 @@ def check_type(values):
 
 
 def get_stats(values):
+    from core.stats.numpy import StatisticNumpy
+    import numpy as np
     check_type(values)
     _type = get_type(values[0])
     _stats = None
@@ -127,6 +126,8 @@ def tohex(value):
 
 
 def print_stats(arg, stat):
+    from core.stats.numpy import StatisticNumpy
+    types = (StatisticNumpy,)
     logger.debug(f"\tArg {arg}")
     if isinstance(stat, types):
         logger.debug(f"\tNumber of elements: {stat.size()}")

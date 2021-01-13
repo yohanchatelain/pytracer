@@ -4,14 +4,17 @@ import os
 import pstats
 import time
 from pstats import SortKey
-import shutil
 
 from tqdm import tqdm
 
 import pytracer.core.inout as ptinout
-from pytracer.core.stats.stats import get_stats, print_stats
-from pytracer.core.config import constant, config as cfg
+from pytracer.core.stats.stats import print_stats
+from pytracer.core.config import constant
 from pytracer.core.utils.log import get_logger
+import pytracer.core.parser_init as parser_init
+
+import pytracer.core.inout.reader as ioreader
+import pytracer.core.inout.exporter as ioexporter
 
 logger = get_logger()
 
@@ -20,7 +23,7 @@ class Group:
 
     def __init__(self, iotype, data):
         self.iotype = iotype
-        self.reader = ptinout.reader(self.iotype)
+        self.reader = ioreader.Reader()
         self.parse_filenames(data)
         self.init_reader()
 
@@ -106,6 +109,7 @@ class Parser:
         return groups
 
     def merge_dict(self, args):
+        from pytracer.core.stats.stats import get_stats
         args_name = [arg.keys() for arg in args]
         for arg_name in args_name:
             assert(all(map(lambda d: d == arg_name, args_name)))
@@ -197,10 +201,6 @@ class Parser:
         return stats_values
 
 
-cache_default = f"{constant.cache.root}"
-directory_default = f"{constant.cache.root}{os.sep}{constant.cache.traces}"
-
-
 def parse_stat_value(stats_value, info_dict, counter):
     function_id = stats_value["id"]
     time = stats_value["time"]
@@ -224,21 +224,6 @@ def parse_stat_value(stats_value, info_dict, counter):
     # if isinstance(args, dict):
     for arg, stat in args.items():
         print_stats(arg, stat)
-
-
-def init_module(subparser, pytracer_modules):
-    parser_parser = subparser.add_parser("parse", help="parse traces")
-    mutual_exclusion = parser_parser.add_mutually_exclusive_group()
-    mutual_exclusion.add_argument("--filename", help="only parse <filename>")
-    mutual_exclusion.add_argument("--directory", default=directory_default,
-                                  help=("parse all files in <directory>"
-                                        "and merge them"))
-    parser_parser.add_argument("--format", choices=constant.iotypes,
-                               help="format of traces (auto-detected by default)")
-    parser_parser.add_argument(
-        "--timer", action="store_true", help="Display timing for the parsing")
-
-    pytracer_modules["parse"] = main
 
 
 def main(args):
@@ -282,7 +267,7 @@ def main(args):
     if args.timer:
         pr.enable()
 
-    export = ptinout.exporter()
+    export = ioexporter.Exporter()
     for stats_value in tqdm(stats_values,
                             desc="Exporting...",
                             mininterval=0.1,
@@ -298,6 +283,6 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Pytracer parser")
-    init_module(parser, dict())
+    parser_init.init_module(parser, dict())
     args = parser.parse_args()
     main(args)

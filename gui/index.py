@@ -1,13 +1,10 @@
 import argparse
-import os
 
 import dash_core_components as dcc
 import dash_html_components as html
-from pytracer.core.config import constant
 
 import pytracer.gui.core as pgc
-
-directory_default = f"{constant.cache.root}{os.sep}{constant.cache.stats}"
+import pytracer.gui.index_init as index_init
 
 data = pgc.Data()
 
@@ -32,17 +29,6 @@ def init_layout(app, args):
     ])  # , style={"display": "flex", "flex-direction": "column"})
 
 
-def init_module(subparser, pytracer_modules):
-    index_parser = subparser.add_parser("visualize",
-                                        help="visualize traces")
-    index_parser.add_argument("--directory", default=directory_default,
-                              help="directory with traces")
-    index_parser.add_argument("--debug", default=False, action="store_true",
-                              help="rue dash server in debug mode")
-
-    pytracer_modules["visualize"] = main
-
-
 def main(args):
     global data
     import pytracer.gui.callbacks
@@ -56,6 +42,6 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description="Pytracer visualization module")
-    init_module(parser, pytracer_modules=dict())
+    index_init.init_module(parser, pytracer_modules=dict())
     args = parser.parse_args()
     main(args)

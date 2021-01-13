@@ -9,11 +9,10 @@ from importlib import invalidate_caches
 from importlib.abc import Loader, MetaPathFinder
 from importlib.machinery import ModuleSpec
 
-from pytracer.core.utils import str2bool
 from pytracer.core.config import config as cfg
 from pytracer.core.utils.log import get_logger
-from pytracer.core.wrapper.wrapper import WrapperModule
-
+from pytracer.core.wrapper.wrapper import WrapperModule, visited_attr
+import pytracer.core.tracer_init as tracer_init
 
 logger = get_logger()
 
@@ -61,6 +60,9 @@ class Myloader(Loader):
         name_wrp = wrapped_module.__name__
         symbols = dir(real_module)
 
+        if hasattr(real_module, visited_attr):
+            return
+
         for sym in symbols:
             # Doing this instead of hasattr to not call __getattr__ of
             # the module since it makes an infinite loop for numpy.testing
@@ -90,9 +92,10 @@ class Myloader(Loader):
     def create_module(self, spec):
         try:
             logger.debug(f"create module for spec {spec}")
-            real_spec = importlib.util.find_spec(spec.name)
-            real_module = importlib.util.module_from_spec(real_spec)
-            real_spec.loader.exec_module(real_module)
+            # real_spec = importlib.util.find_spec(spec.name)
+            # real_module = importlib.util.module_from_spec(real_spec)
+            # real_spec.loader.exec_module(real_module)
+            real_module = importlib.import_module(spec.name)
             wrp = WrapperModule(real_module)
             wrp.assert_lazy_modules_loaded()
             wrp.assert_lazy_attributes_are_initialized()
@@ -147,6 +150,17 @@ class MyImporter(MetaPathFinder):
                         f"no module {module_name} in sys.modules", caller=self)
                 self.modules_to_load.append(module_name)
 
+    def need_real_module(self):
+        for stack in inspect.stack():
+            filename = stack.filename
+            if filename.find("/pytracer/"):
+                if filename.endswith(__file__):
+                    if stack.function == "create_module":
+                        return True
+                if filename.endswith("_wrapper.py"):
+                    return True
+        return False
+
     def find_spec(self, fullname, path=None, target=None):
         to_load = False
         for module in self.modules_to_load:
@@ -158,11 +172,9 @@ class MyImporter(MetaPathFinder):
         logger.debug(f"find spec for {fullname} {path} {target}", caller=self)
         # if we are in the create_module function,
         # we return the real module (return None)
-        for stack in inspect.stack():
-            if stack.filename.endswith(__file__) and \
-                    stack.function == "create_module":
-                logger.debug(f"We are in {__file__}")
-                return None
+        if self.need_real_module():
+            logger.debug(f"We are in {__file__}")
+            return None
 
         spec = ModuleSpec(fullname, Myloader(fullname))
 
@@ -180,7 +192,7 @@ def install(loader):
 
 def run():
     if sys.platform != "linux":
-        logger.error("Other platform than linux not supported")
+        logger.error("Others platforms than linux are not supported")
 
     finder = MyImporter()
     install(finder)
@@ -212,22 +224,9 @@ def main(args):
         logger.error(f"File {args.module} not found")
 
 
-def init_arguments(parser):
-    parser.add_argument("--module", required=True,
-                        help="path of the module to trace")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Run the module wihtout tracing it")
-
-
-def init_module(subparser, pytracer_modules):
-    tracer_parser = subparser.add_parser("trace", help="trace functions")
-    init_arguments(tracer_parser)
-    pytracer_modules["trace"] = main
-
-
 if __name__ == "__main__":
     parser_args = argparse.ArgumentParser(
         description="Pytracer tracing module")
-    init_arguments(parser_args)
+    tracer_init.init_arguments(parser_args)
     args = parser_args.parse_args()
     main(args)

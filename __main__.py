@@ -2,9 +2,9 @@ import argparse
 import os
 
 from pytracer.core.config import constant, config as cfg
-from pytracer.core.tracer import init_module as pt_init_module
-from pytracer.core.parser import init_module as ps_init_module
-from pytracer.gui.index import init_module as pg_init_module
+import pytracer.core.tracer_init as tracer_init
+import pytracer.core.parser_init as parser_init
+import pytracer.gui.index_init as visualize_init
 
 import shutil
 
@@ -16,6 +16,22 @@ def clean():
     if os.path.isdir(dir_to_clean):
         shutil.rmtree(dir_to_clean, ignore_errors=True)
 
+# Dynamically import module to avoid
+# extra module being imported while tracing
+# like importing the numpy module before tracing it
+
+
+def pytracer_module_main(args):
+    if args.pytracer_module == "trace":
+        from pytracer.core.tracer import main
+        main(args)
+    elif args.pytracer_module == "parse":
+        from pytracer.core.parser import main
+        main(args)
+    elif args.pytracer_module == "visualize":
+        from pytracer.gui.index import main
+        main(args)
+
 
 def main():
     parser = argparse.ArgumentParser(description="Pytracer", prog="pytracer")
@@ -25,17 +41,16 @@ def main():
                                       help="pytracer modules",
                                       dest="pytracer_module")
 
-    pytracer_modules = dict()
-    pt_init_module(subparser, pytracer_modules)
-    ps_init_module(subparser, pytracer_modules)
-    pg_init_module(subparser, pytracer_modules)
+    tracer_init.init_module(subparser)
+    parser_init.init_module(subparser)
+    visualize_init.init_module(subparser)
 
     args, _ = parser.parse_known_args()
 
     if args.clean:
         clean()
     elif args.pytracer_module:
-        pytracer_modules[args.pytracer_module](args)
+        pytracer_module_main(args)
     else:
         parser.print_help()
 
