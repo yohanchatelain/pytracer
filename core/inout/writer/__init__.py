@@ -1,5 +1,4 @@
 from . import _pickle
-from . import _marshal
 from . import _wrapper
 from ._wrapper import *
 
