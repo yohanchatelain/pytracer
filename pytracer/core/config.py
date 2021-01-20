@@ -105,6 +105,32 @@ class _Constant(metaclass=Singleton):
             return None
 
 
+def _get_abs_path(cfg_path, path):
+    if os.path.isabs(path):
+        return path
+    else:
+        return f"{cfg_path}{os.sep}{path}"
+
+
+def _replace_abs_path(cfg_path, _key, _dict):
+    if _key in _dict:
+        _value = _dict[_key]
+        if _value:
+            if type(_value) is str:
+                _dict[_key] = _get_abs_path(cfg_path, _value)
+            elif type(_value) is list:
+                _dict[_key] = list(
+                    map(lambda x: _get_abs_path(cfg_path, x), _value))
+            else:
+                sys.exit(f"Error while parsing config file {config} ",
+                         f"value of key {_key} has invalid type {type(_value)}")
+
+
+def _fix_path(config_path, cfg):
+    for key in ("include_file", "exclude_file"):
+        _replace_abs_path(config_path, key, cfg)
+
+
 class _Config(object, metaclass=Singleton):
 
     pytracer_config = "PYTRACER_CONFIG"
@@ -158,11 +184,14 @@ class _Config(object, metaclass=Singleton):
 
     def read_config(self):
         config = ptutils.getenv(self.pytracer_config)
+        cfg_path, _ = os.path.split(config)
         try:
             config_file = open(config)
         except FileNotFoundError as e:
             sys.exit(f"Error while opening file {config}:{os.linesep} {e}")
-        _Config._data = DictAt(json.load(config_file))
+        cfg = json.load(config_file)
+        _fix_path(cfg_path, cfg)
+        _Config._data = DictAt(cfg)
 
 
 config = _Config()

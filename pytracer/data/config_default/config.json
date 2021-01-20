@@ -6,9 +6,9 @@
     ],
     "include_file": "",
     "exclude_file": [
-        "/home/yohan/Work/pytracer/exclude.default.txt",
-        "/home/yohan/Work/pytracer/exclude.numpy.default.txt",
-        "/home/yohan/Work/pytracer/exclude.sklearn.default.txt"
+        "exclude.default.txt",
+        "exclude.numpy.default.txt",
+        "exclude.sklearn.default.txt"
     ],
     "filter_alias": true,
     "logger": {
