@@ -11,3 +11,7 @@ plotly==4.13.0
 dash_table==4.11.0
 dash_bootstrap_components==0.10.7
 scikit_learn==0.23.2
+tables==3.6.1
+Flask==1.1.2
+Flask-Caching==1.9.0
+Flask-Compress==1.8.0

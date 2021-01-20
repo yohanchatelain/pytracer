@@ -1,7 +1,7 @@
 from enum import IntEnum, auto
 from types import FunctionType
 
-from core.utils.log import get_logger
+from pytracer.core.utils.log import get_logger
 
 logger = get_logger()
 
@@ -46,7 +46,7 @@ class TypeValue(IntEnum):
 
 
 def get_type(value):
-    from core.stats.numpy import StatisticNumpy
+    from pytracer.core.stats.numpy import StatisticNumpy
     import numpy as np
     _type = None
     if isinstance(value, int):
@@ -79,7 +79,7 @@ def check_type(values):
 
 
 def get_stats(values):
-    from core.stats.numpy import StatisticNumpy
+    from pytracer.core.stats.numpy import StatisticNumpy
     import numpy as np
     check_type(values)
     _type = get_type(values[0])
@@ -126,7 +126,7 @@ def tohex(value):
 
 
 def print_stats(arg, stat):
-    from core.stats.numpy import StatisticNumpy
+    from pytracer.core.stats.numpy import StatisticNumpy
     types = (StatisticNumpy,)
     logger.debug(f"\tArg {arg}")
     if isinstance(stat, types):
