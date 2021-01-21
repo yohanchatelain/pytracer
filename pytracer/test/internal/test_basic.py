@@ -4,7 +4,8 @@ import math
 import numpy as np
 import argparse
 
-if '__main__' == __name__:
+
+def main():
 
     import sys
     print(sys.argv)
@@ -15,7 +16,7 @@ if '__main__' == __name__:
     args = parser.parse_args()
     print("args", args)
 
-    import pytracer.test.internal.hook as hook
+    import pytracer.test.internal.test_hook as hook
     print("list module of hook")
     hook.list_module()
 
@@ -44,3 +45,7 @@ if '__main__' == __name__:
     print(np.minimum.accumulate)
 
     print("Test finished")
+
+
+if '__main__' == __name__:
+    main()
