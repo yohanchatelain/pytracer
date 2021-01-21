@@ -109,6 +109,10 @@ def is_valid_file(file):
         return True
 
 
+def run_file(script_runner, args, file):
+    ret = script_runner.run("pytracer","trace",f"--module {file}")
+    assert ret.success
+
 def run_file(args, file):
     status = None
     if is_valid_file(file):

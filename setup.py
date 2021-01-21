@@ -17,8 +17,8 @@ setuptools.setup(
     packages=setuptools.find_namespace_packages(include=included_packages),
     package_data={
         "pytracer": [
-            "data/config_default/*.txt",
-            "data/config_default/*.json"
+            "data/config/*.txt",
+            "data/config/*.json"
         ]
     },
     classifiers=[
