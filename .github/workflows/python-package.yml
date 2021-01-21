@@ -38,4 +38,4 @@ jobs:
       env:
         PYTRACER_CONFIG: ${GITHUB_WORKSPACE}/pytracer/data/config/config.json
       run: |
-        pytest --script-launch-mode=subprocess pytracer/test/run_test.py
+        pytest --script-launch-mode=subprocess test/run_test.py
