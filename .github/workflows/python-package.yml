@@ -39,6 +39,6 @@ jobs:
         pip install .
     - name: Test with pytest
       env:
-        PYTRACER_CONFIG: ${GITHUB_WORKSPACE}/pytracer/data/config/config.json
+        PYTRACER_CONFIG: $GITHUB_WORKSPACE/pytracer/data/config/config.json
       run: |
         pytest --script-launch-mode=subprocess pytracer/test/run_test.py
