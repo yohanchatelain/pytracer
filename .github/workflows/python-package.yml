@@ -46,5 +46,5 @@ jobs:
       env:
         PYTRACER_CONFIG: ${{ github.workspace }}/pytracer/data/config/config.json
       run: |
-        pytest --script-launch-mode=subprocess -m "not slow" -k -v ${{ matrix.python-test }}
-        pytest --script-launch-mode=subprocess -m "slow" -k -v ${{ matrix.python-test }}
+        pytest --script-launch-mode=subprocess -m "not slow" -v -k ${{ matrix.python-test }}
+        pytest --script-launch-mode=subprocess -m "slow" -v -k ${{ matrix.python-test }}
