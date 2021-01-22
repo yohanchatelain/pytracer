@@ -22,8 +22,8 @@ jobs:
           '"parse"'
         ]
         python-long: [
-          '"slow"'
-          #'"not slow"'
+          #'"slow"'
+          '"not slow"'
         ]
 
     steps:
