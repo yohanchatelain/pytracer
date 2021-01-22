@@ -21,6 +21,10 @@ jobs:
           '"trace_only and ufunc_on"',
           '"parse"'
         ]
+        python-long: [
+          '"slow"',
+          '"not slow"'
+        ]
 
     steps:
     - uses: actions/checkout@v2
@@ -46,5 +50,4 @@ jobs:
       env:
         PYTRACER_CONFIG: ${{ github.workspace }}/pytracer/data/config/config.json
       run: |
-        pytest --script-launch-mode=subprocess -m "not slow" -v -k ${{ matrix.python-test }}
-        pytest --script-launch-mode=subprocess -m "slow" -v -k ${{ matrix.python-test }}
+        pytest --script-launch-mode=subprocess -m ${{ matrix.python-long }} -v -k ${{ matrix.python-test }}
