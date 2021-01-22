@@ -1,3 +1,4 @@
+import pytest
 import numpy as np
 from sklearn import linear_model
 
@@ -37,6 +38,28 @@ def basic_tests():
     reg.fit(X, Y)
     reg.predict([[1, 0.]])
     print(reg.coef_)
+
+
+@pytest.mark.xfail
+@pytest.mark.usefixtures("turn_numpy_ufunc_on", "cleandir")
+def test_trace_only_ufunc_on(script_runner):
+    ret = script_runner.run("pytracer", "trace",
+                            f"--module {__file__}")
+    assert ret.success
+
+
+@pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir")
+def test_trace_only_ufunc_off(script_runner):
+    ret = script_runner.run("pytracer", "trace",
+                            f"--module {__file__}")
+    assert ret.success
+
+
+@pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir", "parse")
+def test_trace_parse(script_runner):
+    ret = script_runner.run("pytracer", "trace",
+                            f"--module {__file__}")
+    assert ret.success
 
 
 if __name__ == "__main__":

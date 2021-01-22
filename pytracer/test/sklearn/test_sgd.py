@@ -1,3 +1,6 @@
+import pytest
+
+
 def maximum_margin_separating_hyperplane():
     import numpy as np
     import matplotlib.pyplot as plt
@@ -263,6 +266,28 @@ def svm():
     # plt.legend([a.collections[0], b.collections[0]], ["non weighted", "weighted"],
     #         loc="upper right")
     # plt.show()
+
+
+@pytest.mark.xfail
+@pytest.mark.usefixtures("turn_numpy_ufunc_on", "cleandir")
+def test_trace_only_ufunc_on(script_runner):
+    ret = script_runner.run("pytracer", "trace",
+                            f"--module {__file__}")
+    assert ret.success
+
+
+@pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir")
+def test_trace_only_ufunc_off(script_runner):
+    ret = script_runner.run("pytracer", "trace",
+                            f"--module {__file__}")
+    assert ret.success
+
+
+@pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir", "parse")
+def test_trace_parse(script_runner):
+    ret = script_runner.run("pytracer", "trace",
+                            f"--module {__file__}")
+    assert ret.success
 
 
 if __name__ == "__main__":

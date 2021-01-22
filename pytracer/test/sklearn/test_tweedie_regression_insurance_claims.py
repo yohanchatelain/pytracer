@@ -1,3 +1,4 @@
+import pytest
 import sys
 
 
@@ -588,6 +589,31 @@ def tweedie_regression_insurance_claims():
         ylabel='Fraction of total claim amount'
     )
     ax.legend(loc="upper left")
+
+
+@pytest.mark.xfail
+@pytest.mark.slow
+@pytest.mark.usefixtures("turn_numpy_ufunc_on", "cleandir")
+def test_trace_only_ufunc_on(script_runner):
+    ret = script_runner.run("pytracer", "trace",
+                            f"--module {__file__}")
+    assert not ret.success
+
+
+@pytest.mark.slow
+@pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir")
+def test_trace_only_ufunc_off(script_runner):
+    ret = script_runner.run("pytracer", "trace",
+                            f"--module {__file__}")
+    assert ret.success
+
+
+@pytest.mark.slow
+@pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir", "parse")
+def test_trace_parse(script_runner):
+    ret = script_runner.run("pytracer", "trace",
+                            f"--module {__file__}")
+    assert ret.success
 
 
 if __name__ == "__main__":

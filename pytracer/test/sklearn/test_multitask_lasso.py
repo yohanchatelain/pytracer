@@ -1,3 +1,4 @@
+import pytest
 import numpy as np
 from sklearn import linear_model
 
@@ -20,6 +21,28 @@ def multitask_lasso():
         alpha=0.5).fit(X, y).coef_ for y in Y.T])
     coef_multi_task_lasso_ = linear_model.MultiTaskLasso(
         alpha=1.).fit(X, Y).coef_
+
+
+@pytest.mark.xfail
+@pytest.mark.usefixtures("turn_numpy_ufunc_on", "cleandir")
+def test_trace_only_ufunc_on(script_runner):
+    ret = script_runner.run("pytracer", "trace",
+                            f"--module {__file__}")
+    assert ret.success
+
+
+@pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir")
+def test_trace_only_ufunc_off(script_runner):
+    ret = script_runner.run("pytracer", "trace",
+                            f"--module {__file__}")
+    assert ret.success
+
+
+@pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir", "parse")
+def test_trace_parse(script_runner):
+    ret = script_runner.run("pytracer", "trace",
+                            f"--module {__file__}")
+    assert ret.success
 
 
 if __name__ == "__main__":
