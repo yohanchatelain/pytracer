@@ -15,5 +15,6 @@ def init_module(subparser):
                                         "and merge them"))
     parser_parser.add_argument("--format", choices=constant.iotypes,
                                help="format of traces (auto-detected by default)")
-    parser_parser.add_argument(
-        "--timer", action="store_true", help="Display timing for the parsing")
+    parser_parser.add_argument("--batch-size", default=50,
+                               help=(f"Number of elements to process per batch. "
+                                     f"Increasing this number requires more memory RAM"))
