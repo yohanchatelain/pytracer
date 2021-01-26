@@ -14,10 +14,8 @@ class Counter(metaclass=Singleton):
     """
 
     def __init__(self):
-        self._internal = 0
-
-    def increment(self):
-        self._internal += 1
+        self._internal = -1
 
     def __call__(self):
+        self._internal += 1
         return self._internal

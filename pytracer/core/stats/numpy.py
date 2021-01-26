@@ -42,12 +42,19 @@ class StatisticNumpy:
         else:
             if isinstance(values, list):
                 raise Exception
-            self._data = values
+            self._data = self._preprocess_values(values)
             self._samples = len(values)
             self._size = values.size/self._samples
             self._ndim = self._data.ndim - 1
             self._shape = self._data.shape[1:]
             self._type = self._data.dtype
+
+    def _preprocess_values(self, values):
+        x0 = values[0]
+        if spr.issparse(x0):
+            return np.array(list(map(lambda x: x.toarray(), values)))
+        else:
+            return values
 
     def __getstate__(self):
         to_return = {"mean": self.cached_mean,
@@ -74,13 +81,14 @@ class StatisticNumpy:
         _mean = getattr(self, "cached_mean", None)
         if _mean is None:
             with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                if spr.issparse(self._data[0]):
-                    self._data.reshape(
-                        (self._data.shape[0],) + self._data[0].shape)
-                    spr.csr_matrix.mean(self._data, axis=0, dtype=np.float64)
-                else:
-                    _mean = np.mean(self._data, axis=0, dtype=np.float64)
+                # warnings.simplefilter("ignore")
+                # if spr.issparse(self._data[0]):
+                #     # self._data.reshape(
+                #     #     (self._data.shape[0],) + self._data[0].shape)
+                #     print("DATA", self._data)
+                #     spr.csr_matrix.mean(self._data, axis=0)
+                # else:
+                _mean = np.mean(self._data, axis=0, dtype=np.float64)
         self.cached_mean = _mean
         return _mean
 

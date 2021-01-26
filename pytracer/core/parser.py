@@ -195,7 +195,8 @@ class Parser:
         filenames_grouped = self.group_files(iotype, filenames)
 
         stats_values = list()
-        for value in zip(*filenames_grouped.values()):
+        # for value in zip(*filenames_grouped.values()):
+        for value in tqdm(zip(*filenames_grouped.values()), desc="Parsing..."):
             stat_value = self.merge(value)
             stats_values.append(stat_value)
         return stats_values
@@ -243,20 +244,21 @@ def main(args):
         pr = cProfile.Profile()
         pr.enable()
 
-    for stats_value in tqdm(stats_values,
-                            desc="Parsing...",
-                            mininterval=0.1,
-                            maxinterval=1):
-        if args.timer:
-            tic = time.perf_counter()
+    # for stats_value in tqdm(stats_values,
+    #                         desc="Parsing...",
+    #                         mininterval=0.1,
+    #                         maxinterval=1):
+    #     pass
+        # if args.timer:
+        #     tic = time.perf_counter()
 
-        parse_stat_value(stats_value, info_dict, counter)
+        # parse_stat_value(stats_value, info_dict, counter)
 
-        if args.timer:
-            toc = time.perf_counter()
-            logger.debug(f"[{counter}] parsing time: {toc-tic} seconds")
-            time_dict[counter] = (toc-tic)
-        counter += 1
+        # if args.timer:
+        #     toc = time.perf_counter()
+        #     logger.debug(f"[{counter}] parsing time: {toc-tic} seconds")
+        #     time_dict[counter] = (toc-tic)
+        # counter += 1
 
     if args.timer:
         pr.disable()

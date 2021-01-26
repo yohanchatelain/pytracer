@@ -19,7 +19,7 @@ jobs:
         python-test: [ 
           '"trace_only and ufunc_off"',
           '"trace_only and ufunc_on"',
-          '"parse"'
+          '"trace_parse"'
         ]
         python-long: [
           #'"slow"'

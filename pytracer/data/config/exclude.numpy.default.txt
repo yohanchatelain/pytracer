@@ -4,7 +4,7 @@
 #* deprecate
 * frompyfunc
 #numpy.core.numeric array_function_dispatch
-#numpy.core.arrayprint *
+numpy.core.arrayprint *
 * MaskedArray
 numpy* ndarray
 numpy* array
@@ -14,8 +14,7 @@ numpy* array
 numpy* isnan
 #numpy* PytestTester
 #numpy* logical_and
-#numpy* asarray
-#numpy* empty
+numpy* asarray
 numpy* ndim
 numpy* testing
 numpy test
@@ -25,3 +24,9 @@ numpy* can_cast
 numpy* issubdtype
 numpy* dtype
 numpy* iterable
+numpy* _internal
+numpy* deprecate
+* copy
+numpy finfo
+numpy* zeros
+numpy* empty

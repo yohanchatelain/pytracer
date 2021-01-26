@@ -3,3 +3,7 @@ matplotlib* *
 ctypes *
 typing *
 itertools *
+collections *
+traceback *
+BaseException *
+pathlib *
