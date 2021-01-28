@@ -22,7 +22,7 @@ jobs:
           '"trace_parse"'
         ]
         python-long: [
-          '"slow"',
+          #'"slow"',
           '"not slow"'
         ]
 
