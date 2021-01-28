@@ -15,7 +15,7 @@ _report_call_dict = dict()
 _report_memory_dict = dict()
 
 
-report_type_default = Report.OFF
+report_type_default = Report.OFF.name
 report_type = list(map(lambda x: x.lower(), Report.__members__.keys()))
 
 
