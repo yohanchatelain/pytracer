@@ -38,7 +38,7 @@ class Filter:
             self.load_file(filename)
 
     def debug(self):
-        logger.debug(f"{self.__class__.__name__} initialized")
+        logger.debug(f"initialized", caller=self)
         for module, functions_set in self.__modules.items():
             logger.debug(f"module:{module}")
             for function in functions_set:
@@ -46,7 +46,7 @@ class Filter:
 
     def load_file(self, filename):
         if filename:
-            logger.debug(f"{self.__class__.__name__} read file: {filename}")
+            logger.debug(f"read file: {filename}", caller=self)
             self.fi = open(filename)
             self.read_file()
 
@@ -67,21 +67,20 @@ class Filter:
             self._add(module, function)
 
     def has_module(self, module):
-        logger.debug(
-            f"{self.__class__.__name__} checking entry for module {module}")
+        logger.debug(f"checking entry for module {module}", caller=self)
         if not module:
             return False
         if not bool(self.__modules):
             return False
         for _module in self.__modules:
             if _module.fullmatch(module):
-                logger.debug(f"{self.__class__.__name__} has module {module}")
-                logger.debug(f"Filter {_module}, pattern {module}")
+                logger.debug(f"has module {module}", caller=self)
+                logger.debug(f"Filter {_module}, pattern {module}",
+                             caller=self)
                 return True
         return False
 
     def has_function(self, functions, module=None):
-        logger.debug(f"has_function: {functions} {module}", caller=self)
         if isinstance(functions, tuple):
             for function in functions:
                 if self._has_function(function, module):
@@ -96,24 +95,29 @@ class Filter:
         return self.has_function(submodule, module)
 
     def _has_function(self, function, module=None):
-        logger.debug(
-            f"{self.__class__.__name__} checking entry for function {function} (in {module})")
+        logger.debug(f"Check if function {function} is in {module}",
+                     caller=self)
         if not function:
             return False
         if not bool(self.__modules):
             return False
         # We search function in module
         if module:
+            logger.debug("iter over modules", caller=self)
             for mod in self.__modules:
+                logger.debug(f"- {mod}", caller=self)
                 if mod.fullmatch(module):
+                    logger.debug(f"{mod} matches {module}", caller=self)
                     functions = self.__modules[mod]
+                    logger.debug(f"iter over functions in {mod}", caller=self)
                     for _function in functions:
+                        logger.debug(
+                            f"check if {_function} matches {function}", caller=self)
                         if _function.fullmatch(function):
-                            logger.debug(
-                                f"{self.__class__.__name__} has function {function} in module {module}")
-                            logger.debug(f"Filter {mod}, pattern {module}")
-                            logger.debug(
-                                f"Filter {_function}, pattern {function}")
+                            msg = (f"Has function {function} in module {module}{os.linesep}"
+                                   f"Module filter {mod}, pattern {module}{os.linesep}"
+                                   f"Function filter {_function}, pattern {function}")
+                            logger.debug(msg, caller=self)
                             return True
             return False
 
@@ -121,8 +125,7 @@ class Filter:
         for function_set in self.__modules.values():
             for _function in function_set:
                 if _function.fullmatch(function):
-                    logger.debug(
-                        f"{self.__class__.__name__} has function {function}")
+                    logger.debug(f"has function {function}", caller=self)
                     return True
         return False
 
@@ -256,11 +259,13 @@ def wrap_instance(instance):
         except TypeError as e:
             if "is not an acceptable base type" in e.args[0]:
                 logger.warning(
-                    f"Instance {instance} cannot be wrapped", error=e)
+                    f"Instance {instance} cannot be wrapped")
+                logger.debug(f"Instance {instance}: {e}")
             x = None
         except Exception as e:
             logger.warning(
-                f"Instance {instance} cannot be wrapped", error=e)
+                f"Instance {instance} cannot be wrapped")
+            logger.debug("Instance {instance}: {e}")
             x = None
 
     return x
@@ -367,12 +372,12 @@ class Wrapper(metaclass=ABCMeta):
 #            return generic_wrapper({self.get_name()}.{function_name},*args,**kwargs)
         return wrapper_code
 
-    def getwrapperbasic(self, basic):
-        """
-        Return wrapper for basic python objects
-        """
-        wrapper_code = f"{basic} = {self.module_name}.{basic}{os.linesep}"
-        return wrapper_code
+    # def getwrapperbasic(self, basic):
+    #     """
+    #     Return wrapper for basic python objects
+    #     """
+    #     wrapper_code = f"{basic} = {self.module_name}.{basic}{os.linesep}"
+    #     return wrapper_code
 
     def isfunction(self, attr_obj):
         """
@@ -464,7 +469,7 @@ class Wrapper(metaclass=ABCMeta):
         logger.debug(
             f"Function {name} at {hex(id(function))} -> {hex(id(func))}")
 
-    def handle_function(self, name, function, module=None):
+    def handle_function(self, name, function, module=None, exclude=False):
         """
         Handler for functions
         """
@@ -503,7 +508,10 @@ class Wrapper(metaclass=ABCMeta):
 
         logger.debug(
             f"Handling function {name} from {module_name} ({id(function)})")
-        if not is_arithmetic_operator(name) and \
+
+        if exclude:
+            self.handle_excluded_function(alias_function_name, function)
+        elif not is_arithmetic_operator(name) and \
             (function_name.startswith("_") or
                 function_name == "generic_wrapper" or
              function_name == "_generic_wrapper"):
@@ -549,7 +557,7 @@ class Wrapper(metaclass=ABCMeta):
         Wrapper.m2wm[submodule] = submodule_wrp
         logger.debug(f"submodule {submodname} included")
 
-    def handle_module(self, attr, submodule):
+    def handle_module(self, attr, submodule, exclude=False):
         """
         Handler for submodules
         """
@@ -586,7 +594,9 @@ class Wrapper(metaclass=ABCMeta):
         # numpy.random * -> <submodqualname> *
         # numpy random   -> <module> <attr>
 
-        if submodname == "wrapper.wrapper":
+        if exclude:
+            self.handle_excluded_module(attr, submodule)
+        elif submodname == "wrapper.wrapper":
             self.handle_excluded_module(attr, submodname)
         elif hasattr(submodule, visited_attr):
             self.handle_excluded_module(attr, submodule)
@@ -623,7 +633,7 @@ class Wrapper(metaclass=ABCMeta):
         setattr(self.wrapped_obj, name, clss)
         setattr(self.wrapped_obj, classname, clss)
 
-    def handle_class(self, attr, clss):
+    def handle_class(self, attr, clss, exclude=False):
         """
             Handler for class
         """
@@ -641,7 +651,9 @@ class Wrapper(metaclass=ABCMeta):
         logger.debug(
             f"Handling class {clssname} from module {modname}", caller=self)
 
-        if inspect.isabstract(clss):
+        if exclude:
+            self.handle_excluded_class(attr, clss)
+        elif inspect.isabstract(clss):
             self.handle_excluded_class(attr, clss)
         # Exclude class inhereting from BaseException
         elif issubclass(clss, BaseException):
@@ -684,7 +696,7 @@ class Wrapper(metaclass=ABCMeta):
         except TypeError:
             return False
 
-    def handle_basic(self, name, obj):
+    def handle_basic(self, name, obj, exclude=False):
         """
             Handler for basic objects
         """
@@ -697,6 +709,8 @@ class Wrapper(metaclass=ABCMeta):
 
         if self.is_hashable(obj) and obj in Wrapper.m2wm:
             self.handle_excluded_basic(name, Wrapper.m2wm[obj])
+        elif exclude:
+            self.handle_excluded_basic(name, obj)
         elif isinstance(obj, functools.partial):
             self.handle_excluded_basic(name, obj)
         elif hasattr(obj, "visited_attr"):
@@ -726,6 +740,71 @@ class Wrapper(metaclass=ABCMeta):
         except Exception as e:
             logger.critical(f"{self} {attr} {attr_obj}", error=e, caller=self)
 
+    def is_excluded(self, obj, attr):
+        """
+            A = {set of all attributes for a object}
+            o = {empty set}
+            I = {set of included attributes}
+            E = {set of excluded attributes}
+            intersection = ∩
+            union = ∪
+            difference = \
+            complement = ^
+                    Object              |     Included    | Excluded
+            -----------------------------------------------------------
+                Include and     Exclude | I \ (I ∩ E)     | I ∩ E
+                Include and not Exclude | I               | I^
+            not Include and     Exclude | E^              | E
+            not Include and not Exclude | A               | o
+
+                Attributes
+            ---------------------------------------------------
+            | Include     Exclude |    Included     | Excluded
+            |  *            *     |       o         |    A
+            |  I            *     |       o         |    A
+            |  *            E     |       E^        |    E
+            |  I            E     |   I \ (I ∩ E)   |  I' ∪ (I ∩ E)
+            ---------------------------------------------------
+            |  *            -     |       A         |    o
+            |  I            -     |       I         |    I^
+            ----------------------------------------------------
+            |  -            *     |       o         |    A
+            |  -            E     |       E^        |    E
+            ----------------------------------------------------
+            |  -            -     |       A         |    o
+
+            if io:
+                if eo:
+                    if ia and not ea:
+                        include = True
+                    else:
+                        exclude = True
+                else:  # not eo
+                    if ia:
+                        include = True
+                    else:
+                        exclude = True
+            else:  # not io
+                if eo:
+                    if ea:
+                        exclude = True
+                    else:
+                        include = True
+                else: # not eo
+                    include = True
+        """
+        io = self.included.has_module(obj)
+        eo = self.excluded.has_module(obj)
+        ia = self.included.has_function(attr, obj)
+        ea = self.excluded.has_function(attr, obj)
+        print(f"{obj} {attr} -> io:{io} eo:{eo} ia:{ia} ea:{ea}")
+        if (not eo or (eo and not ea)) and (not io or (io and ia)):
+            exclude = False
+        else:
+            exclude = True
+
+        return exclude
+
     def populate(self, obj, attributes):
         """
             Create wrapper for each attribute in the module
@@ -754,16 +833,27 @@ class Wrapper(metaclass=ABCMeta):
 
             logger.debug(f"Object {attr} at {hex(id(attr_obj))}", caller=self)
 
+            if hasattr(obj, "__module__") and hasattr(obj, "__qualname__"):
+                modulename = getattr(obj, "__module__")
+                qualname = getattr(obj, "__qualname__")
+                qualname = ".".join(qualname.split(".")[:-1])
+                obj_name = f"{modulename}.{qualname}"
+            else:
+                obj_name = getattr(obj, "__name__")
+
+            exclude = self.is_excluded(obj_name, attr)
+            print(f"[{obj}] {obj_name} {attr} -> {exclude} excluded")
+
             if self.isspecialattr(attr):
                 self.handle_special(attr, attr_obj)
             elif self.isfunction(attr_obj):
-                self.handle_function(attr, attr_obj)
+                self.handle_function(attr, attr_obj, exclude=exclude)
             elif self.ismodule(attr_obj):
-                self.handle_module(attr, attr_obj)
+                self.handle_module(attr, attr_obj, exclude=exclude)
             elif self.isclass(attr_obj):
-                self.handle_class(attr, attr_obj)
+                self.handle_class(attr, attr_obj, exclude=exclude)
             else:
-                self.handle_basic(attr, attr_obj)
+                self.handle_basic(attr, attr_obj, exclude=exclude)
 
 
 class WrapperModule(Wrapper):
@@ -804,9 +894,6 @@ class WrapperClass(Wrapper):
 
         def _generic_wrapper(*args, **kwargs):
             return _wrapper(info, *args, **kwargs)
-        # _generic_wrapper.__module__ = info[1]
-        # _generic_wrapper.__name__ = info[2]
-        # _generic_wrapper.__qualname__ = f"{info[1]}.{info[2]}"
         setattr(_generic_wrapper, visited_attr, True)
         return _generic_wrapper
 
@@ -839,7 +926,7 @@ class WrapperClass(Wrapper):
                         "fused_cython_function")
         return _ty.__name__ in cython_types
 
-    def handle_function(self, name, function):
+    def handle_function(self, name, function, exclude=False):
         registered = id(function) in cache.id_dict
         visited = id(function) in cache.visited_functions
         if registered and visited:
@@ -848,6 +935,8 @@ class WrapperClass(Wrapper):
             if not visited:
                 logger.error(
                     f"Function registered={registered} and visited={visited}")
+        elif exclude:
+            self.handle_excluded_function(name, function)
         elif isinstance(function, (classmethod, staticmethod)):
             self.handle_excluded_function(name, function)
         elif name == "__new__":
@@ -875,7 +964,7 @@ class WrapperClass(Wrapper):
 
     def check_not_visited(self, function, function_id):
         if function_id in cache.id_dict:
-            logger.error(f"Function {function} (id:{hex(function_id)}) has been registered",
+            logger.error(f"Function {function} (id:{hex(function_id)}) has been registered twice",
                          caller=self)
 
     def handle_included_methoddescriptor(self, name, function):
@@ -977,9 +1066,12 @@ class WrapperClass(Wrapper):
             return
         super().handle_special(attr, attr_obj)
 
-    def handle_basic(self, name, obj):
+    def handle_basic(self, name, obj, exclude=False):
         try:
-            super().handle_included_basic(name, obj)
+            if exclude:
+                super().handle_excluded_basic(name, obj)
+            else:
+                super().handle_included_basic(name, obj)
             # setattr(self.wrapped_obj, name, obj)
             logger.debug(
                 f"[{self.get_name()}] Include object {name}", caller=self)
@@ -990,9 +1082,9 @@ class WrapperClass(Wrapper):
             logger.warning(
                 f"Cannot handle basic object {name}", error=e, caller=self)
 
-    def handle_class(self, attr, clss):
+    def handle_class(self, attr, clss, exclude=False):
         if clss in self.visited_class:
             if self.visited_class[clss] is not None:
                 return self.visited_class[clss]
             return
-        super().handle_class(attr, clss)
+        super().handle_class(attr, clss, exclude=exclude)

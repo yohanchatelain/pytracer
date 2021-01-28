@@ -8,6 +8,7 @@
     "exclude_file": [
         "exclude.default.txt",
         "exclude.numpy.default.txt",
+        "exclude.scipy.default.txt",
         "exclude.sklearn.default.txt"
     ],
     "filter_alias": true,

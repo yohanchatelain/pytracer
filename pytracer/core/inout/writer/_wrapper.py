@@ -1,4 +1,3 @@
-
 import pytracer.core.wrapper.cache as wrapper_cache
 from pytracer.core.utils.log import get_logger
 from pytracer.core.utils.singleton import Counter
@@ -8,6 +7,7 @@ logger = get_logger()
 is_wrapper_attr = "__Pytracer_visited__"
 
 elements = Counter()
+
 
 # Generic wrapper
 

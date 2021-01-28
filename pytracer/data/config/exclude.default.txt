@@ -7,3 +7,9 @@ collections *
 traceback *
 BaseException *
 pathlib *
+gzip *
+joblib *
+joblib.parallel *
+contextlib *
+type *
+abc *

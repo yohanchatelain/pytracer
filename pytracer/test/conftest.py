@@ -61,5 +61,5 @@ def cleandir(script_runner, tmp_path):
 @pytest.fixture
 def parse(script_runner):
     yield
-    ret = script_runner.run("pytracer", "parse")
+    ret = script_runner.run("pytracer", "parse", "--online")
     assert ret.success

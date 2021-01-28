@@ -13,6 +13,7 @@ from pytracer.core.config import config as cfg
 from pytracer.core.utils.log import get_logger
 from pytracer.core.wrapper.wrapper import WrapperModule, visited_attr
 import pytracer.core.tracer_init as tracer_init
+import pytracer.core.utils.report as report
 
 logger = get_logger()
 
@@ -57,7 +58,6 @@ class Myloader(Loader):
         logger.debug(
             f"{indent}Sanitize check for module {wrapped_module}", caller=self)
         self.visited_modules.add(wrapped_module.__name__)
-        name_wrp = wrapped_module.__name__
         symbols = dir(real_module)
 
         if hasattr(real_module, visited_attr):
@@ -75,19 +75,17 @@ class Myloader(Loader):
                 continue
             logger.debug(f"{indent+' '}checking symbol {sym}", caller=self)
             if not hasattr(wrapped_module, sym):
+                warn = (f"symbol {sym} is missing "
+                        "in the wrapped module {name_wrp}")
+                logger.error(warn, caller=self)
                 if sym == "__warningregistry__":
-                    logger.warning(
-                        f"symbol {sym} is missing in the wrapped module {name_wrp}", caller=self)
                     continue
-                else:
-                    logger.error(
-                        f"symbol {sym} is missing in the wrapped module {name_wrp}", caller=self)
             sym_obj_wrp = getattr(wrapped_module, sym)
             sym_obj_rl = getattr(real_module, sym)
             if inspect.ismodule(sym_obj_wrp):
                 self.sanitize_check(sym_obj_rl, sym_obj_wrp, indent+" ")
-        logger.debug(
-            f"Sanitize check for module {wrapped_module} done", caller=self)
+        logger.debug(f"Sanitize check for module {wrapped_module} done",
+                     caller=self)
 
     def create_module(self, spec):
         try:
@@ -217,9 +215,12 @@ def exec_module(module_name):
 def main(args):
 
     if os.path.isfile(args.module):
+        report.set_report(args.report)
         if not args.dry_run:
             run()
         exec_module(args.module)
+        if report.report_enable():
+            report.dump_report()
     else:
         logger.error(f"File {args.module} not found")
 
