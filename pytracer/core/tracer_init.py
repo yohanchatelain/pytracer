@@ -1,4 +1,4 @@
-from pytracer.core.utils.report import report_type, report_type_default
+from pytracer.utils.report import report_type, report_type_default
 
 
 def init_arguments(parser):

@@ -1,6 +1,6 @@
 from abc import abstractmethod
 
-from pytracer.core.utils.singleton import Singleton
+from pytracer.utils.singleton import Singleton
 
 from . import _wrapper
 

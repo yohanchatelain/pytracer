@@ -6,8 +6,8 @@ import sys
 from abc import abstractmethod
 from enum import IntEnum, auto
 
-import pytracer.core.utils.color as color
-import pytracer.core.utils.singleton as singleton
+import pytracer.utils.color as color
+import pytracer.utils.singleton as singleton
 from pytracer.core.config import config as cfg
 
 logger_filename = "pytracer.log"

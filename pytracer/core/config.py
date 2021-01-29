@@ -2,8 +2,8 @@ import json
 import os
 import sys
 
-import pytracer.core.utils as ptutils
-from pytracer.core.utils.singleton import Singleton
+import pytracer.utils as ptutils
+from pytracer.utils.singleton import Singleton
 
 
 class PytracerError(Exception):

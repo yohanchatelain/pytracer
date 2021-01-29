@@ -3,11 +3,12 @@ from datetime import datetime
 import h5py
 
 import pytracer.core.inout as ptinout
-from pytracer.core.utils.log import get_logger
-from pytracer.core.utils.singleton import Singleton
+from pytracer.utils.log import get_logger
+from pytracer.utils.singleton import Singleton
 from pytracer.core.config import constant, config as cfg
 
 logger = get_logger()
+
 
 class Writer(metaclass=Singleton):
 
@@ -22,9 +23,9 @@ class Writer(metaclass=Singleton):
         atexit.register(self.exit)
 
     def exit(self):
-        logger.debug("Close writer",caller=self)
+        logger.debug("Close writer", caller=self)
         self.ostream.close()
-        
+
     def _init_ostream(self):
         if self.parameters.filename:
             self.filename = self.get_filename_path(self.parameters.filename)

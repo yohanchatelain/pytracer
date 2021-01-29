@@ -5,10 +5,10 @@ import os
 from collections import namedtuple
 import numpy as np
 
-import pytracer.core.utils as ptutils
+import pytracer.utils as ptutils
 import tables
 from pytracer.core.config import constant
-from pytracer.core.utils.log import get_logger
+from pytracer.utils.log import get_logger
 
 from . import _exporter, _init
 

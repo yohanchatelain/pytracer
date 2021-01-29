@@ -5,15 +5,14 @@ import os
 import re
 import sys
 from abc import ABCMeta, abstractmethod
-import traceback
 from types import FunctionType, LambdaType, ModuleType
 
 import pytracer.core.inout.writer as iowriter
 import pytracer.core.wrapper.cache as cache
 from pytracer.core.config import DictAtKeyError
 from pytracer.core.config import config as cfg
-from pytracer.core.utils.log import get_logger
-from pytracer.core.utils.singleton import Singleton
+from pytracer.utils.log import get_logger
+from pytracer.utils.singleton import Singleton
 
 visited_attr = "__Pytracer_visited__"
 

@@ -1,16 +1,16 @@
 import argparse
 import os
-
-from tqdm import tqdm
+import tempfile
 
 import pytracer.core.inout as ptinout
-from pytracer.core.stats.stats import print_stats
-from pytracer.core.config import constant
-from pytracer.core.utils.log import get_logger
-import pytracer.core.parser_init as parser_init
-
-import pytracer.core.inout.reader as ioreader
 import pytracer.core.inout.exporter as ioexporter
+import pytracer.core.inout.reader as ioreader
+import pytracer.core.parser_init as parser_init
+import pytracer.utils.context as ptcontext
+from pytracer.core.config import constant
+from pytracer.core.stats.stats import print_stats
+from pytracer.utils.log import get_logger
+from tqdm import tqdm
 
 logger = get_logger()
 
@@ -254,6 +254,16 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Pytracer parser")
-    parser_init.init_module(parser, dict())
+    parser_init.init_module(parser)
     args = parser.parse_args()
-    main(args)
+
+    t = tempfile.NamedTemporaryFile()
+    t.write(ptcontext.verificarlo.getenv(
+        ptcontext.verificarlo.BackendType.IEEE))
+    env = {"VFC_BACKENDS_FROM_FILE": t.name}
+    env_excluded = ["VFC_BACKENDS"]
+
+    with ptcontext.context.ContextManager(env, env_excluded):
+        main(args)
+
+    t.close()

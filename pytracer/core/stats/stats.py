@@ -1,7 +1,7 @@
 from enum import IntEnum, auto
 from types import FunctionType
 
-from pytracer.core.utils.log import get_logger
+from pytracer.utils.log import get_logger
 
 logger = get_logger()
 

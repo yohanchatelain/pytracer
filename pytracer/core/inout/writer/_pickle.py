@@ -6,11 +6,11 @@ import os
 import pickle
 import traceback
 
-import pytracer.core.utils as ptutils
+import pytracer.utils as ptutils
 from pytracer.core.config import config as cfg
 from pytracer.core.config import constant
-from pytracer.core.utils.log import get_logger
-from pytracer.core.utils import report
+from pytracer.utils.log import get_logger
+from pytracer.utils import report
 
 from . import _init, _writer
 

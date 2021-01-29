@@ -3,8 +3,8 @@ from enum import IntEnum, auto
 
 from pytracer.core.config import config as cfg
 from pytracer.core.config import constant
-from pytracer.core.utils.log import get_logger
-from pytracer.core.utils.singleton import Singleton
+from pytracer.utils.log import get_logger
+from pytracer.utils.singleton import Singleton
 
 logger = get_logger()
 

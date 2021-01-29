@@ -1,7 +1,7 @@
 import csv
 import sys
 from enum import Enum, auto
-from pytracer.core.utils.memory import total_size
+from pytracer.utils.memory import total_size
 
 
 class Report(Enum):

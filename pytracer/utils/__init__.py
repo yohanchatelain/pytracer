@@ -11,7 +11,7 @@ def getenv(env_name, exit_on_failure=True):
 
 
 def check_extension(filename, extension):
-    from pytracer.core.utils.log import get_logger
+    from pytracer.utils.log import get_logger
     logger = get_logger()
 
     def warn():
