@@ -63,3 +63,15 @@ def parse(script_runner):
     yield
     ret = script_runner.run("pytracer", "parse", "--online")
     assert ret.success
+
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--nsamples", action="store", type=int, default=1,
+        help="Number of samples to run"
+    )
+
+
+@pytest.fixture
+def nsamples(request):
+    return request.config.getoption("--nsamples")
