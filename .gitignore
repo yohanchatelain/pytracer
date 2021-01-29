@@ -3,3 +3,7 @@ __pycache__
 *.stdout
 *.dat
 *.log
+.__pytracercache__/
+cache-directory
+*.error
+log

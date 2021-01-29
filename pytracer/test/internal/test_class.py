@@ -26,10 +26,11 @@ def test_trace_only_ufunc_off(script_runner):
 
 
 @pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir", "parse")
-def test_trace_parse(script_runner):
-    ret = script_runner.run("pytracer", "trace",
-                            f"--module {__file__}")
-    assert ret.success
+def test_trace_parse(nsamples, script_runner):
+    for _ in range(nsamples):
+        ret = script_runner.run("pytracer", "trace",
+                                f"--module {__file__}")
+        assert ret.success
 
 
 if __name__ == '__main__':
