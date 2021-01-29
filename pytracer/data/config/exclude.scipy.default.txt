@@ -1,0 +1,7 @@
+scipy* iterate
+scipy.sparse* check_format
+scipy.sparse* getnnz
+scipy.sparse* prune
+scipy.sparse* _swap
+scipy.sparse* transpose
+scipy.sparse* _check

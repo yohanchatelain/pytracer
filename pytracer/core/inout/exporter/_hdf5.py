@@ -174,6 +174,7 @@ class ExporterHDF5(_exporter.Exporter):
         row["BacktraceDescription/lineno"] = backtrace.lineno
         row["BacktraceDescription/name"] = backtrace.name
         row.append()
+
         # We create array to keep the object
         if ndim > 0:
             filters = tables.Filters(complevel=9, complib='zlib')
@@ -204,6 +205,10 @@ class ExporterHDF5(_exporter.Exporter):
         function_id = obj["id"]
         time = obj["time"]
         module_grp_name = f"/{module}"
+
+        assert(module)
+        assert(function)
+
         if module_grp_name in self.h5file:
             module_grp = self.h5file.get_node(module_grp_name)
         else:

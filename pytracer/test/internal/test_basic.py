@@ -1,5 +1,7 @@
 #!/usr/bin/python3
 
+import pytest
+import os
 import math
 import numpy as np
 import argparse
@@ -45,6 +47,50 @@ def main():
     print(np.minimum.accumulate)
 
     print("Test finished")
+
+# Pytests
+
+
+@pytest.mark.usefixtures("turn_numpy_ufunc_on", "cleandir")
+def test_trace_only_no_arg_ufunc_on(script_runner):
+    ret = script_runner.run("pytracer", "trace",
+                            f"--module {__file__}")
+    assert not ret.success
+
+
+@pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir")
+def test_trace_only_no_arg_ufunc_off(script_runner):
+    ret = script_runner.run("pytracer", "trace",
+                            f"--module {__file__}")
+    assert not ret.success
+
+
+@pytest.mark.usefixtures("turn_numpy_ufunc_on", "cleandir")
+def test_trace_only_ufunc_on(script_runner):
+    ret = script_runner.run("pytracer", "trace",
+                            f"--module {__file__} --test2=1")
+    assert ret.success
+
+
+@pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir")
+def test_trace_only_ufunc_off(script_runner):
+    ret = script_runner.run("pytracer", "trace",
+                            f"--module {__file__} --test2=1")
+    assert ret.success
+
+
+@pytest.mark.usefixtures("turn_numpy_ufunc_on", "cleandir", "parse")
+def test_trace_parse_ufunc_on(script_runner):
+    ret = script_runner.run("pytracer", "trace",
+                            f"--module {__file__} --test2=1")
+    assert ret.success
+
+
+@pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir", "parse")
+def test_trace_parse(script_runner):
+    ret = script_runner.run("pytracer", "trace",
+                            f"--module {__file__} --test2=1")
+    assert ret.success
 
 
 if '__main__' == __name__:

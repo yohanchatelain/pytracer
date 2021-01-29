@@ -10,6 +10,7 @@ import pytracer.core.utils as ptutils
 from pytracer.core.config import config as cfg
 from pytracer.core.config import constant
 from pytracer.core.utils.log import get_logger
+from pytracer.core.utils import report
 
 from . import _init, _writer
 
@@ -70,9 +71,7 @@ class WriterPickle(_writer.Writer):
 
     def is_writable(self, obj):
         try:
-            # pickler_test = pickle.Pickler(io.BytesIO())
             pickle.dump(obj, io.BytesIO())
-            # print(f"{obj} is writable")
             return True
         except Exception as e:
             obj.pop("args")
@@ -102,7 +101,14 @@ class WriterPickle(_writer.Writer):
                     "backtrace": backtrace}
         try:
             if self.is_writable(to_write):
-                self._write(to_write)
+
+                if report.report_enable():
+                    key = (module_name, function_name)
+                    value = to_write
+                    report.report(key, value)
+
+                if not report.report_only():
+                    self._write(to_write)
 
         except pickle.PicklingError as e:
             logger.error(

@@ -1,4 +1,7 @@
 
+import pytest
+
+
 def poisson_regression_non_normal_loss():
     """
     ======================================
@@ -565,6 +568,31 @@ def poisson_regression_non_normal_loss():
     #   Error are hard to meaningfully interpret on count values with many zeros.
 
     # plt.show()
+
+
+@pytest.mark.xfail
+@pytest.mark.slow
+@pytest.mark.usefixtures("turn_numpy_ufunc_on", "cleandir")
+def test_trace_only_ufunc_on(script_runner):
+    ret = script_runner.run("pytracer", "trace",
+                            f"--module {__file__}")
+    assert ret.success
+
+
+@pytest.mark.slow
+@pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir")
+def test_trace_only_ufunc_off(script_runner):
+    ret = script_runner.run("pytracer", "trace",
+                            f"--module {__file__}")
+    assert ret.success
+
+
+@pytest.mark.slow
+@pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir", "parse")
+def test_trace_parse(script_runner):
+    ret = script_runner.run("pytracer", "trace",
+                            f"--module {__file__}")
+    assert ret.success
 
 
 if __name__ == "__main__":

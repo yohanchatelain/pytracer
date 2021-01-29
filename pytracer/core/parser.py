@@ -1,9 +1,5 @@
 import argparse
-import cProfile
 import os
-import pstats
-import time
-from pstats import SortKey
 
 from tqdm import tqdm
 
@@ -72,6 +68,8 @@ class Parser:
         self.check_args(args)
 
     def init_args(self, args):
+        self.online = args.online
+        self.batch_size = args.batch_size
         self.directory = None
         self.filename = None
 
@@ -176,7 +174,7 @@ class Parser:
 
         filenames = list()
         sizes = set()
-        for file in tqdm(os.listdir(self.directory), desc="Reading..."):
+        for file in os.listdir(self.directory):
             abs_file = os.path.abspath(f"{self.directory}{os.sep}{file}")
             if os.path.isfile(abs_file):
                 filenames.append(abs_file)
@@ -194,11 +192,16 @@ class Parser:
         logger.info(f"Auto-detection type: {iotype.name} file")
         filenames_grouped = self.group_files(iotype, filenames)
 
-        stats_values = list()
-        for value in zip(*filenames_grouped.values()):
-            stat_value = self.merge(value)
-            stats_values.append(stat_value)
-        return stats_values
+        if self.online:
+            for value in tqdm(zip(*filenames_grouped.values()), desc="Parsing..."):
+                yield self.merge(value)
+        else:
+            stats_values = list()
+            for value in tqdm(zip(*filenames_grouped.values()), desc="Parsing..."):
+                stats_values.append(self.merge(value))
+                if len(stats_values) % self.batch_size == 0:
+                    yield stats_values
+                    stats_values.clear()
 
 
 def parse_stat_value(stats_value, info_dict, counter):
@@ -232,53 +235,20 @@ def main(args):
 
     stats_values = parser.parse_directory()
 
-    time_dict = dict()
-    info_dict = dict()
-    counter = 0
-    pr = None
-    toc = None
-    tic = None
-
-    if args.timer:
-        pr = cProfile.Profile()
-        pr.enable()
-
-    for stats_value in tqdm(stats_values,
-                            desc="Parsing...",
-                            mininterval=0.1,
-                            maxinterval=1):
-        if args.timer:
-            tic = time.perf_counter()
-
-        parse_stat_value(stats_value, info_dict, counter)
-
-        if args.timer:
-            toc = time.perf_counter()
-            logger.debug(f"[{counter}] parsing time: {toc-tic} seconds")
-            time_dict[counter] = (toc-tic)
-        counter += 1
-
-    if args.timer:
-        pr.disable()
-        stats_time = pstats.Stats(pr)
-        stats_time.sort_stats(SortKey.CUMULATIVE)
-        stats_time.print_stats(10)
-
-    if args.timer:
-        pr.enable()
-
     export = ioexporter.Exporter()
-    for stats_value in tqdm(stats_values,
-                            desc="Exporting...",
-                            mininterval=0.1,
-                            maxinterval=1):
-        export.export(stats_value)
-
-    if args.timer:
-        pr.disable()
-        stats_time = pstats.Stats(pr)
-        stats_time.sort_stats(SortKey.CUMULATIVE)
-        stats_time.print_stats(10)
+    if args.online:
+        for stats_value in tqdm(stats_values,
+                                desc="Exporting...",
+                                mininterval=0.1,
+                                maxinterval=1):
+            export.export(stats_value)
+    else:
+        for stats_value_batch in tqdm(stats_values,
+                                      desc="Exporting...",
+                                      mininterval=0.1,
+                                      maxinterval=1):
+            for stats_value in stats_value_batch:
+                export.export(stats_value)
 
 
 if __name__ == "__main__":

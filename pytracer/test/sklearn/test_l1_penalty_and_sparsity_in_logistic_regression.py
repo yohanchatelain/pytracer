@@ -1,3 +1,4 @@
+import pytest
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -69,6 +70,28 @@ def l1_penalty_and_sparsity_in_logistic_regression():
         #     ax.set_yticks(())
 
         # axes_row[0].set_ylabel('C = %s' % C)
+
+
+@pytest.mark.xfail
+@pytest.mark.usefixtures("turn_numpy_ufunc_on", "cleandir")
+def test_trace_only_ufunc_on(script_runner):
+    ret = script_runner.run("pytracer", "trace",
+                            f"--module {__file__}")
+    assert ret.success
+
+
+@pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir")
+def test_trace_only_ufunc_off(script_runner):
+    ret = script_runner.run("pytracer", "trace",
+                            f"--module {__file__}")
+    assert ret.success
+
+
+@pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir", "parse")
+def test_trace_parse(script_runner):
+    ret = script_runner.run("pytracer", "trace",
+                            f"--module {__file__}")
+    assert ret.success
 
 
 if __name__ == "__main__":

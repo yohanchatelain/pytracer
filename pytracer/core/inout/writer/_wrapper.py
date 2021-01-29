@@ -1,5 +1,3 @@
-import sys
-
 import pytracer.core.wrapper.cache as wrapper_cache
 from pytracer.core.utils.log import get_logger
 from pytracer.core.utils.singleton import Counter
@@ -9,6 +7,7 @@ logger = get_logger()
 is_wrapper_attr = "__Pytracer_visited__"
 
 elements = Counter()
+
 
 # Generic wrapper
 
@@ -21,7 +20,6 @@ def wrapper(self,
 
     inputs = {**{f"x{i}": x for i, x in enumerate(args)}, **kwargs}
     stack = self.backtrace()
-
     if hasattr(function, is_wrapper_attr):
         logger.error(f"Function {function} is wrapped itself")
 
@@ -48,7 +46,6 @@ def wrapper(self,
                  args=_outputs,
                  backtrace=stack)
 
-    elements.increment()
     return outputs
 
 # Wrapper used for modules' functions
@@ -68,9 +65,6 @@ def wrapper_function(self,
         logger.error(f"Function {function} is wrapped itself")
 
     time = elements()
-    # print("Function", function, file=sys.stderr)
-    # print("Inputs", inputs, file=sys.stderr)
-    # sys.stderr.flush()
 
     self.inputs(time=time,
                 module_name=fmodule,
@@ -80,8 +74,6 @@ def wrapper_function(self,
                 backtrace=stack)
 
     outputs = function(*args, **kwargs)
-
-    # print("Outputs", outputs, file=sys.stderr)
 
     if not isinstance(outputs, dict):
         _outputs = {"x0": outputs}
@@ -95,7 +87,6 @@ def wrapper_function(self,
                  args=_outputs,
                  backtrace=stack)
 
-    elements.increment()
     return outputs
 
 # Wrapper used for instances
@@ -126,7 +117,7 @@ def wrapper_class(self, info, *args, **kwargs):
     stack = self.backtrace()
 
     if hasattr(function, is_wrapper_attr):
-        logger.error(f"Function {function} is wrapped itself")
+        logger.error(f"Function {function} {dir(function)} is wrapped itself")
 
     time = elements()
 
@@ -151,7 +142,6 @@ def wrapper_class(self, info, *args, **kwargs):
                  args=_outputs,
                  backtrace=stack)
 
-    elements.increment()
     return outputs
 
 
@@ -248,5 +238,4 @@ def wrapper_ufunc(self, function, *args, **kwargs):
                  args=_outputs,
                  backtrace=stack)
 
-    elements.increment()
     return outputs
