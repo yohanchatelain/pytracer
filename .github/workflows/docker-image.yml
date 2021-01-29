@@ -22,4 +22,4 @@ jobs:
     steps:
     - name: Build the Docker image
       run: |
-        docker build . --file Dockerfile.${{ matrix.dockerfile }} --tag ${{ matrix.dockerfile }}:$(date +%s)
+        docker build . --file ../Dockerfile.${{ matrix.dockerfile }} --tag ${{ matrix.dockerfile }}:$(date +%s)
