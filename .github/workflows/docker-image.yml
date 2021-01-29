@@ -14,12 +14,12 @@ jobs:
     strategy:
       matrix:
         dockerfile: [
-          "Dockerfile.fuzzy",
-          "Dockerfile.fuzzy-numpy",
-          "Dockerfile.fuzzy-numpy-scipy",
-          "Dockerfile.fuzzy-numpy-scipy-sklearn"
+          "fuzzy",
+          "fuzzy-numpy",
+          "fuzzy-numpy-scipy",
+          "fuzzy-numpy-scipy-sklearn"
         ]
     steps:
     - name: Build the Docker image
       run: |
-        docker build . --file ${{ matrix.dockerfile }} --tag ${{ matrix.dockerfile}}:$(date +%s)
+        docker build . --file Dockerfile.${{ matrix.dockerfile }} --tag ${{ matrix.dockerfile }}:$(date +%s)
