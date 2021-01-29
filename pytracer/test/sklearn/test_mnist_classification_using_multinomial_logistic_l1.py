@@ -14,6 +14,8 @@ def mnist_classification_using_multinomial_logistic_l1():
     # Author: Arthur Mensch <arthur.mensch@m4x.org>
     # License: BSD 3 clause
 
+    np.random.seed(42)
+
     # Turn down for faster convergence
     t0 = time.time()
     train_samples = 5000

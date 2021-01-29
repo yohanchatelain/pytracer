@@ -797,7 +797,6 @@ class Wrapper(metaclass=ABCMeta):
         eo = self.excluded.has_module(obj)
         ia = self.included.has_function(attr, obj)
         ea = self.excluded.has_function(attr, obj)
-        print(f"{obj} {attr} -> io:{io} eo:{eo} ia:{ia} ea:{ea}")
         if (not eo or (eo and not ea)) and (not io or (io and ia)):
             exclude = False
         else:
@@ -842,7 +841,6 @@ class Wrapper(metaclass=ABCMeta):
                 obj_name = getattr(obj, "__name__")
 
             exclude = self.is_excluded(obj_name, attr)
-            print(f"[{obj}] {obj_name} {attr} -> {exclude} excluded")
 
             if self.isspecialattr(attr):
                 self.handle_special(attr, attr_obj)
