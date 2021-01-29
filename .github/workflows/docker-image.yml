@@ -20,6 +20,8 @@ jobs:
           "fuzzy-numpy-scipy-sklearn"
         ]
     steps:
+    - name: Check Out Repo
+      uses: actions/checkout@v2
     - name: Build the Docker image
       run: |
-        docker build . --file ../Dockerfile.${{ matrix.dockerfile }} --tag ${{ matrix.dockerfile }}:$(date +%s)
+        docker build . --file Dockerfile.${{ matrix.dockerfile }} --tag ${{ matrix.dockerfile }}:$(date +%s)
