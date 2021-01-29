@@ -1,0 +1,25 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ '*' ]
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        dockerfile: [
+          "Dockerfile.fuzzy",
+          "Dockerfile.fuzzy-numpy",
+          "Dockerfile.fuzzy-numpy-scipy",
+          "Dockerfile.fuzzy-numpy-scipy-sklearn"
+        ]
+    steps:
+    - name: Build the Docker image
+      run: |
+        docker build . --file ${{ matrix.dockerfile }} --tag ${{ matrix.dockerfile}}:$(date +%s)
