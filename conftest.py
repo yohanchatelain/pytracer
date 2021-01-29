@@ -3,9 +3,12 @@ import pytest
 import json
 import tempfile
 
+from pytracer.utils import getenv
+from pytracer.core.config import constant, PytracerConfigError
+
 
 def get_config():
-    return os.getenv("PYTRACER_CONFIG")
+    return getenv(constant.env.config)
 
 
 def get_pycfg(update):
@@ -19,7 +22,7 @@ def get_pycfg(update):
                                     suffix=".json")
     json.dump(pycfg, t)
     t.flush()
-    os.environ["PYTRACER_CONFIG"] = os.path.join(t.name)
+    os.environ[constant.env.config] = os.path.join(t.name)
     return fi, t
 
 
@@ -31,7 +34,7 @@ def turn_numpy_ufunc_on():
 
     yield
 
-    os.environ["PYTRACER_CONFIG"] = pycfg_env
+    os.environ[constant.env.config] = pycfg_env
     fori.close()
     ftmp.close()
 
@@ -44,7 +47,7 @@ def turn_numpy_ufunc_off():
 
     yield
 
-    os.environ["PYTRACER_CONFIG"] = pycfg_env
+    os.environ[constant.env.config] = pycfg_env
     fori.close()
     ftmp.close()
 

@@ -6,7 +6,7 @@ import pytracer.utils as ptutils
 from pytracer.utils.singleton import Singleton
 
 
-class PytracerError(Exception):
+class PytracerConfigError(Exception):
 
     def __init__(self, message=None):
         self.message = message
@@ -66,6 +66,11 @@ class DictAt:
         return str(self._dict)
 
 
+environment_variables = {
+    "config": "PYTRACER_CONFIG"
+}
+
+
 class _Constant(metaclass=Singleton):
     __attributes = {
         "cache": {"root": ".__pytracercache__",
@@ -76,8 +81,8 @@ class _Constant(metaclass=Singleton):
         "pickle_ext": ".pkl",
         "iotypes": ["text", "json", "pickle"],
         "export": {"dat": "stats.pkl",
-                   "header": "header.pkl"}
-
+                   "header": "header.pkl"},
+        "env": environment_variables,
     }
 
     def __init__(self):
@@ -103,6 +108,9 @@ class _Constant(metaclass=Singleton):
             return self.__dict[attr]
         else:
             return None
+
+
+constant = _Constant()
 
 
 def _get_abs_path(cfg_path, path):
@@ -133,7 +141,7 @@ def _fix_path(config_path, cfg):
 
 class _Config(object, metaclass=Singleton):
 
-    pytracer_config = "PYTRACER_CONFIG"
+    pytracer_config = constant.env.config
 
     _attributes = ["python_modules_path",
                    "modules_to_load",
@@ -195,4 +203,3 @@ class _Config(object, metaclass=Singleton):
 
 
 config = _Config()
-constant = _Constant()

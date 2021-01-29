@@ -1,3 +1,4 @@
+from enum import Enum
 import sys
 import os
 import argparse
@@ -34,30 +35,34 @@ def check_extension(filename, extension):
     raise TypeError
 
 
-KB = 2**10
-MB = 2**20
-GB = 2**30
-TB = 2**40
+class SIPrefix(Enum):
+    B = 1
+    KB = 2**10
+    MB = 2**20
+    GB = 2**30
+    TB = 2**40
+    PB = 2**50
+
+
+def __to_si_prefix(size, si_prefix):
+    return f"{float(size/si_prefix.value):.1f}{si_prefix.name}"
+
+
+__si_prefixes = SIPrefix.__members__.values()
 
 
 def get_human_size(size):
-    sizeh = ""
-    if size < KB:
-        sizeh = f"{size}B"
-    elif KB <= size < MB:
-        sizeh = f"{int(size/KB)}KB"
-    elif MB <= size < GB:
-        sizeh = f"{int(size/MB)}MB"
-    elif GB <= size < TB:
-        sizeh = f"{int(size/GB)}GB"
-    else:
-        sizeh = f"{int(size/TB)}TB"
-    return sizeh
-
-# https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
+    _si = SIPrefix.B
+    for si in __si_prefixes:
+        if size < si.value:
+            return __to_si_prefix(size, _si)
+        _si = si
+    raise Exception(f"Unknown error get_humane_size: {size}")
 
 
 def str2bool(v):
+    # Taken from:
+    # https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
     if isinstance(v, bool):
         return v
     if v.lower() in ('yes', 'true', 't', 'y', '1'):

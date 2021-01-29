@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import plotly.graph_objects as go
 
-from pytracer.core.utils import get_human_size
+from pytracer.utils import get_human_size
 
 sort_keys = ["module", "function", "calls", "memory"]
 
