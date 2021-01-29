@@ -183,7 +183,8 @@ class Parser:
         if len(sizes) != 1:
             msg = (f"Traces do not have the same size{os.linesep}"
                    f"You are trying to merge data from different "
-                   f"program executions or your program is non deterministic ")
+                   f"program executions or your program is non deterministic {os.linesep}"
+                   f"sizes: {sizes}")
             logger.error(msg, caller=self)
 
         logger.debug(f"List of files to parse: {filenames}")
