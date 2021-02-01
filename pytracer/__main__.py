@@ -1,12 +1,12 @@
 import argparse
 import os
-
-from pytracer.core.config import constant, config as cfg
-import pytracer.core.tracer_init as tracer_init
-import pytracer.core.parser_init as parser_init
-import pytracer.gui.index_init as visualize_init
-
 import shutil
+
+import pytracer.core.parser_init as parser_init
+import pytracer.core.tracer_init as tracer_init
+import pytracer.gui.index_init as visualize_init
+from pytracer.core.config import config as cfg
+from pytracer.core.config import constant
 
 
 def clean():
