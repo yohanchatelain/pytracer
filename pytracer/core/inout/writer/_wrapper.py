@@ -1,3 +1,5 @@
+import inspect
+
 import pytracer.core.wrapper.cache as wrapper_cache
 from pytracer.utils.log import get_logger
 from pytracer.utils.singleton import Counter
@@ -9,6 +11,24 @@ is_wrapper_attr = "__Pytracer_visited__"
 elements = Counter()
 
 
+def get_bound_args(function, *args, **kwargs):
+    try:
+        sig = inspect.signature(function)
+        boundargs = sig.bind(*args, **kwargs)
+        inputs = dict(boundargs.arguments)
+    except Exception as e:
+        inputs = {**{f"Arg{i}": x for i, x in enumerate(args)}, **kwargs}
+    return inputs
+
+
+def format_output(outputs):
+    if isinstance(outputs, dict):
+        _outputs = outputs
+    elif isinstance(outputs, tuple):
+        _outputs = {f"Ret{i}": o for i, o in enumerate(outputs)}
+    else:
+        _outputs = {"Ret": outputs}
+    return _outputs
 # Generic wrapper
 
 
@@ -18,7 +38,8 @@ def wrapper(self,
             function_name,
             *args, **kwargs):
 
-    inputs = {**{f"x{i}": x for i, x in enumerate(args)}, **kwargs}
+    inputs = get_bound_args(function, *args, **kwargs)
+
     stack = self.backtrace()
     if hasattr(function, is_wrapper_attr):
         logger.error(f"Function {function} is wrapped itself")
@@ -33,11 +54,7 @@ def wrapper(self,
                 backtrace=stack)
 
     outputs = function(*args, **kwargs)
-
-    if not isinstance(outputs, dict):
-        _outputs = {"x0": outputs}
-    else:
-        _outputs = outputs
+    _outputs = format_output(outputs)
 
     self.outputs(time=time,
                  module_name=function_module,
@@ -58,7 +75,7 @@ def wrapper_function(self,
     fid, fmodule, fname = info
     function = wrapper_cache.id_dict[fid]
 
-    inputs = {**{f"x{i}": x for i, x in enumerate(args)}, **kwargs}
+    inputs = get_bound_args(function, *args, **kwargs)
     stack = self.backtrace()
 
     if hasattr(function, is_wrapper_attr):
@@ -74,11 +91,7 @@ def wrapper_function(self,
                 backtrace=stack)
 
     outputs = function(*args, **kwargs)
-
-    if not isinstance(outputs, dict):
-        _outputs = {"x0": outputs}
-    else:
-        _outputs = outputs
+    _outputs = format_output(outputs)
 
     self.outputs(time=time,
                  module_name=fmodule,
@@ -112,8 +125,13 @@ def wrapper_class(self, info, *args, **kwargs):
     function = wrapper_cache.id_dict[fid]
 
     # args without self
-    _args = args[1:]
-    inputs = {**{f"x{i}": x for i, x in enumerate(_args)}, **kwargs}
+    # _args = args[1:]
+    # inputs = {**{f"x{i}": x for i, x in enumerate(_args)}, **kwargs}
+    inputs = get_bound_args(function, *args, **kwargs)
+    if "self" in inputs:
+        inputs.pop("self")
+    else:
+        inputs.pop("x0")
     stack = self.backtrace()
 
     if hasattr(function, is_wrapper_attr):
@@ -129,11 +147,7 @@ def wrapper_class(self, info, *args, **kwargs):
                 backtrace=stack)
 
     outputs = function(*args, **kwargs)
-
-    if not isinstance(outputs, dict):
-        _outputs = {"x0": outputs}
-    else:
-        _outputs = outputs
+    _outputs = format_output(outputs)
 
     self.outputs(time=time,
                  module_name=fmodule,
@@ -205,7 +219,7 @@ def wrapper_ufunc(self, function, *args, **kwargs):
     if not fmodule and hasattr(fmodule, "__class__"):
         fmodule = getattr(function.__class__, "__module__")
 
-    inputs = {**{f"x{i}": x for i, x in enumerate(args)}, **kwargs}
+    inputs = get_bound_args(function, *args, **kwargs)
     stack = self.backtrace()
 
     time = elements()
@@ -226,10 +240,7 @@ def wrapper_ufunc(self, function, *args, **kwargs):
         outputs_type = get_ufunc_output_type(inputs_type, function.types)
         outputs = outputs.astype(outputs_type)
 
-    if not isinstance(outputs, dict):
-        _outputs = {"x0": outputs}
-    else:
-        _outputs = outputs
+    _outputs = format_output(outputs)
 
     self.outputs(time=time,
                  module_name=fmodule,

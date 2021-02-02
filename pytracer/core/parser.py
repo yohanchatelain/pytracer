@@ -187,7 +187,7 @@ class Parser:
                    f"sizes: {sizes}")
             logger.error(msg, caller=self)
         else:
-            print("Filesize: {sizes}")
+            print(f"Filesize: {sizes}")
         logger.debug(f"List of files to parse: {filenames}")
 
         iotype = self.auto_detect_format(filenames[0])

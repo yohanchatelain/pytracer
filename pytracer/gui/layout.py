@@ -6,6 +6,9 @@ import dash_daq as daq
 
 import pytracer.gui.core as pgc
 
+# TODO: Use regexp to get original module
+# >>> c=re.compile(r"[a-zA-Z0-9][_]{1}")
+# >>> c.sub(".", module)
 info_table = html.Div(
     [
         dt.DataTable(

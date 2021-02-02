@@ -155,8 +155,7 @@ data = Data()
 
 def init_data(args):
     global data
-    filename = "test.h5"
-    data = Data(filename)
+    data = Data(args.filename)
 
 
 def get_data():
@@ -188,5 +187,6 @@ def is_scalar(value):
     if hasattr(value, "ndim"):
         _is_scalar = value.ndim == 0
     return _is_scalar
+
 
 bt_to_id = dict()

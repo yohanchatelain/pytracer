@@ -12,4 +12,6 @@ def init_module(subparser):
     index_parser.add_argument("--directory", default=directory_default,
                               help="directory with traces")
     index_parser.add_argument("--debug", default=False, action="store_true",
-                              help="rue dash server in debug mode")
+                              help="run dash server in debug mode")
+    index_parser.add_argument("--filename", required=True,
+                              help="file to visualize")

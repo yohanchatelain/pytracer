@@ -198,6 +198,7 @@ def open_modal_source(on):
     return style_on if on else style_off
 
 
+@cache.memoize(timeout=TIMEOUT)
 def get_scatter_timeline(module, function, label, backtrace, arg, mode, marker_symbol,
                          marker_color, customdata=None):
     b = time.perf_counter()
@@ -232,7 +233,7 @@ def get_scatter_timeline(module, function, label, backtrace, arg, mode, marker_s
     else:
         customdata.extend([{"backtrace": backtracejoined}]*len(x))
 
-    scatter = go.Scattergl(name=f"{label} - {arg} - {lineno}",
+    scatter = go.Scattergl(name=f"{arg} - {lineno}",
                            legendgroup=f"group{backtrace}",
                            x=x,
                            y=y,

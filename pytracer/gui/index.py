@@ -42,6 +42,6 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description="Pytracer visualization module")
-    index_init.init_module(parser, pytracer_modules=dict())
+    index_init.init_module(parser)
     args = parser.parse_args()
     main(args)

@@ -197,8 +197,8 @@ class ExporterHDF5(_exporter.Exporter):
             sig_array[:] = raw_sig
 
     def export(self, obj):
-        module = obj["module"].replace(".", "_")
-        function = obj["function"].replace(".", "_")
+        module = obj["module"].replace(".", "$")
+        function = obj["function"].replace(".", "$")
         label = obj["label"]
         args = obj["args"]
         backtrace = obj["backtrace"]
