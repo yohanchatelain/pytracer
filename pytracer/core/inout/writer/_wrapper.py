@@ -131,7 +131,7 @@ def wrapper_class(self, info, *args, **kwargs):
     if "self" in inputs:
         inputs.pop("self")
     else:
-        inputs.pop("x0")
+        inputs.pop("Arg0")
     stack = self.backtrace()
 
     if hasattr(function, is_wrapper_attr):
