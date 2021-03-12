@@ -31,7 +31,9 @@ class IOInitializer(metaclass=Singleton):
     filename_default = None
     cache_default = {"root": constant.cache.root,
                      "traces": constant.cache.traces,
-                     "stats": constant.cache.stats}
+                     "stats": constant.cache.stats,
+                     "sources": constant.cache.sources
+                     }
     export_default = constant.export
 
     def __init__(self):
@@ -57,6 +59,9 @@ class IOInitializer(metaclass=Singleton):
         self.cache_stats = self._get_parameters(
             cfg.io.cache.stats, self.cache_default["stats"])
 
+        self.cache_sources = self._get_parameters(
+            cfg.io.cache.sources, self.cache_default["sources"])
+
         self.filename = self._get_parameters(
             cfg.io.filename, self.filename_default)
 
@@ -72,12 +77,20 @@ class IOInitializer(metaclass=Singleton):
         self.cache_traces_path = f"{self.cache_path}{os.sep}{self.cache_traces}"
         if not os.path.isdir(self.cache_traces_path):
             os.makedirs(self.cache_traces_path)
-            logger.debug(f"cache directory created {self.cache_traces_path}")
+            logger.debug(
+                f"cache traces directory created {self.cache_traces_path}")
 
         self.cache_stats_path = f"{self.cache_path}{os.sep}{self.cache_stats}"
         if not os.path.isdir(self.cache_stats_path):
             os.makedirs(self.cache_stats_path)
-            logger.debug(f"cache directory created {self.cache_stats_path}")
+            logger.debug(
+                f"cache stats directory created {self.cache_stats_path}")
+
+        self.cache_sources_path = f"{self.cache_path}{os.sep}{self.cache_sources}"
+        if not os.path.isdir(self.cache_sources_path):
+            os.makedirs(self.cache_sources_path)
+            logger.debug(
+                f"cache sources directory created {self.cache_sources_path}")
 
     def get_type(self):
         return self.type

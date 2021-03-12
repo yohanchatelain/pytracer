@@ -124,10 +124,8 @@ def wrapper_class(self, info, *args, **kwargs):
     fid, fmodule, fname = info
     function = wrapper_cache.id_dict[fid]
 
-    # args without self
-    # _args = args[1:]
-    # inputs = {**{f"x{i}": x for i, x in enumerate(_args)}, **kwargs}
     inputs = get_bound_args(function, *args, **kwargs)
+    # args without self
     if "self" in inputs:
         inputs.pop("self")
     else:

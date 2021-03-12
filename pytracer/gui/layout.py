@@ -1,4 +1,6 @@
 
+from dash_core_components.Input import Input
+import dash_ace
 import dash_core_components as dcc
 import dash_html_components as html
 import dash_table as dt
@@ -19,7 +21,7 @@ info_table = html.Div(
             selected_rows=[0],
             sort_action="native",
             cell_selectable=False,
-            row_selectable="single",
+            row_selectable="multi",
             fixed_columns={"headers": True, "data": 0},
             style_table={
                 "overflowY": "auto"
@@ -77,6 +79,34 @@ yscale_selector = html.Div([
         className="dcc_control",
     )], className="mini_container")
 
+xformat_selector = html.Div([
+    html.P("X-format:",
+           className="control_label"),
+    dcc.RadioItems(
+        id="x-format",
+        options=[
+            {"label": "normal", "value": ""},
+            {"label": "exponent", "value": "e"},
+        ],
+        value="",
+        labelStyle={"display": "inline-block"},
+        className="dcc_control",
+    )], className="mini_container")
+
+yformat_selector = html.Div([
+    html.P("Y-format:",
+           className="control_label"),
+    dcc.RadioItems(
+        id="y-format",
+        options=[
+            {"label": "normal", "value": ""},
+            {"label": "exponent", "value": "e"},
+        ],
+        value="",
+        labelStyle={"display": "inline-block"},
+        className="dcc_control",
+    )], className="mini_container")
+
 
 timeline_hover_info = html.Div(
     dcc.Markdown(id="info-data-timeline-summary"),
@@ -100,18 +130,29 @@ timeline_hover = html.Div(
 
 modal = html.Div(
     [
-        # dcc.Markdown(id="source-modal-body-md",
-        #              style={"marginBottom": 10,
-        #                     "width": "100%",
-        #                     "height": "100%",
-        #                     "overflowY": "scroll"})
+        dash_ace.DashAceEditor(id="source-modal-body-md",
+                               value="..",
+                               theme='github',
+                               mode='python',
+                               tabSize=2,
+                               style={"marginBottom": 10,
+                                      "width": "100%",
+                                               "height": "100%",
+                                               "overflowY": "scroll"}),
+
+
     ],
     id="source-file",
-    className="pretty_container ten columns",
+    className="mini_container",
+    # className="row flex-display",
+    # className="pretty_container ten columns",
     style={"display": "flex", "height": 400})
 
 timeline_graph = html.Div([
-    dcc.Graph(id="timeline"),
+    dcc.Graph(id="timeline",
+              config={'responsive': False,
+                      'autosizable': True,
+                      'showLink': True}),
     html.Div(
         [
             html.Div(
@@ -120,10 +161,33 @@ timeline_graph = html.Div([
                     dcc.Markdown(id="source",
                                  style={"overflowY": "auto",
                                         "height": "200"}),
-                ], className="mini_container"
+                ], className="mini_container",
+                style={'width': "100%"}
             ),
-            daq.BooleanSwitch(label="Show source",
-                              id="source-button", on=False),
+            html.Div(
+                [
+                    daq.BooleanSwitch(label="Show source",
+                                      id="source-button", on=False)
+                ], className="mini_container",
+                style={'width': "25%"}),
+            html.Div(
+                [
+                    dcc.Input(id='source-file-path',
+                              placeholder='Path to source directory',
+                              debounce=True)
+                ], className="mini_container",
+                style={'width': "50%", 'align-items': 'center', 'justify-content': 'center'}),
+            html.Div(
+                [
+                    dcc.Input(id='lines-start', placeholder='Start'),
+                    dcc.Input(id='lines-end', placeholder='End'),
+                    dcc.Input(id='lines-file-selection',
+                              placeholder='Filename'),
+                    daq.BooleanSwitch(label="Fix source range",
+                                      id='line-button', on=False),
+                    html.Div(id='lines-slider-selection'),
+                ], className="mini_container",
+                style={'width': "100%", 'align-items': 'center', 'justify-content': 'center'})
         ], className="mini_container",
         style={"display": "flex", "flex-direction": "row"},
     ),
@@ -185,7 +249,9 @@ rootpanel = html.Div(
             [
                 mode_selector,
                 xscale_selector,
-                yscale_selector
+                yscale_selector,
+                xformat_selector,
+                yformat_selector
             ],
             className="pretty_container",
             style={"display": "flex", "flex-direction": "row"},

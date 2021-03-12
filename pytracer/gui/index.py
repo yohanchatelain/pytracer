@@ -18,6 +18,7 @@ def init_layout(app, args):
         dcc.Store(id="memory-data", storage_type="local"),
         html.Div(id="output-clientsid"),
         header,
+        modal,
         html.Div(
             [
                 sidebar,
@@ -25,7 +26,6 @@ def init_layout(app, args):
             ],
             style={"display": "flex", "flex-direction": "row"}
         ),
-        modal
     ])  # , style={"display": "flex", "flex-direction": "column"})
 
 
@@ -42,6 +42,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description="Pytracer visualization module")
-    index_init.init_module(parser)
+    subparser = parser.add_subparsers()
+    index_init.init_module(subparser)
     args = parser.parse_args()
     main(args)

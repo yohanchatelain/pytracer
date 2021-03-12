@@ -16,7 +16,7 @@
         "format": "print",
         "output": "pytracer.log",
         "color": false,
-        "level": "error"
+        "level": "debug"
     },
     "io": {
         "type": "pickle",

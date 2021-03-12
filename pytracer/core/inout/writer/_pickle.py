@@ -5,6 +5,7 @@ import io
 import os
 import pickle
 import traceback
+import shutil
 
 import pytracer.utils as ptutils
 from pytracer.core.config import config as cfg
@@ -15,6 +16,8 @@ from pytracer.utils import report
 from . import _init, _writer
 
 logger = get_logger()
+
+visited_files = set()
 
 
 class WriterPickle(_writer.Writer):
@@ -36,6 +39,15 @@ class WriterPickle(_writer.Writer):
         if os.path.isfile(self.filename):
             if os.stat(self.filename).st_size == 0:
                 os.remove(self.filename)
+        self.copy_sources()
+
+    def copy_sources(self):
+        for filename in visited_files:
+            src = filename
+            dst = f"{self.parameters.cache_sources_path}{os.path.sep}{filename}"
+            dstdir = os.path.dirname(dst)
+            os.makedirs(dstdir, exist_ok=True)
+            shutil.copy(src, dst)
 
     def _init_ostream(self):
         if self.parameters.filename:
@@ -157,5 +169,6 @@ class WriterPickle(_writer.Writer):
     def backtrace(self):
         if cfg.io.backtrace:
             stack = traceback.extract_stack(limit=4)[0]
+            visited_files.add(stack.filename)
             return stack
         return None

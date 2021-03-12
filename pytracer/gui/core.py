@@ -48,6 +48,7 @@ class NodeNotFound(DataError):
 
 class Data:
 
+    __cache = dict()
     __labels = {"inputs", "outputs"}
     __modes = ("mean", "std", "sig")
 
@@ -133,10 +134,17 @@ class Data:
 
         searchnodename = re.compile(f"{label}_{arg}_{time}_{mode}")
         functionnode = self.get_function(module, function)
+
+        if (key := (module, function, searchnodename)) in Data.__cache:
+            return Data.__cache[key]
+
         foundnodes = []
         for node in functionnode:
             if searchnodename.fullmatch(node.name):
                 foundnodes.append(node)
+
+        key = (module, function, searchnodename)
+        Data.__cache[key] = foundnodes
 
         return foundnodes
 
@@ -144,10 +152,22 @@ class Data:
         if self.data is None:
             return None
 
+        if (key := (module, function, col, filters)) in Data.__cache:
+            return Data.__cache[key]
+
         functionnode = self.get_function(module, function)
         values = functionnode.values
         ret = [x[col] for x in values.iterrows() if filters(x)]
+
+        key = (module, function, col, filters)
+        Data.__cache[key] = ret
+
         return ret
+
+    def get_first_call_from_line(self, filename, line):
+        for group in self.data.walk_groups():
+            for bt in g.values.col('BacktraceDescription'):
+                sourcefile = 
 
 
 data = Data()

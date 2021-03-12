@@ -1,6 +1,13 @@
+from enum import Enum, auto
+import pickle
+import networkx as nx
 import argparse
 import os
 import tempfile
+import copy
+
+
+from typing_extensions import Protocol
 
 import pytracer.core.inout as ptinout
 import pytracer.core.inout.exporter as ioexporter
@@ -231,11 +238,328 @@ def parse_stat_value(stats_value, info_dict, counter):
         print_stats(arg, stat)
 
 
+class EdgeType(Enum):
+    CAUSAL = auto()
+    HIERARCHICAL = auto()
+    DEPENDENCY = auto()
+    CYCLE = auto()
+
+
+class CallChain:
+
+    _input_label = "inputs"
+    _output_label = "outputs"
+
+    _id_index = 0
+    _name_index = _id_index + 1
+    _label_index = _name_index + 1
+    _bt_index = _label_index + 1
+    _time_index = _bt_index + 1
+
+    _bt_filename_index = 0
+    _bt_line_index = _bt_filename_index + 1
+    _bt_lineno_index = _bt_line_index + 1
+    _bt_name_index = _bt_lineno_index + 1
+
+    def __init__(self):
+        fo = open("callgraph.pkl", "wb")
+        self._pickler = pickle.Pickler(fo, protocol=pickle.HIGHEST_PROTOCOL)
+        self._stack = []
+
+    def to_call(self, obj):
+        module = obj["module"]  # .replace(".", "$")
+        function = obj["function"]  # .replace(".", "$")
+        label = obj["label"]
+        backtrace = obj["backtrace"]
+        time = obj['time']
+        fid = obj["id"]
+
+        name = f"{module}.{function}"
+        bt = (backtrace.filename,
+              backtrace.line,
+              backtrace.lineno,
+              backtrace.name)
+
+        return (fid, name, label, bt, time)
+
+    @staticmethod
+    def call_to_str(call, sep):
+        return sep.join(map(str, call))
+
+    @staticmethod
+    def str_to_call(str, sep):
+        [fid, name, label, bt, time] = str.split(sep)
+        # get original type
+        fid_ori = int(fid)
+        bt_ori = eval(bt)
+        time_ori = int(time)
+        return (fid_ori, name, label, bt_ori, time_ori)
+
+    def have_same_origin(self, call1, call2):
+        same_id = CallChain.get_id(call1) == CallChain.get_id(call2)
+        same_name = CallChain.get_name(call1) == CallChain.get_name(call2)
+        same_bt = CallChain.get_bt(call1) == CallChain.get_bt(call2)
+        return all((same_id, same_name, same_bt))
+
+    @classmethod
+    def get_id(cls, call):
+        return call[cls._id_index]
+
+    @classmethod
+    def get_name(cls, call):
+        return call[cls._name_index]
+
+    @classmethod
+    def get_label(cls, call):
+        return call[cls._label_index]
+
+    @classmethod
+    def get_bt(cls, call):
+        return call[cls._bt_index]
+
+    @classmethod
+    def get_lineno(cls, call):
+        return call[cls._bt_index][cls._bt_lineno_index]
+
+    @classmethod
+    def get_filename(cls, call):
+        return call[cls._bt_index][cls._bt_filename_index]
+
+    @classmethod
+    def get_line(cls, call):
+        return call[cls._bt_index][cls._bt_line_index]
+
+    @classmethod
+    def get_caller(cls, call):
+        return call[cls._bt_index][cls._bt_name_index]
+
+    @classmethod
+    def get_time(cls, call):
+        return call[cls._time_index]
+
+    def is_input_call(self, call):
+        return call[self._label_index] == self._input_label
+
+    def print_stack(self, stack, name=None, to_print=False):
+        if not to_print:
+            return
+        stack.reverse()
+        print('[')
+        if name:
+            for elt in stack:
+                print(f"  -{name(elt)}")
+        else:
+            for elt in stack:
+                print(f"  -{elt}")
+        print(']')
+        stack.reverse()
+
+    def to_tree(self, short=False):
+        print("--- Start building tree ---")
+        G = nx.DiGraph()
+        last_input_call = None
+        parents = []
+        children = []
+        children_stack = []
+
+        stack_nb = self.to_number(as_dict=True)
+        if short:
+            def pp(call):
+                if isinstance(call, list):
+                    return list(map(lambda c: stack_nb[c], call))
+                else:
+                    return stack_nb[call]
+        else:
+            def pp(call): return call
+
+        last_node = None
+        last_node_cycle = 1
+
+        to_print = len(self._stack) < 4
+        printd = print if to_print else lambda x: None
+
+        if len(self._stack) == 2:
+            G.add_node(self._stack[0])
+            return G
+
+        i = ''
+        for j, call in enumerate(self._stack, start=1):
+            printd(f"{i} (*) {j} Visit call {pp(call)}")
+            printd(f"{i+'|'}Current children stack: ")
+            self.print_stack(children_stack, pp, to_print=to_print)
+            if self.is_input_call(call):
+
+                if last_input_call is not None:
+                    if not self.have_same_origin(last_input_call, call):
+                        G.add_edge(last_input_call, call,
+                                   edgetype=EdgeType.CAUSAL)
+
+                last_input_call = call
+
+                if children_stack:
+                    children = children_stack.pop()
+                else:
+                    children = []
+
+                printd("children.append(call)")
+                children.append(call)
+                self.print_stack(children_stack, pp, to_print=to_print)
+
+                printd("children_stack.append(children)")
+                children_stack.append(children)
+                self.print_stack(children_stack, pp, to_print=to_print)
+
+                printd("children = []")
+                children = []
+                printd(f"{i+'|'}Push new children -> ")
+                self.print_stack(children_stack, pp, to_print=to_print)
+            else:  # ouput-call
+                children = children_stack.pop()
+                printd(f"{i+'|'}Pop children {pp(children)} -> ")
+                self.print_stack(children_stack, pp, to_print=to_print)
+
+            if parents:
+                parent = parents.pop()
+                printd(f"{i+'|'}Parent {pp(parent)}")
+                if self.isclosure(parent, call):
+                    printd(f"{i+'|'}Is closure {pp(parent)} {pp(call)}")
+                    printd(f"{i+'|'}Create node {pp(parent)}")
+
+                    if last_node:
+                        if self.have_same_origin(last_node, parent):
+                            last_node_cycle += 1
+                        else:
+                            printd(f"{i+'|'} add node {pp(parent)}")
+                            printd(f"{i+'|'} add node {pp(last_node)}")
+                            G.add_node(parent)
+                            G.add_node(last_node)
+                            if last_node_cycle > 1:
+                                printd(
+                                    f"{i+'|'} add edge {pp(last_node)} -> {pp(last_node)}")
+                                G.add_edge(last_node, last_node,
+                                           cycle=last_node_cycle,
+                                           edgetype=EdgeType.CAUSAL)
+                                last_node_cycle = 1
+                            last_node = parent
+                    else:
+                        last_node = parent
+
+                    if children:
+                        printd(f"{i+'|'}Has children {pp(children)}")
+                        for child in children:
+                            printd(
+                                f"{i+'|'}Add edge {pp(parent)}->{pp(child)}")
+                            G.add_edge(parent, child,
+                                       edgetype=EdgeType.HIERARCHICAL)
+                    printd(f"{i+'|'} Append child {pp(parent)}")
+
+                    # children.append(parent)
+                    i = i[:-1]
+                else:
+                    i += '|'
+                    children_stack.append(children)
+                    parents.append(parent)
+                    parents.append(call)
+            else:
+                printd(f"{i+'|'}No parent")
+                parents.append(call)
+                children_stack.append(children)
+                i += '|'
+            printd(f"{i+'|'}Current children stack: ")
+            self.print_stack(children_stack, pp, to_print=to_print)
+        print("--- End building tree ---")
+
+        return G
+
+    def dump(self, obj):
+        self._pickler.dump(obj)
+
+    def isclosure(self, call1, call2):
+        (id1, name1, _, bt1, t1) = call1
+        (id2, name2, _, bt2, t2) = call2
+
+        if call1 == (id2, name2, self._input_label, bt2, t2) and \
+                call2 == (id1, name1, self._output_label, bt1, t1):
+            return True
+        else:
+            return False
+
+    def to_number(self, as_dict=False):
+
+        counter = 1
+        call_to_id = dict()
+        for call in self._stack:
+            key = f"{call[self._id_index]}{call[self._name_index]}{call[self._bt_index]}"
+            if key not in call_to_id:
+                call_to_id[key] = f"{counter}"
+                counter += 1
+
+        _str = "" if not as_dict else dict()
+        for call in self._stack:
+            key = f"{call[self._id_index]}{call[self._name_index]}{call[self._bt_index]}"
+            dir = "<" if call[self._label_index] == self._input_label else ">"
+            if as_dict:
+                _str[call] = f"{call_to_id[key]}{dir}"
+            else:
+                _str += f"{call_to_id[key]}{dir} "
+
+        return _str
+
+    def push(self, call, short=False):
+        # print(f"{self._indent}Push {call} onto stack -> {self._stack}")
+
+        if self._stack == []:
+            self._stack.append(call)
+            # print(f"{self._indent}  1st: {self._stack[0]}")
+        else:
+            self._stack.append(call)
+
+            fst_call = self._stack[0]
+            # (fst_id, fst_name, fst_label) = fst_call
+            # (prev_id, prev_name, prev_label) = self._stack[len(self._stack)-2]
+            # (cur_id, cur_name, cur_label) = call
+
+            # print(f"{self._indent}   1st: {self._stack[0]}")
+            # print(f"{self._indent}  Last: {call}")
+            if self.isclosure(fst_call, call):
+
+                stack_nb = self.to_number(as_dict=True)
+                if short:
+                    def pp(call):
+                        if isinstance(call, list):
+                            return list(map(lambda c: stack_nb[c], call))
+                        else:
+                            return stack_nb[call]
+                else:
+                    def pp(call): return call
+
+                print("CallChain", self.to_number())
+                G = self.to_tree(short=True)
+                # print("Tree")
+                # for node in G.nodes():
+                #     print(f'node {node}')
+                # for e1, e2, d in G.edges(data=True):
+                #     print(f'edge [{d["edgetype"]}] {pp(e1)}->{pp(e2)}')
+                self.dump(G)
+                self._stack.clear()
+                # self._indent = ""
+            # elif prev_id == cur_id and \
+            #         prev_label == self._input_label and \
+            #         cur_label == self._output_label and \
+            #         prev_name == cur_name:
+            #     self._indent = self._indent[:-1]
+            # else:
+            #     self._indent += " "
+
+
 def main(args):
 
     parser = Parser(args)
 
     stats_values = parser.parse_directory()
+
+    # Construct call chain
+    callchain = CallChain()
 
     export = ioexporter.Exporter()
     if args.online:
@@ -243,6 +567,8 @@ def main(args):
                                 desc="Exporting...",
                                 mininterval=0.1,
                                 maxinterval=1):
+            call = callchain.to_call(stats_value)
+            callchain.push(call, short=True)
             export.export(stats_value)
     else:
         for stats_value_batch in tqdm(stats_values,
@@ -250,6 +576,8 @@ def main(args):
                                       mininterval=0.1,
                                       maxinterval=1):
             for stats_value in stats_value_batch:
+                call = callchain.to_call(stats_value)
+                callchain.push(call, short=True)
                 export.export(stats_value)
 
 

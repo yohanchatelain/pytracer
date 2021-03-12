@@ -967,7 +967,8 @@ class WrapperClass(Wrapper):
     def handle_included_methoddescriptor(self, name, function):
         function_id = id(function)
         function_class = function.__objclass__.__name__
-        function_name = function.__name__
+        # function_name = function_class + '.' + function.__name__
+        function_name = function.__qualname__
         info = (function_id, function_class, function_name)
         wrapped_function = self.generic_wrapper(info)
         self.check_not_visited(function, function_id)
@@ -991,10 +992,14 @@ class WrapperClass(Wrapper):
             logger.debug(f"[{self.get_name()}] Include methoddescriptor {name}",
                          caller=self)
 
+    # TODO: This function should be safely removed
+    #       since Class object contains function
+    #       method are for instances class
     def handle_included_method(self, name, function):
         function_id = id(function)
         function_class = function.__self__.__name__
-        function_name = function.__name__
+        function_name = function.__qualname__
+        # function_name = function.__name__
         info = (function_id, function_class, function_name)
         wrapped_function = self.generic_wrapper(info)
         self.check_not_visited(function, function_id)
@@ -1015,14 +1020,14 @@ class WrapperClass(Wrapper):
                             error=e, caller=self)
         else:
             logger.debug(
-                f"[{self.get_name()}] Include method {name}", caller=self)
+                f"[{self.get_name()}] Include method {function_name}", caller=self)
 
     def handle_included_function(self, name, function):
         function_id = id(function)
         function_module = function.__module__
-        function_name = function.__name__
+        function_name = function.__qualname__
         assert function_module
-        function_name = getattr(function, "__name__")
+        # function_name = getattr(function, "__name__")
         info = (function_id, function_module, function_name)
         wrapped_function = self.generic_wrapper(info)
         self.check_not_visited(function, function_id)
@@ -1043,7 +1048,7 @@ class WrapperClass(Wrapper):
                             error=e, caller=self)
         else:
             logger.debug(
-                f"[{self.get_name()}] Include function {name}", caller=self)
+                f"[{self.get_name()}] Include function {function_name}", caller=self)
 
     def handle_visited_function(self, name, function):
         logger.debug(

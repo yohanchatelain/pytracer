@@ -7,7 +7,32 @@ import numpy as np
 import argparse
 
 
+def f(x, y, z):
+    sum_ = 0
+    if (h := x-y) < 0:
+        for i in range(x):
+            sum_ += i/h
+        else:
+            sum_ += sum_
+
+    if x < y:
+        z = z * x
+        return z+sum_
+    else:
+        z = z * y
+        return z+sum_
+
+
 def main():
+
+    try:
+        x = 1/0
+    except ZeroDivisionError as e:
+        print(e)
+    else:
+        print(x)
+    finally:
+        print("Division done")
 
     import sys
     print(sys.argv)
@@ -18,7 +43,7 @@ def main():
     args = parser.parse_args()
     print("args", args)
 
-    import pytracer.test.internal.test_hook as hook
+    from . import test_hook as hook
     print("list module of hook")
     hook.list_module()
 

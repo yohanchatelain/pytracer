@@ -75,7 +75,8 @@ class _Constant(metaclass=Singleton):
     __attributes = {
         "cache": {"root": ".__pytracercache__",
                   "traces": "traces",
-                  "stats": "stats"},
+                  "stats": "stats",
+                  'sources': 'sources'},
         "text_ext": ".txt",
         "json_ext": ".json",
         "pickle_ext": ".pkl",
@@ -158,6 +159,7 @@ class _Config(object, metaclass=Singleton):
                    "io.cache.root",
                    "io.cache.stats",
                    "io.cache.traces",
+                   "io.cache.sources",
                    "io.export.dat",
                    "io.export.header",
                    "numpy",
