@@ -1,12 +1,15 @@
 
 from dash_core_components.Input import Input
+from dash_html_components.Label import Label
 import dash_ace
 import dash_core_components as dcc
 import dash_html_components as html
 import dash_table as dt
 import dash_daq as daq
+import plotly.express as px
 
 import pytracer.gui.core as pgc
+import pytracer.callgraph.core as pcc
 
 # TODO: Use regexp to get original module
 # >>> c=re.compile(r"[a-zA-Z0-9][_]{1}")
@@ -107,6 +110,12 @@ yformat_selector = html.Div([
         className="dcc_control",
     )], className="mini_container")
 
+time_range_selector = html.Div([
+    html.P("Filter time",
+           className='control_label'),
+    dcc.Input(id='time-start', placeholder='Start'),
+    dcc.Input(id='time-end', placeholder='End')
+])
 
 timeline_hover_info = html.Div(
     dcc.Markdown(id="info-data-timeline-summary"),
@@ -118,10 +127,34 @@ timeline_hover_heatmap = html.Div(
     className="pretty_container"
 )
 
+
+heatmap_colors_selector = html.Div([
+    html.Div([
+        html.Label(["Color map style",
+                    dcc.Dropdown(
+                        id='color-heatmap-style',
+                        options=[
+                            {"label": 'sequential', 'value': 'sequential'},
+                            {'label': 'diverging', 'value': 'diverging'}
+                        ]
+                    )], className='mini_container'),
+        html.Label(["Color map selection",
+                    dcc.Dropdown(
+                        id='color-heatmap',
+                        options=[]
+                    )], className='mini_container'),
+        # html.Button('Animation', id='animate-heatmap', n_clicks=0)],
+    ],
+        className="mini_container",
+        style={"display": "flex", "display-direction": "row", 'width': '100%'})
+]
+)
+
 timeline_hover = html.Div(
     [
         timeline_hover_info,
-        timeline_hover_heatmap
+        timeline_hover_heatmap,
+        heatmap_colors_selector
     ],
     id="info-timeline",
     className="pretty_container",
@@ -170,13 +203,6 @@ timeline_graph = html.Div([
                                       id="source-button", on=False)
                 ], className="mini_container",
                 style={'width': "25%"}),
-            html.Div(
-                [
-                    dcc.Input(id='source-file-path',
-                              placeholder='Path to source directory',
-                              debounce=True)
-                ], className="mini_container",
-                style={'width': "50%", 'align-items': 'center', 'justify-content': 'center'}),
             html.Div(
                 [
                     dcc.Input(id='lines-start', placeholder='Start'),
@@ -243,30 +269,53 @@ header = html.Div(
 
 sidebar = info_table
 
-rootpanel = html.Div(
-    [
-        html.Div(
-            [
-                mode_selector,
-                xscale_selector,
-                yscale_selector,
-                xformat_selector,
-                yformat_selector
-            ],
-            className="pretty_container",
-            style={"display": "flex", "flex-direction": "row"},
-            id="cross-filter-options"
-        ),
-        html.Div(
-            [
-                timeline_graph,
-            ],
-            className="pretty_container",
-            style={"display": "flex", "flex-direction": "column"}
-        )
-    ],
-    id="mainContainer",
-    style={"display": "flex", "flex-direction": "column",
-           "justify-direction": "stretch",
-           "width": "100%"}
-)
+
+def get_gantt(callgraph):
+    gantt = pgc.get_gantt(callgraph)
+    start_time = [pcc.convert_date_to_time(point['Start']) for point in gantt]
+    end_time = [pcc.convert_date_to_time(point['Finish']) for point in gantt]
+    max_time = int(max(max(start_time), max(end_time)))
+    time = [t for t in range(max_time+1)]
+    date = [pcc.convert_time_to_date(t) for t in time]
+    fig = px.timeline(gantt, y="Task", x_start='Start', x_end='Finish')
+    fig.update_xaxes(tickformat=f'%s', overwrite=True)
+    fig.update_yaxes(tickwidth=1, ticklen=1)
+    return dcc.Graph(id='gantt', figure=fig)
+
+
+def get_rootpanel(args):
+    return html.Div(
+        [
+            html.Div(
+                [
+                    mode_selector,
+                    xscale_selector,
+                    yscale_selector,
+                    xformat_selector,
+                    yformat_selector,
+                    time_range_selector,
+                ],
+                className="pretty_container",
+                style={"display": "flex", "flex-direction": "row"},
+                id="cross-filter-options"
+            ),
+            html.Div(
+                [
+                    get_gantt(args.callgraph),
+                ],
+                className="pretty_container",
+                style={"display": "flex", "flex-direction": "column"}
+            ),
+            html.Div(
+                [
+                    timeline_graph,
+                ],
+                className="pretty_container",
+                style={"display": "flex", "flex-direction": "column"}
+            )
+        ],
+        id="mainContainer",
+        style={"display": "flex", "flex-direction": "column",
+               "justify-direction": "stretch",
+               "width": "100%"}
+    )

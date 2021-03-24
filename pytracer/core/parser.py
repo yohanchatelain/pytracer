@@ -1,14 +1,11 @@
-from enum import Enum, auto
-import pickle
-import networkx as nx
 import argparse
-import os
-import tempfile
 import copy
+import os
+import pickle
+import tempfile
+from enum import Enum, auto
 
-
-from typing_extensions import Protocol
-
+import networkx as nx
 import pytracer.core.inout as ptinout
 import pytracer.core.inout.exporter as ioexporter
 import pytracer.core.inout.reader as ioreader
@@ -355,7 +352,7 @@ class CallChain:
         stack.reverse()
 
     def to_tree(self, short=False):
-        print("--- Start building tree ---")
+        # print("--- Start building tree ---")
         G = nx.DiGraph()
         last_input_call = None
         parents = []
@@ -467,7 +464,7 @@ class CallChain:
                 i += '|'
             printd(f"{i+'|'}Current children stack: ")
             self.print_stack(children_stack, pp, to_print=to_print)
-        print("--- End building tree ---")
+        # print("--- End building tree ---")
 
         return G
 
@@ -533,7 +530,6 @@ class CallChain:
                 else:
                     def pp(call): return call
 
-                print("CallChain", self.to_number())
                 G = self.to_tree(short=True)
                 # print("Tree")
                 # for node in G.nodes():

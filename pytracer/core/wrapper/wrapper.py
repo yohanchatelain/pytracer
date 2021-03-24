@@ -472,8 +472,12 @@ class Wrapper(metaclass=ABCMeta):
         """
         Handler for functions
         """
+        if isinstance(function, functools.partial):
+            setattr(self.wrapped_obj, name, function)
+            return
+
         alias_function_name = name
-        function_name = getattr(function, "__name__")
+        function_name = getattr(function, "__name__", name)
         names = (alias_function_name, function_name)
         module_name = self.obj_name
 
@@ -843,12 +847,12 @@ class Wrapper(metaclass=ABCMeta):
 
             if self.isspecialattr(attr):
                 self.handle_special(attr, attr_obj)
+            elif self.isclass(attr_obj):
+                self.handle_class(attr, attr_obj, exclude=exclude)
             elif self.isfunction(attr_obj):
                 self.handle_function(attr, attr_obj, exclude=exclude)
             elif self.ismodule(attr_obj):
                 self.handle_module(attr, attr_obj, exclude=exclude)
-            elif self.isclass(attr_obj):
-                self.handle_class(attr, attr_obj, exclude=exclude)
             else:
                 self.handle_basic(attr, attr_obj, exclude=exclude)
 

@@ -183,21 +183,26 @@ class ExporterHDF5(_exporter.Exporter):
         # We create array to keep the object
         if ndim > 0:
             filters = tables.Filters(complevel=9, complib='zlib')
-            unique_id = "_".join([label, name, str(time)])
+            unique_id = "/".join([label, name])
             atom_type = tables.Atom.from_dtype(stats.dtype())
             shape = stats.shape()
+
+            path = tables.path.join_path(function_grp._v_pathname, unique_id)
+            group = self.h5file.create_group(path,
+                                             str(time), createparents=True)
+
             mean_array = self.h5file.create_carray(
-                function_grp, unique_id + "_mean",
+                group, "mean",
                 atom=atom_type, shape=shape, filters=filters)
             mean_array[:] = raw_mean
 
             std_array = self.h5file.create_carray(
-                function_grp, unique_id + "_std",
+                group, "std",
                 atom=atom_type, shape=shape, filters=filters)
             std_array[:] = raw_std
 
             sig_array = self.h5file.create_carray(
-                function_grp, unique_id + "_sig",
+                group, "sig",
                 atom=atom_type, shape=shape, filters=filters)
             sig_array[:] = raw_sig
 
@@ -210,7 +215,6 @@ class ExporterHDF5(_exporter.Exporter):
         function_id = obj["id"]
         time = obj["time"]
         module_grp_name = f"/{module}"
-
 
         assert(module)
         assert(function)

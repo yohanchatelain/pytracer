@@ -12,6 +12,7 @@ from importlib.machinery import ModuleSpec
 from pytracer.core.config import config as cfg
 from pytracer.utils.log import get_logger
 from pytracer.core.wrapper.wrapper import WrapperModule, visited_attr
+from pytracer.core.wrapper.cache import visited_files
 import pytracer.core.tracer_init as tracer_init
 import pytracer.utils.report as report
 
@@ -204,6 +205,7 @@ def run():
 
 
 def exec_module(module_name):
+    visited_files.add(module_name)
     spec = importlib.util.spec_from_file_location("__main__", module_name)
     module = importlib.util.module_from_spec(spec)
     # Pass arguments to program

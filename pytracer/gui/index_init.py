@@ -3,7 +3,7 @@ import os
 
 from pytracer.core.config import constant
 
-directory_default = f"{constant.cache.root}{os.sep}{constant.cache.stats}"
+directory_default = f"{constant.cache.root}{os.sep}"
 
 
 def init_module(subparser):
@@ -15,3 +15,4 @@ def init_module(subparser):
                               help="run dash server in debug mode")
     index_parser.add_argument("--filename", required=True,
                               help="file to visualize")
+    index_parser.add_argument('--callgraph', required=True, help='Call graph file')

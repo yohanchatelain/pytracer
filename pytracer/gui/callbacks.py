@@ -1,3 +1,5 @@
+import plotly.express as px
+import sys
 import astroid
 import cProfile
 from threading import TIMEOUT_MAX
@@ -52,42 +54,224 @@ def update_table_active_cell(selected_rows, data):
 
 
 @app.callback(
+    dash.dependencies.Output('color-heatmap', 'options'),
+    dash.dependencies.Input('color-heatmap-style', 'value'))
+def fill_heatmap_color(color_style):
+    if color_style is None:
+        return []
+    style = getattr(px.colors, color_style)
+    available_colors = px.colors.named_colorscales()
+
+    colors = []
+    for attr in dir(style):
+        if "_r" in attr:
+            attr_lower = attr.replace('_r', '').lower()
+        else:
+            attr_lower = attr.lower()
+        if attr_lower in available_colors:
+            colors.append({'label': attr, 'value': attr})
+    return colors
+
+
+def str_to_utf8(string):
+    return bytes(string, 'utf-8')
+
+
+def utf8_to_str(utf8):
+    return utf8.decode('utf-8')
+
+
+def frame_args(duration):
+    return {
+        "frame": {"duration": duration},
+        "mode": "immediate",
+        "fromcurrent": True,
+        "transition": {"duration": duration, "easing": "linear"},
+    }
+
+
+@app.callback(
     dash.dependencies.Output("info-data-timeline-heatmap", "figure"),
     dash.dependencies.Output("info-timeline", "style"),
     [dash.dependencies.Input("timeline", "hoverData"),
-     dash.dependencies.Input("timeline-mode", "value")])
-def print_heatmap(hover_data, mode):
+     dash.dependencies.Input("timeline-mode", "value"),
+     dash.dependencies.Input('color-heatmap', 'value'),
+     dash.dependencies.State('info-data-timeline-heatmap', 'figure'),
+     dash.dependencies.State('lines-start', 'value'),
+     dash.dependencies.State('lines-end', 'value')])
+def print_heatmap(hover_data, mode, color, fig, lstart, lend):
     b = time.perf_counter()
     figure = dict()
     display = {"display": "flex", "display-direction": "row"}
-    # display = {"display": "none"}
 
+    ctx = dash.callback_context
+    print(ctx.triggered)
+    # if ctx.triggered:
+    #     trigger = ctx.triggered[0]['prop_id']
+    #     if trigger == "animate-heatmap.n_clicks":
+    #         print("Animate triggered")
+    #         if hover_data:
+    #             print('HoverData')
+    #             x = hover_data['points'][0]['x']
+    #             info = hover_data['points'][0]['customdata']
+    #             module = info['module']
+    #             function = info['function']
+    #             label = info['label']
+    #             arg = info['arg']
+    #             filename = info['filename']
+    #             lineno = info['lineno']
+    #             name = info['name']
+
+    #             time_start = lstart if lstart else 0
+    #             time_end = lend if lend else sys.maxsize
+
+    #             filename_index = 0
+    #             lineno_index = 2
+    #             name_index = 3
+
+    #             def get_x(row):
+    #                 return row["label"] == str_to_utf8(label) and \
+    #                     row["name"] == str_to_utf8(arg) and \
+    #                     row["BacktraceDescription"][filename_index] == str_to_utf8(filename) and \
+    #                     row["BacktraceDescription"][lineno_index] == lineno and \
+    #                     row["BacktraceDescription"][name_index] == str_to_utf8(name) and \
+    #                     row['time'] >= time_start and \
+    #                     row['time'] <= time_end
+
+    #             x = pgc.data.filter(module, function, get_x, "time")
+    #             extra_values = list()
+    #             for i in x:
+    #                 extra_value = pgc.data.get_extra_value(
+    #                     module, function, label, arg, i, mode)
+    #                 if extra_value:
+    #                     _ndarray = extra_value.read()
+    #                     ndim = _ndarray.ndim
+
+    #                     if ndim == 1:
+    #                         _ndarray = _ndarray.reshape(_ndarray.shape+(1,))
+    #                     _row, _col = _ndarray.shape
+    #                     _x = [i for i in range(_row)]
+    #                     _y = [i for i in range(_col)]
+    #                     if mode == "sig":
+    #                         heatmap = go.Heatmap(x=_x,
+    #                                              y=_y,
+    #                                              z=_ndarray,
+    #                                              zmin=0,
+    #                                              zmax=64)
+    #                     else:
+    #                         heatmap = go.Heatmap(x=_x,
+    #                                              y=_y,
+    #                                              z=_ndarray)
+
+    #                     figure = heatmap
+    #                     extra_values.append(go.Frame(data=figure, name=str(i)))
+    #             fig = go.Figure(frames=extra_values)
+    #             sliders = [
+    #                 {
+    #                     "pad": {"b": 10, "t": 60},
+    #                     "len": 0.9,
+    #                     "x": 0.1,
+    #                     "y": 0,
+    #                     "steps": [
+    #                         {
+    #                             "args": [[f.name], frame_args(0)],
+    #                             "label": str(k),
+    #                             "method": "animate",
+    #                         }
+    #                         for k, f in enumerate(fig.frames)
+    #                     ],
+    #                 }
+    #             ]
+    #             fig.update_layout(
+    #                 title='Slices in volumetric data',
+    #                 width=700,
+    #                 height=700,
+    #                 updatemenus=[
+    #                     {
+    #                         "buttons": [
+    #                             {
+    #                                 "args": [None, frame_args(len(extra_values))],
+    #                                 "label": "&#9654;",  # play symbol
+    #                                 "method": "animate",
+    #                             },
+    #                             {
+    #                                 "args": [[None], frame_args(0)],
+    #                                 "label": "&#9724;",  # pause symbol
+    #                                 "method": "animate",
+    #                             },
+    #                         ],
+    #                         "direction": "left",
+    #                         "pad": {"r": 10, "t": 70},
+    #                         "type": "buttons",
+    #                         "x": 0.1,
+    #                         "y": 0,
+    #                     }
+    #                 ], sliders=sliders
+    #             )
+    #             fig.add_trace(go.Heatmap(extra_values[0]))
+    #             return (fig, display)
+
+    print(f'Change color {color}')
+
+    extra_value = None
     if hover_data:
-        if "customdata" in hover_data["points"][0]:
-            customdata = hover_data["points"][0]["customdata"]
-            if "extra" in customdata:
-                _ndarray = np.array(customdata["extra"])
-                ndim = _ndarray.ndim
+        x = hover_data['points'][0]['x']
+        info = hover_data['points'][0]['customdata']
 
-                if ndim == 1:
-                    _ndarray = _ndarray.reshape(_ndarray.shape+(1,))
-                _row, _col = _ndarray.shape
-                _x = [i for i in range(_row)]
-                _y = [i for i in range(_col)]
-                if mode == "sig":
-                    heatmap = go.Figure(data=go.Heatmap(x=_x,
-                                                        y=_y,
-                                                        z=_ndarray,
-                                                        zmin=0,
-                                                        zmax=64))
-                else:
-                    heatmap = go.Figure(data=go.Heatmap(x=_x,
-                                                        y=_y,
-                                                        z=_ndarray))
+        try:
+            extra_value = pgc.data.get_extra_value(info['module'],
+                                                   info['function'],
+                                                   info['label'],
+                                                   info['arg'],
+                                                   x,
+                                                   mode)
+            print("Extra value", extra_value)
 
-                figure = heatmap
-                figure.update_layout(width=700, height=700)
-                display = {"display": "flex", "display-direction": "row"}
+        except KeyError:
+            extra_value = None
+
+    if extra_value:
+        _ndarray = extra_value.read()
+        ndim = _ndarray.ndim
+
+        if ndim == 1:
+            _ndarray = _ndarray.reshape(_ndarray.shape+(1,))
+        _row, _col = _ndarray.shape
+        _x = [i for i in range(_row)]
+        _y = [i for i in range(_col)]
+        if mode == "sig":
+            heatmap = go.Figure(data=go.Heatmap(x=_x,
+                                                y=_y,
+                                                z=_ndarray,
+                                                zmin=0,
+                                                zmax=64,
+                                                coloraxis='coloraxis'))
+        else:
+            heatmap = go.Figure(data=go.Heatmap(x=_x,
+                                                y=_y,
+                                                z=_ndarray,
+                                                coloraxis='coloraxis'))
+
+        figure = heatmap
+        figure.update_layout(width=700, height=700)
+        print('One extra value')
+        if color:
+            colorscale = dict(colorscale=color)
+            if mode == "sig":
+                colorscale['cmin'] = 0
+                colorscale['cmax'] = 53
+            figure.update_layout(coloraxis=colorscale)
+
+    if ctx.triggered:
+        if ctx.triggered[0]['prop_id'] == 'color-heatmap.value':
+            print('Change color 2')
+            colorscale = dict(colorscale=color)
+            if mode == "sig":
+                colorscale['cmin'] = 0
+                colorscale['cmax'] = 53
+            fig = go.Figure(fig)
+            fig.update_layout(coloraxis=colorscale)
+            figure = fig
 
     e = time.perf_counter()
     print("print_heatmap", e-b)
@@ -118,14 +302,32 @@ def find_file_in_path(path, filename):
     return file_found
 
 
+__source_line_cache = dict()
+
+
+def get_full_source_line(path, line):
+    if (key := (path, line)) in __source_line_cache:
+        return __source_line_cache[key]
+
+    fi = open(path)
+    source = fi.read()
+    m = astroid.parse(source)
+    for call in m.nodes_of_class(astroid.Call):
+        if call.lineno == int(line):
+            source = call.statement()
+            key = (path, line)
+            __source_line_cache[key] = source
+            return source
+    return None
+
+
 @ app.callback(
     dash.dependencies.Output("source", "children"),
     dash.dependencies.Output("source-link", "href"),
     dash.dependencies.Output("source-link", "children"),
-    [dash.dependencies.Input("timeline", "hoverData"),
-     dash.dependencies.Input('source-file-path', 'value')])
+    [dash.dependencies.Input("timeline", "hoverData")])
 # @cache.memoize(timeout=TIMEOUT)
-def print_source(hover_data, source_path):
+def print_source(hover_data):
     b = time.perf_counter()
 
     line = ""
@@ -134,23 +336,24 @@ def print_source(hover_data, source_path):
 
     if hover_data:
         customdata = hover_data["points"][0]["customdata"]
-        [_source, _line, _lineno] = customdata["backtrace"]
-        line = f"```py{os.linesep} {_line}{os.linesep}```"
-        if os.path.isfile(_source):
-            source = _source
+        source = customdata["filename"]
+        _lineno = customdata['lineno']
+        path = f"{pgc.data.source_path}{os.sep}{source}"
+        if os.path.isfile(path):
+            line = get_full_source_line(path, _lineno)
+            line = f'```py{os.linesep} {line.as_string()}{os.linesep}```'
         else:
-            source = find_file_in_path(source_path, _source)
-            source = source if source else _source
-        description = f"{_source}:{_lineno}"
+            raise FileNotFoundError
+        description = f"{source}:{_lineno}"
 
     e = time.perf_counter()
     print("print_source", e-b)
     return line, source, description
 
 
-@app.callback(dash.dependencies.Output('lines-slider-selection', 'children'),
-              dash.dependencies.Input('lines-start', 'value'),
-              dash.dependencies.Input('lines-end', 'value'))
+@ app.callback(dash.dependencies.Output('lines-slider-selection', 'children'),
+               dash.dependencies.Input('lines-start', 'value'),
+               dash.dependencies.Input('lines-end', 'value'))
 def print_line_selection(start, end):
     return f"Selected lines: {start}:{end}"
 
@@ -159,27 +362,43 @@ def print_line_selection(start, end):
     # dash.dependencies.Output("source-modal-body-md", "children"),
     dash.dependencies.Output("source-file", "children"),
     [dash.dependencies.Input("source-button", "on"),
-     dash.dependencies.Input("source-link", "href")])
+     dash.dependencies.Input("source-link", "href")],
+    dash.dependencies.State('source-link', "children"))
 # @cache.memoize(timeout=TIMEOUT)
-def print_modal_source(on, href):
+def print_modal_source(on, href, href_description):
     b = time.perf_counter()
     source_code = "No source code found..."
     md = None
     if on:
         if href:
-            if os.path.isfile(href):
-                nl = os.linesep
-                with open(href, "r") as fi:
-                    source_code = "".join(fi.readlines())
+            path = f"{pgc.data.source_path}{os.sep}{href}"
+            lineno = href_description.split(':')[-1]
+            line = get_full_source_line(path, lineno)
+            line_start = line.fromlineno
+            line_end = line.tolineno
+            print(f"Line {line_start}:{line_end}")
+            if os.path.isfile(path):
+                fi = open(path)
+                source_code = fi.read()
             md = dash_ace.DashAceEditor(id="source-modal-body-md",
                                         value=source_code,
                                         theme='github',
                                         mode='python',
                                         tabSize=2,
+                                        focus=True,
+                                        enableSnippets=True,
                                         style={"marginBottom": 10,
                                                "width": "100%",
                                                "height": "100%",
-                                               "overflowY": "scroll"})
+                                               "overflowY": "scroll"},
+                                        markers=[{'startRow': line_start,
+                                                  'startCol': 0,
+                                                  'endRow': line_end,
+                                                  'endCol': 20,
+                                                  'className': 'error-marker',
+                                                  'type': 'background'}],
+                                        annotations=[{'row': line_start-1,
+                                                      'type': 'error', 'text': 'Current call'}])
 
     e = time.perf_counter()
     print("print_modal_source", e-b)
@@ -188,36 +407,51 @@ def print_modal_source(on, href):
 
 @ app.callback(
     dash.dependencies.Output("info-data-timeline-summary", "children"),
-    dash.dependencies.Input("timeline", "hoverData"))
-def print_datahover_summary(hover_data):
+    dash.dependencies.Input("timeline", "hoverData"),
+    dash.dependencies.State('timeline-mode', 'value'))
+def print_datahover_summary(hover_data, mode):
     b = time.perf_counter()
     text = ""
     if hover_data:
-        if "customdata" in hover_data["points"][0]:
+        print(f'hover_data {hover_data}')
+        x = hover_data['points'][0]['x']
+        info = hover_data['points'][0]['customdata']
+        extra_value = None
+        try:
+            extra_value = pgc.data.get_extra_value(info['module'],
+                                                   info['function'],
+                                                   info['label'],
+                                                   info['arg'],
+                                                   x,
+                                                   mode)
+        except KeyError:
+            extra_value = None
 
-            customdata = hover_data["points"][0]["customdata"]
-            if "extra" in customdata:
+        if extra_value:
+            _ndarray = extra_value.read()
+            ndim = _ndarray.ndim
 
-                _ndarray = np.array(customdata["extra"])
-                ndim = _ndarray.ndim
+            if ndim == 1:
+                (_size,) = _ndarray.shape
+                norm_fro = np.linalg.norm(_ndarray)
+                norm_inf = np.linalg.norm(_ndarray, ord=np.inf)
+                text = (f"Function={info['function']}{os.linesep*2}"
+                        f"Arg={info['arg']}{os.linesep*2}"
+                        f"shape={_size}{os.linesep}{os.linesep}"
+                        f"Frobenius norm={norm_fro:.2}{os.linesep}{os.linesep}"
+                        f"Inf norm={norm_inf:.2}{os.linesep}{os.linesep}")
 
-                if ndim == 1:
-                    (_size,) = _ndarray.shape
-                    norm_fro = np.linalg.norm(_ndarray)
-                    norm_inf = np.linalg.norm(_ndarray, ord=np.inf)
-                    text = (f"shape={_size}{os.linesep}{os.linesep}"
-                            f"Frobenius norm={norm_fro:.2}{os.linesep}{os.linesep}"
-                            f"Inf norm={norm_inf:.2}{os.linesep}{os.linesep}")
-
-                elif ndim == 2:
-                    _row, _col = _ndarray.shape
-                    norm_fro = np.linalg.norm(_ndarray)
-                    norm_inf = np.linalg.norm(_ndarray, ord=np.inf)
-                    cond = np.linalg.cond(_ndarray)
-                    text = (f"shape={_row}x{_col}{os.linesep}{os.linesep}"
-                            f"Frobenius norm={norm_fro:.2}{os.linesep}{os.linesep}"
-                            f"Inf norm={norm_inf:.2}{os.linesep}{os.linesep}"
-                            f"Cond={cond:.2e}{os.linesep}{os.linesep}")
+            elif ndim == 2:
+                _row, _col = _ndarray.shape
+                norm_fro = np.linalg.norm(_ndarray)
+                norm_inf = np.linalg.norm(_ndarray, ord=np.inf)
+                cond = np.linalg.cond(_ndarray)
+                text = (f"Function={info['function']}{os.linesep*2}"
+                        f"Arg={info['arg']}{os.linesep*2}",
+                        f"shape={_row}x{_col}{os.linesep}{os.linesep}"
+                        f"Frobenius norm={norm_fro:.2}{os.linesep}{os.linesep}"
+                        f"Inf norm={norm_inf:.2}{os.linesep}{os.linesep}"
+                        f"Cond={cond:.2e}{os.linesep}{os.linesep}")
 
     e = time.perf_counter()
     print("print_datahover_summary", e-b)
@@ -236,9 +470,9 @@ def open_modal_source(on):
     return style_on if on else style_off
 
 
-@cache.memoize(timeout=TIMEOUT)
+# @cache.memoize(timeout=TIMEOUT)
 def get_scatter_timeline(module, function, label, backtrace, arg, mode, marker_symbol,
-                         marker_color, customdata=None):
+                         marker_color, customdata=None, time_start=-1, time_end=sys.maxsize):
     b = time.perf_counter()
 
     b1 = time.perf_counter()
@@ -246,7 +480,9 @@ def get_scatter_timeline(module, function, label, backtrace, arg, mode, marker_s
     def get_x(row):
         return row["label"] == bytes(label, "utf-8") and \
             row["name"] == arg and \
-            row["BacktraceDescription"] == backtrace
+            row["BacktraceDescription"] == backtrace and \
+            row['time'] >= time_start and \
+            row['time'] <= time_end
 
     x = pgc.data.filter(module, function, get_x, "time")
     y = pgc.data.filter(module, function, get_x, mode)
@@ -257,35 +493,33 @@ def get_scatter_timeline(module, function, label, backtrace, arg, mode, marker_s
 
     b2 = time.perf_counter()
 
-    backtracejoined = np.array(
-        [filename.decode('utf-8'), line.decode('utf-8'), lineno])
-    customdata = []
-    if pgc.data.has_extra_value(module, function):
-        _tmp = []
-        extra_values = pgc.data.get_extra_value(
-            module, function, label=label, arg=arg.decode("utf-8"), mode=mode)
-        for _x in x:
-            found = False
-            for ev in extra_values:
-                if ev.name.find(str(_x)):
-                    found = True
-                    _tmp.append(
-                        {"backtrace": backtracejoined, "extra": np.array(ev)})
-                    break
-            if not found:
-                _tmp.append({"backtrace": backtracejoined})
-        customdata.extend(_tmp)
-    else:
-        customdata.extend([{"backtrace": backtracejoined}]*len(x))
+    info = {'module': module,
+            'function': function,
+            'label': label,
+            'arg': arg.decode('utf-8'),
+            'filename': filename.decode('utf-8'),
+            'lineno': lineno,
+            'name': name.decode('utf-8')}
+
+    customdata = list()
+    hovertext = list()
+    for i in x:
+        info['time'] = i
+        customdata.append(info)
+        hovertext.append(f"{function}{os.linesep}{arg.decode('utf-8')}")
 
     e2 = time.perf_counter()
     print("extra_value", e2-b2)
 
     b3 = time.perf_counter()
-    scatter = go.Scattergl(name=f"{arg} - {lineno}",
-                           legendgroup=f"group{backtrace}",
+    scatter = go.Scattergl(name=f"{function} - {arg.decode('utf-8')} - {lineno}",
+                           #    legendgroup=f"group{backtrace}",
                            x=x,
                            y=y,
+                           hovertemplate='<b>X</b>: %{x}' +
+                           '<br><b>Y</b>: %{y:.7e}<br>' +
+                           '<b>%{text}</b>',
+                           text=hovertext,
                            customdata=customdata,
                            mode="markers",
                            marker_symbol=marker_symbol,
@@ -299,7 +533,9 @@ def get_scatter_timeline(module, function, label, backtrace, arg, mode, marker_s
 
 
 def add_scatter(fig, module, function,
-                label, backtraces_set, argsname, colors, marker, mode):
+                label, backtraces_set,
+                argsname, colors, marker, mode,
+                time_start=0, time_end=sys.maxsize):
     b = time.perf_counter()
 
     for backtrace in backtraces_set:
@@ -312,7 +548,9 @@ def add_scatter(fig, module, function,
                                            arg,
                                            mode,
                                            marker,
-                                           colors[backtrace])
+                                           colors[backtrace],
+                                           time_start=time_start,
+                                           time_end=time_end)
 
             if scatter:
                 fig.add_trace(scatter)
@@ -363,9 +601,12 @@ def get_first_call_from_line(lfile, lstart):
      dash.dependencies.State("lines-start", "value"),
      dash.dependencies.State("lines-end", "value"),
      dash.dependencies.State("lines-file-selection", "value"),
+     dash.dependencies.State("time-start", "value"),
+     dash.dependencies.State("time-end", "value")
      ])
 def update_timeline(selected_rows, data, mode, xscale, yscale,
-                    xfmt, yfmt, line_on, curr_fig, lstart, lend, lfile):
+                    xfmt, yfmt, line_on, curr_fig, lstart, lend, lfile,
+                    time_start, time_end):
     ctx = dash.callback_context
 
     b = time.perf_counter()
@@ -386,7 +627,7 @@ def update_timeline(selected_rows, data, mode, xscale, yscale,
             print("Return fig")
             return fig
 
-    fig = go.Figure()
+    fig = go.Figure(layout={'height': 800})
     ylabel = pgc.get_ylabel(mode)
     fig.update_xaxes(title_text="Invocation", type=xscale)
     fig.update_yaxes(title_text=ylabel,
@@ -401,6 +642,9 @@ def update_timeline(selected_rows, data, mode, xscale, yscale,
             pgc.data.get_first_call_from_line(lstart)
         else:
             print(f"File {lfile} does not exit")
+
+    time_start = -1 if time_start is None else int(time_start)
+    time_end = sys.maxsize if time_end is None else int(time_end)
 
     for mf in module_and_function:
         module = mf["module"]
@@ -419,7 +663,8 @@ def update_timeline(selected_rows, data, mode, xscale, yscale,
         add_scatter(fig=fig,
                     module=module, function=function,
                     label="inputs", backtraces_set=backtraces_set,
-                    argsname=argsname, colors=colors, marker="triangle-up", mode=mode)
+                    argsname=argsname, colors=colors, marker="triangle-up", mode=mode,
+                    time_start=time_start, time_end=time_end)
 
         names = pgc.data.filter(
             module, function, lambda row: row["label"] == b"outputs", "name")
@@ -428,7 +673,8 @@ def update_timeline(selected_rows, data, mode, xscale, yscale,
         add_scatter(fig=fig,
                     module=module, function=function,
                     label="outputs", backtraces_set=backtraces_set,
-                    argsname=argsname, colors=colors, marker="triangle-down", mode=mode)
+                    argsname=argsname, colors=colors, marker="triangle-down", mode=mode,
+                    time_start=time_start, time_end=time_end)
 
     e = time.perf_counter()
     print("update_timeline", e-b)

@@ -1,3 +1,4 @@
+import pytracer.callgraph as pc
 import tables
 import os
 import re
@@ -52,13 +53,20 @@ class Data:
     __labels = {"inputs", "outputs"}
     __modes = ("mean", "std", "sig")
 
-    def __init__(self, filename=None):
-        if filename is None:
-            self.data = None
-        elif os.path.isfile(filename):
+    def __init__(self, filename, directory):
+        if os.path.isfile(filename):
             self.data = tables.File(filename)
         else:
             raise FileNotFoundError
+
+        self.source_path = self.get_source_directory(directory)
+
+    def get_source_directory(self, directory):
+        path = f"{directory}{os.sep}sources"
+        if os.path.isdir(path):
+            return path
+        else:
+            raise FileNotFoundError(f"Unknown directory path {path}")
 
     def get_header(self):
         if self.data is None:
@@ -114,18 +122,15 @@ class Data:
     def is_value(self, node):
         return isinstance(node, tables.table.Table)
 
-    def is_extra_value(self, node):
-        return isinstance(node, tables.carray.CArray)
-
-    def has_extra_value(self, module, function):
+    def has_extra_value(self, module, function, label, arg):
         functionnode = self.get_function(module, function)
-        for node in functionnode:
-            if self.is_extra_value(node):
+        if labelnode := getattr(functionnode, label, None):
+            if getattr(labelnode, arg, None):
                 return True
         return False
 
     def get_extra_value(self, module, function, label=".*", arg=".*", time=".*", mode=".*"):
-        if not self.has_extra_value(module, function):
+        if not self.has_extra_value(module, function, label, arg):
             raise KeyError(
                 f"group /{module}/{function} does not have extra values")
 
@@ -133,20 +138,20 @@ class Data:
         self.check_is_valid_mode(mode)
 
         searchnodename = re.compile(f"{label}_{arg}_{time}_{mode}")
-        functionnode = self.get_function(module, function)
-
         if (key := (module, function, searchnodename)) in Data.__cache:
             return Data.__cache[key]
 
-        foundnodes = []
-        for node in functionnode:
-            if searchnodename.fullmatch(node.name):
-                foundnodes.append(node)
+        functionnode = self.get_function(module, function)
+
+        labelnode = getattr(functionnode, label)
+        argnode = getattr(labelnode, arg)
+        timenode = getattr(argnode, str(time))
+        extra_value = getattr(timenode, mode)
 
         key = (module, function, searchnodename)
-        Data.__cache[key] = foundnodes
+        Data.__cache[key] = extra_value
 
-        return foundnodes
+        return extra_value
 
     def filter(self, module, function, filters, col):
         if self.data is None:
@@ -164,18 +169,18 @@ class Data:
 
         return ret
 
-    def get_first_call_from_line(self, filename, line):
-        for group in self.data.walk_groups():
-            for bt in g.values.col('BacktraceDescription'):
-                sourcefile = 
+    # def get_first_call_from_line(self, filename, line):
+    #     for group in self.data.walk_groups():
+    #         for bt in g.values.col('BacktraceDescription'):
+    #             sourcefile =
 
 
-data = Data()
+data = None
 
 
 def init_data(args):
     global data
-    data = Data(args.filename)
+    data = Data(args.filename, args.directory)
 
 
 def get_data():
@@ -207,6 +212,14 @@ def is_scalar(value):
     if hasattr(value, "ndim"):
         _is_scalar = value.ndim == 0
     return _is_scalar
+
+
+def get_gantt(callgraph):
+    pc.core.raw_graphs = pc.core.load(callgraph)
+    gantt = list()
+    for _, g in pc.core.raw_graphs.items():
+        gantt += pc.core.get_gantt(g)
+    return gantt
 
 
 bt_to_id = dict()

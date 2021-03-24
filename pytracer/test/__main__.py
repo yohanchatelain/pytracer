@@ -6,7 +6,7 @@ import subprocess
 from sys import prefix
 
 from pytracer.core.config import constant
-from pytracer.core.utils import color, get_human_size
+from pytracer.utils import color, get_human_size
 
 excluded_directories = [".__pytracercache__", "__pycache__"]
 excluded_files = ["__main__", "__init__", "generic_test"]
@@ -110,8 +110,9 @@ def is_valid_file(file):
 
 
 def run_file(script_runner, args, file):
-    ret = script_runner.run("pytracer","trace",f"--module {file}")
+    ret = script_runner.run("pytracer", "trace", f"--module {file}")
     assert ret.success
+
 
 def run_file(args, file):
     status = None

@@ -12,12 +12,11 @@ from pytracer.core.config import config as cfg
 from pytracer.core.config import constant
 from pytracer.utils.log import get_logger
 from pytracer.utils import report
+from pytracer.core.wrapper.cache import visited_files
 
 from . import _init, _writer
 
 logger = get_logger()
-
-visited_files = set()
 
 
 class WriterPickle(_writer.Writer):
@@ -44,10 +43,11 @@ class WriterPickle(_writer.Writer):
     def copy_sources(self):
         for filename in visited_files:
             src = filename
-            dst = f"{self.parameters.cache_sources_path}{os.path.sep}{filename}"
-            dstdir = os.path.dirname(dst)
-            os.makedirs(dstdir, exist_ok=True)
-            shutil.copy(src, dst)
+            if os.path.isfile(src):
+                dst = f"{self.parameters.cache_sources_path}{os.path.sep}{filename}"
+                dstdir = os.path.dirname(dst)
+                os.makedirs(dstdir, exist_ok=True)
+                shutil.copy(src, dst)
 
     def _init_ostream(self):
         if self.parameters.filename:
@@ -121,7 +121,6 @@ class WriterPickle(_writer.Writer):
 
                 if not report.report_only():
                     self._write(to_write)
-
         except pickle.PicklingError as e:
             logger.error(
                 f"while writing in Pickle file: {self.filename}",

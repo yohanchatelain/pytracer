@@ -1,4 +1,5 @@
 import argparse
+from pytracer.gui.layout import get_rootpanel
 
 import dash_core_components as dcc
 import dash_html_components as html
@@ -6,23 +7,17 @@ import dash_html_components as html
 import pytracer.gui.core as pgc
 import pytracer.gui.index_init as index_init
 
-data = pgc.Data()
-
 
 def init_layout(app, args):
-    from pytracer.gui.layout import header, modal, rootpanel, sidebar
+    from pytracer.gui.layout import header, modal, get_rootpanel, sidebar
     app.layout = html.Div([
-        dcc.Store(id="memory-args", data=dict(args._get_kwargs())),
-        dcc.Store(id="memory-path"),
-        dcc.Store(id="memory-header"),
-        dcc.Store(id="memory-data", storage_type="local"),
         html.Div(id="output-clientsid"),
         header,
         modal,
         html.Div(
             [
                 sidebar,
-                rootpanel
+                get_rootpanel(args)
             ],
             style={"display": "flex", "flex-direction": "row"}
         ),
@@ -30,13 +25,12 @@ def init_layout(app, args):
 
 
 def main(args):
-    global data
     import pytracer.gui.callbacks
     from pytracer.gui.app import app
 
     init_layout(app, args)
     pgc.init_data(args)
-    app.run_server(debug=args.debug)
+    app.run_server(debug=args.debug, threaded=False)
 
 
 if __name__ == '__main__':
