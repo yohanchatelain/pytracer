@@ -10,9 +10,11 @@ class TypeValue(IntEnum):
     INT = auto()
     FLOAT = auto()
     NUMPY = auto()
+    BOOL = auto()
     LIST = auto()
     TUPLE = auto()
     FUNCTION = auto()
+    SKLEARN = auto()
     OTHER = auto()
 
     def is_scalar(self):
@@ -45,8 +47,12 @@ class TypeValue(IntEnum):
         return not self.is_function() and not self.is_other()
 
 
+_type_cache = set()
+
+
 def get_type(value):
     from pytracer.core.stats.numpy import StatisticNumpy
+    from pytracer.core.stats.sklearn import is_sklearn_value
     import numpy as np
     _type = None
     if isinstance(value, int):
@@ -65,10 +71,14 @@ def get_type(value):
         _type = TypeValue.TUPLE
     elif isinstance(value, FunctionType):
         _type = TypeValue.FUNCTION
+    elif is_sklearn_value(value):
+        _type = TypeValue.SKLEARN
     else:
         _type = TypeValue.OTHER
         if not isinstance(value, (str, np.ndarray, np.dtype, type)):
-            logger.warning(f"Unknown type: {type(value)} {value}")
+            if type(value) not in _type_cache:
+                logger.warning(f"Unknown type: {type(value)} {value}")
+                _type_cache.add(type(value))
     return _type
 
 
@@ -80,6 +90,7 @@ def check_type(values):
 
 def get_stats(values):
     from pytracer.core.stats.numpy import StatisticNumpy
+    from pytracer.core.stats.sklearn import get_sklearn_stat
     import numpy as np
     check_type(values)
     _type = get_type(values[0])
@@ -106,6 +117,8 @@ def get_stats(values):
     elif _type == TypeValue.NUMPY:
         array = np.array(values)
         _stats = StatisticNumpy(array)
+    elif _type == TypeValue.SKLEARN:
+        _stats = get_sklearn_stat(values, type(values[0]))
     else:
         _stats = StatisticNumpy(values, empty=True)
         # _stats = values[0]

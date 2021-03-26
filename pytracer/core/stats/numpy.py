@@ -30,6 +30,9 @@ class StatisticNumpy:
 
     def __init__(self, values, empty=False):
 
+        if not empty and values.ndim == 0:
+            empty = True
+
         if empty:
             self.cached_mean = np.nan
             self.cached_sig = np.nan

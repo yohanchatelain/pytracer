@@ -134,7 +134,7 @@ class Parser:
         elif callable(attr):
             attrs = [attr(value) for value in values]
         else:
-            logger.error(f"Unknow type attribute during merge: {attr}")
+            logger.error(f"Unknow type attribute during merging: {attr}")
 
         if not do_not_check and len(set(attrs)) != 1:
             logger.error(
@@ -579,16 +579,20 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Pytracer parser")
-    parser_init.init_module(parser)
+    subparser = parser.add_subparsers(title="pytracer modules",
+                                      help="pytracer modules",
+                                      dest="pytracer_module")
+
+    parser_init.init_module(subparser)
     args = parser.parse_args()
+    main(args)
 
-    t = tempfile.NamedTemporaryFile()
-    t.write(ptcontext.verificarlo.getenv(
-        ptcontext.verificarlo.BackendType.IEEE))
-    env = {"VFC_BACKENDS_FROM_FILE": t.name}
-    env_excluded = ["VFC_BACKENDS"]
+    # t = tempfile.NamedTemporaryFile()
+    # t.write(ptcontext.verificarlo.getenv(
+    #     ptcontext.verificarlo.BackendType.IEEE))
+    # env = {"VFC_BACKENDS_FROM_FILE": t.name}
+    # env_excluded = ["VFC_BACKENDS"]
 
-    with ptcontext.context.ContextManager(env, env_excluded):
-        main(args)
+    # with ptcontext.context.ContextManager(env, env_excluded):
 
-    t.close()
+    # t.close()

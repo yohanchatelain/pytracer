@@ -152,6 +152,9 @@ class ExporterHDF5(_exporter.Exporter):
         backtrace = kwargs["backtrace"]
         function_grp = kwargs["hdf5_function_group"]
 
+        if stats is None or stats == [] or stats.shape() == (0,):
+            return
+
         ndim = stats.ndim()
 
         raw_mean = stats.mean()
@@ -241,6 +244,17 @@ class ExporterHDF5(_exporter.Exporter):
                                     function_id=function_id,
                                     label=label,
                                     name=f"{name}_TID{i}",
+                                    time=time,
+                                    backtrace=backtrace,
+                                    hdf5_function_group=function_grp)
+
+            if isinstance(stats, dict):
+                for name_attr, stat in stats.items():
+                    self.export_arg(row=row,
+                                    stats=stat,
+                                    function_id=function_id,
+                                    label=label,
+                                    name=f"{name}_{name_attr}",
                                     time=time,
                                     backtrace=backtrace,
                                     hdf5_function_group=function_grp)
