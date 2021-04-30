@@ -86,7 +86,10 @@ class WriterPickle(_writer.Writer):
             pickle.dump(obj, io.BytesIO())
             return True
         except Exception as e:
-            obj.pop("args")
+            try:
+                obj.pop("args")
+            except AttributeError:
+                pass
             logger.warning(
                 f"Object is not writable: {obj}", caller=self, error=e)
             return False
@@ -103,6 +106,9 @@ class WriterPickle(_writer.Writer):
         args = kwargs["args"]
         backtrace = kwargs["backtrace"]
 
+        if 'self' in args:
+            args.pop('self')
+
         function_id = id(function)
         to_write = {"id": function_id,
                     "time": time,
@@ -111,6 +117,7 @@ class WriterPickle(_writer.Writer):
                     "label": label,
                     "args": args,
                     "backtrace": backtrace}
+
         try:
             if self.is_writable(to_write):
 
@@ -121,6 +128,25 @@ class WriterPickle(_writer.Writer):
 
                 if not report.report_only():
                     self._write(to_write)
+
+            else:
+                logger.warning(f"Iterate over args")
+                args_ = dict()
+                for name, arg in args.items():
+                    if not self.is_writable(arg):
+                        args_[name] = None
+                    else:
+                        args_[name] = arg
+
+                to_write['args'] = args_
+                if report.report_enable():
+                    key = (module_name, function_name)
+                    value = to_write
+                    report.report(key, value)
+
+                if not report.report_only():
+                    self._write(to_write)
+
         except pickle.PicklingError as e:
             logger.error(
                 f"while writing in Pickle file: {self.filename}",

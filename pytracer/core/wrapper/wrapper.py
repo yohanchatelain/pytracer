@@ -66,16 +66,12 @@ class Filter:
             self._add(module, function)
 
     def has_module(self, module):
-        logger.debug(f"checking entry for module {module}", caller=self)
         if not module:
             return False
         if not bool(self.__modules):
             return False
         for _module in self.__modules:
             if _module.fullmatch(module):
-                logger.debug(f"has module {module}", caller=self)
-                logger.debug(f"Filter {_module}, pattern {module}",
-                             caller=self)
                 return True
         return False
 
@@ -94,29 +90,17 @@ class Filter:
         return self.has_function(submodule, module)
 
     def _has_function(self, function, module=None):
-        logger.debug(f"Check if function {function} is in {module}",
-                     caller=self)
         if not function:
             return False
         if not bool(self.__modules):
             return False
         # We search function in module
         if module:
-            logger.debug("iter over modules", caller=self)
             for mod in self.__modules:
-                logger.debug(f"- {mod}", caller=self)
                 if mod.fullmatch(module):
-                    logger.debug(f"{mod} matches {module}", caller=self)
                     functions = self.__modules[mod]
-                    logger.debug(f"iter over functions in {mod}", caller=self)
                     for _function in functions:
-                        logger.debug(
-                            f"check if {_function} matches {function}", caller=self)
                         if _function.fullmatch(function):
-                            msg = (f"Has function {function} in module {module}{os.linesep}"
-                                   f"Module filter {mod}, pattern {module}{os.linesep}"
-                                   f"Function filter {_function}, pattern {function}")
-                            logger.debug(msg, caller=self)
                             return True
             return False
 
@@ -124,7 +108,6 @@ class Filter:
         for function_set in self.__modules.values():
             for _function in function_set:
                 if _function.fullmatch(function):
-                    logger.debug(f"has function {function}", caller=self)
                     return True
         return False
 
@@ -142,7 +125,7 @@ class FilterInclusion(Filter, metaclass=Singleton):
             super().__init__(None)
         except FileNotFoundError:
             logger.error(f"include-file {cfg.include_file} not found")
-        self.debug()
+        # self.debug()
 
 
 class FilterExclusion(Filter, metaclass=Singleton):
@@ -156,7 +139,7 @@ class FilterExclusion(Filter, metaclass=Singleton):
         except FileNotFoundError:
             logger.error(f"exclude-file {cfg.exclude_file} not found")
         self.default_exclusion()
-        self.debug()
+        # self.debug()
 
     def default_exclusion(self):
         modules_to_load = [module.strip() for module in cfg.modules_to_load]
@@ -185,6 +168,12 @@ def instance_wrapper(function):
 
     def wrapper(self, *args, **kwargs):
         return _wrapper(writer, self, *args, **kwargs)
+    for attr in dir(function):
+        try:
+            obj = getattr(function, attr, None)
+            setattr(function, attr, obj)
+        except Exception:
+            continue
     return wrapper
 
 
@@ -462,6 +451,8 @@ class Wrapper(metaclass=ABCMeta):
         wrapped_fun = self.getwrapperfunction(info, function, name)
         code = compile(wrapped_fun, function_path, "exec")
         func = FunctionType(code.co_consts[0], func_dict, name)
+        setattr(func, '__name__', func_dict['__name__'])
+        setattr(func, '__module__', func_dict['__module__'])
         setattr(func, visited_attr, True)
         setattr(self.wrapped_obj, name, func)
         cache.visited_functions[id(function)] = func
@@ -495,8 +486,9 @@ class Wrapper(metaclass=ABCMeta):
             try:
                 setattr(self.wrapped_obj, name, cached_function)
             except TypeError as e:
-                pass
-                # logger.warning(f"Cannot set attribute", caller=self, error=e)
+                # pass
+                logger.warning(
+                    f"Cannot set attribute {name}", caller=self, error=e)
             return
 
         if fid in cache.id_dict:
@@ -545,6 +537,15 @@ class Wrapper(metaclass=ABCMeta):
         setattr(self.wrapped_obj, submodname, submodule)
         # The submodule is excluded so we add itself as value
         Wrapper.m2wm[submodule] = submodule
+
+        try:
+            _ = sys.modules.pop(submodule.__name__)
+        except KeyError:
+            pass
+
+        sys.modules[submodule.__name__] = submodule
+        globals()[submodule.__name__] = submodule
+
         logger.debug(f"submodule {submodname} excluded")
 
     def handle_included_module(self, attr, submodule):
@@ -558,6 +559,15 @@ class Wrapper(metaclass=ABCMeta):
         setattr(self.wrapped_obj, submodname, submodule_wrp)
         # The submodule is included so we add the wrapped module as value
         Wrapper.m2wm[submodule] = submodule_wrp
+
+        try:
+            _ = sys.modules.pop(submodule.__name__)
+        except KeyError:
+            pass
+
+        sys.modules[submodule.__name__] = submodule_wrp
+        globals()[submodule.__name__] = submodule_wrp
+
         logger.debug(f"submodule {submodname} included")
 
     def handle_module(self, attr, submodule, exclude=False):
@@ -814,7 +824,7 @@ class Wrapper(metaclass=ABCMeta):
         for attr in attributes:
             logger.debug(f"[{self.obj_name}] Checking {attr}", caller=self)
             try:
-                attr_obj = inspect.getattr_static(obj, attr)
+                attr_obj = getattr(obj, attr)
             except AttributeError:
                 logger.warning((f"{attr} is not handled by "
                                 "inspec.getattr_static"), caller=self)
@@ -1052,11 +1062,11 @@ class WrapperClass(Wrapper):
                             error=e, caller=self)
         else:
             logger.debug(
-                f"[{self.get_name()}] Include function {function_name}", caller=self)
+                f"[{self.get_name()}] Include function {function_name} ({function_id})", caller=self)
 
     def handle_visited_function(self, name, function):
         logger.debug(
-            f"[{self.real_obj.__name__}] (Visited) Include method {name}")
+            f"[{self.real_obj.__name__}] (Visited) Include method {name} ({id(function)})")
         wrapped_function = cache.visited_functions[id(function)]
         setattr(self.wrapped_obj, name, wrapped_function)
 

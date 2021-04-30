@@ -72,6 +72,9 @@ class Myloader(Loader):
                 has_attr = True
             except AttributeError:
                 has_attr = False
+                logger.debug(f"symbol {sym} is missing")
+            except ModuleNotFoundError:
+                has_attr = False
             if not has_attr:
                 continue
             logger.debug(f"{indent+' '}checking symbol {sym}", caller=self)
@@ -116,19 +119,6 @@ class Myloader(Loader):
         sys.modules[module.__name__] = module
         globals()[module.__name__] = module
 
-        parent = module.__name__.rpartition(".")[0]
-        while parent:
-            logger.debug(f"exec_module {module.__name__} -> {parent}")
-            if parent not in sys.modules:
-                logger.debug(f"not in sys.modules :{parent}", caller=self)
-                parent_module = importlib.import_module(parent)
-                sys.modules[parent] = parent_module
-                globals()[parent] = parent_module
-            else:
-                parent_module = sys.modules[parent]
-            setattr(module, parent, parent_module)
-            parent = parent.rpartition(".")[0]
-
 
 class MyImporter(MetaPathFinder):
 
@@ -152,7 +142,7 @@ class MyImporter(MetaPathFinder):
     def need_real_module(self):
         for stack in inspect.stack():
             filename = stack.filename
-            if filename.find("/pytracer/"):
+            if filename.find("/pytracer/core"):
                 if filename.endswith(__file__):
                     if stack.function == "create_module":
                         return True

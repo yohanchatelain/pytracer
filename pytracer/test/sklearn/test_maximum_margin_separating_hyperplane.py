@@ -1,5 +1,7 @@
 import pytest
 
+# https://scikit-learn.org/stable/auto_examples/linear_model/plot_sgd_separating_hyperplane.html#sphx-glr-auto-examples-linear-model-plot-sgd-separating-hyperplane-py
+
 
 def maximum_margin_separating_hyperplane():
     import numpy as np

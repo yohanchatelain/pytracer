@@ -1,3 +1,5 @@
+# https://scikit-learn.org/stable/auto_examples/linear_model/plot_omp.html#sphx-glr-auto-examples-linear-model-plot-omp-py
+
 import pytest
 import numpy as np
 from sklearn.linear_model import OrthogonalMatchingPursuit

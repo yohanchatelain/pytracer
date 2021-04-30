@@ -64,5 +64,7 @@ def test_trace_parse(nsamples, script_runner):
 
 
 if __name__ == "__main__":
+    import time
+    print(time.localtime())
     basic_tests()
     print("End")

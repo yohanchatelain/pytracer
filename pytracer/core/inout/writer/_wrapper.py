@@ -11,14 +11,33 @@ is_wrapper_attr = "__Pytracer_visited__"
 elements = Counter()
 
 
-def get_bound_args(function, *args, **kwargs):
-    try:
-        sig = inspect.signature(function)
-        boundargs = sig.bind(*args, **kwargs)
-        inputs = dict(boundargs.arguments)
-    except Exception as e:
-        inputs = {**{f"Arg{i}": x for i, x in enumerate(args)}, **kwargs}
-    return inputs
+class Binding:
+
+    def __init__(self, function, *args, **kwargs):
+        try:
+            sig = inspect.signature(function)
+            self._bind_initializer(sig, *args, **kwargs)
+        except ValueError:
+            self._default_initializer(*args, **kwargs)
+
+    def _bind_initializer(self, sig, *args, **kwargs):
+        # Remove default kwarg that are present in *args
+        # Cause error if the same arg is provided twice
+        for name, arg in sig.parameters.items():
+            if name in kwargs:
+                if arg.default == kwargs[name]:
+                    kwargs.pop(name)
+        bind = sig.bind(*args, **kwargs)
+
+        self.arguments = bind.arguments
+        self.args = bind.args
+        self.kwargs = bind.kwargs
+
+    def _default_initializer(self, *args, **kwargs):
+        self.arguments = {
+            **{f"Arg{i}": x for i, x in enumerate(args)}, **kwargs}
+        self.args = args
+        self.kwargs = kwargs
 
 
 def format_output(outputs):
@@ -38,7 +57,7 @@ def wrapper(self,
             function_name,
             *args, **kwargs):
 
-    inputs = get_bound_args(function, *args, **kwargs)
+    inputs = Binding(function, *args, **kwargs)
 
     stack = self.backtrace()
     if hasattr(function, is_wrapper_attr):
@@ -50,10 +69,10 @@ def wrapper(self,
                 module_name=function_module,
                 function_name=function_name,
                 function=function,
-                args=inputs,
+                args=inputs.arguments,
                 backtrace=stack)
 
-    outputs = function(*args, **kwargs)
+    outputs = function(*inputs.args, **inputs.kwargs)
     _outputs = format_output(outputs)
 
     self.outputs(time=time,
@@ -75,7 +94,7 @@ def wrapper_function(self,
     fid, fmodule, fname = info
     function = wrapper_cache.id_dict[fid]
 
-    inputs = get_bound_args(function, *args, **kwargs)
+    bind = Binding(function, *args, **kwargs)
     stack = self.backtrace()
 
     if hasattr(function, is_wrapper_attr):
@@ -87,10 +106,10 @@ def wrapper_function(self,
                 module_name=fmodule,
                 function_name=fname,
                 function=function,
-                args=inputs,
+                args=bind.arguments,
                 backtrace=stack)
 
-    outputs = function(*args, **kwargs)
+    outputs = function(*bind.args, **bind.kwargs)
     _outputs = format_output(outputs)
 
     self.outputs(time=time,
@@ -121,15 +140,10 @@ def wrapper_instance(self, instance, *args, **kwargs):
 
 
 def wrapper_class(self, info, *args, **kwargs):
+
     fid, fmodule, fname = info
     function = wrapper_cache.id_dict[fid]
-
-    inputs = get_bound_args(function, *args, **kwargs)
-    # args without self
-    if "self" in inputs:
-        inputs.pop("self")
-    else:
-        inputs.pop("Arg0")
+    bind = Binding(function, *args, **kwargs)
     stack = self.backtrace()
 
     if hasattr(function, is_wrapper_attr):
@@ -141,10 +155,14 @@ def wrapper_class(self, info, *args, **kwargs):
                 module_name=fmodule,
                 function_name=fname,
                 function=function,
-                args=inputs,
+                args=bind.arguments,
                 backtrace=stack)
 
-    outputs = function(*args, **kwargs)
+    try:
+        outputs = function(*bind.args, **bind.kwargs)
+    except Exception:
+        # Try without the first argument if we have a staticmethod
+        outputs = function(*bind.args[1:], **bind.kwargs)
     _outputs = format_output(outputs)
 
     self.outputs(time=time,
@@ -217,7 +235,7 @@ def wrapper_ufunc(self, function, *args, **kwargs):
     if not fmodule and hasattr(fmodule, "__class__"):
         fmodule = getattr(function.__class__, "__module__")
 
-    inputs = get_bound_args(function, *args, **kwargs)
+    inputs = Binding(function, *args, **kwargs)
     stack = self.backtrace()
 
     time = elements()
@@ -226,10 +244,10 @@ def wrapper_ufunc(self, function, *args, **kwargs):
                 module_name=fmodule,
                 function_name=fname,
                 function=function,
-                args=inputs,
+                args=inputs.arguments,
                 backtrace=stack)
 
-    outputs = function(*args, **kwargs)
+    outputs = function(*inputs.args, **inputs.kwargs)
 
     inputs_type = None
     outputs_type = None

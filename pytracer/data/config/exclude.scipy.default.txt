@@ -5,3 +5,9 @@ scipy.sparse* prune
 scipy.sparse* _swap
 scipy.sparse* transpose
 scipy.sparse* _check
+scipy* decorator
+scipy._lib* *
+scipy* random_state
+scipy.stats* *
+scipy.svm _libsvm_sparse
+scipy* getformat

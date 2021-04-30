@@ -1,6 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+# https://scikit-learn.org/stable/auto_examples/linear_model/plot_sgd_comparison.html#sphx-glr-auto-examples-linear-model-plot-sgd-comparison-py
 import pytest
 
 

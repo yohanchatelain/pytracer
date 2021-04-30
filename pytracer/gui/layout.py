@@ -274,6 +274,8 @@ def get_gantt(callgraph):
     gantt = pgc.get_gantt(callgraph)
     start_time = [pcc.convert_date_to_time(point['Start']) for point in gantt]
     end_time = [pcc.convert_date_to_time(point['Finish']) for point in gantt]
+    if start_time == [] or end_time == []:
+        return dcc.Graph(id='gantt', figure=None)
     max_time = int(max(max(start_time), max(end_time)))
     time = [t for t in range(max_time+1)]
     date = [pcc.convert_time_to_date(t) for t in time]

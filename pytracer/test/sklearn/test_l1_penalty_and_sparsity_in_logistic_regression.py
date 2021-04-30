@@ -1,3 +1,5 @@
+# https://scikit-learn.org/stable/auto_examples/linear_model/plot_logistic_l1_l2_sparsity.html#sphx-glr-auto-examples-linear-model-plot-logistic-l1-l2-sparsity-py
+
 import pytest
 import numpy as np
 import matplotlib.pyplot as plt

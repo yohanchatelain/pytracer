@@ -1,8 +1,10 @@
 {
     "modules_to_load": [
-        "math",
         "numpy",
-        "sklearn"
+        "scipy",
+        "scipy.linalg",
+        "sklearn",
+        "sklearn.utils.extmath"
     ],
     "include_file": "",
     "exclude_file": [

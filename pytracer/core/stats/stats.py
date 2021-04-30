@@ -62,7 +62,7 @@ def get_type(value):
     elif StatisticNumpy.hasinstance(value):
         _type = TypeValue.NUMPY
     elif isinstance(value, list):
-        array = np.array(value)
+        array = np.array(value, dtype=np.object)
         if StatisticNumpy.hasinstance(array):
             _type = TypeValue.LIST
         else:

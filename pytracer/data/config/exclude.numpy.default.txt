@@ -59,3 +59,8 @@ numpy* nonzero
 numpy* result_type
 numpy* may_share_memory
 numpy* is_masked
+numpy* AxisConcatenator
+numpy* MAxisConcatenator
+numpy* RClass
+numpy* scalar
+numpy.lib* index_tricks
