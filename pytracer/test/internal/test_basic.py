@@ -1,7 +1,6 @@
 #!/usr/bin/python3
 
 import pytest
-import os
 import math
 import numpy as np
 import argparse
@@ -43,7 +42,7 @@ def main():
     args = parser.parse_args()
     print("args", args)
 
-    from . import test_hook as hook
+    import pytracer.test.internal.test_hook as hook
     print("list module of hook")
     hook.list_module()
 

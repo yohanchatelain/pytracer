@@ -937,6 +937,25 @@ class WrapperClass(Wrapper):
                         "fused_cython_function")
         return _ty.__name__ in cython_types
 
+    def isstatic(self, function):
+        if isinstance(function, (classmethod, staticmethod)):
+            return True
+        try:
+            src = inspect.getsource(function)
+            if ('@staticmethod' in src) or ('@classmethod' in src):
+                return True
+        except TypeError:
+            pass
+
+        try:
+            sig = inspect.signature(function)
+            if list(sig.parameters)[0] != 'self':
+                return True
+        except Exception:
+            pass
+
+        return False
+
     def handle_function(self, name, function, exclude=False):
         registered = id(function) in cache.id_dict
         visited = id(function) in cache.visited_functions
@@ -948,7 +967,7 @@ class WrapperClass(Wrapper):
                     f"Function registered={registered} and visited={visited}")
         elif exclude:
             self.handle_excluded_function(name, function)
-        elif isinstance(function, (classmethod, staticmethod)):
+        elif self.isstatic(function):
             self.handle_excluded_function(name, function)
         elif name == "__new__":
             self.handle_excluded_function(name, function)

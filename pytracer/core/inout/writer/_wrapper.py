@@ -28,7 +28,6 @@ class Binding:
                 if arg.default == kwargs[name]:
                     kwargs.pop(name)
         bind = sig.bind(*args, **kwargs)
-
         self.arguments = bind.arguments
         self.args = bind.args
         self.kwargs = bind.kwargs
@@ -139,6 +138,14 @@ def wrapper_instance(self, instance, *args, **kwargs):
 # Wrapper used for classes
 
 
+def isstatic(function):
+    try:
+        sig = inspect.signature(function)
+        return 'self' in sig.parameters.keys()
+    except ValueError:
+        return False
+
+
 def wrapper_class(self, info, *args, **kwargs):
 
     fid, fmodule, fname = info
@@ -160,9 +167,9 @@ def wrapper_class(self, info, *args, **kwargs):
 
     try:
         outputs = function(*bind.args, **bind.kwargs)
-    except Exception:
-        # Try without the first argument if we have a staticmethod
-        outputs = function(*bind.args[1:], **bind.kwargs)
+    except:
+        outputs = function(*(bind.args[1:]), **bind.kwargs)
+
     _outputs = format_output(outputs)
 
     self.outputs(time=time,
