@@ -75,17 +75,17 @@ class StatisticsSklearnKMeans(StatisticSklearn):
     def parse_data(self, data):
         _data = dict()
         for attr in self.__attributes:
-            if hasattr(value, attr):
-                for value in data:
+            for value in data:
+                if hasattr(value, attr):
                     if attr in _data:
                         _data[attr].append(getattr(value, attr))
                     else:
                         _data[attr] = [getattr(value, attr)]
 
-                if (d := _data[attr]) == []:
-                    _data[attr] = StatisticNumpy(np.array(d), empty=True)
-                else:
-                    _data[attr] = StatisticNumpy(np.array(d))
+                    if (d := _data[attr]) == []:
+                        _data[attr] = StatisticNumpy(np.array(d), empty=True)
+                    else:
+                        _data[attr] = StatisticNumpy(np.array(d))
 
         return _data
 
@@ -102,8 +102,8 @@ class StatisticsSklearnSVC(StatisticSklearn):
     def parse_data(self, data):
         _data = dict()
         for attr in self.__attributes:
-            if hasattr(value, attr):
-                for value in data:
+            for value in data:
+                if hasattr(value, attr):
                     obj = getattr(value, attr, None)
                     if obj is None:
                         _data[attr] = []
@@ -114,11 +114,11 @@ class StatisticsSklearnSVC(StatisticSklearn):
                     else:
                         _data[attr] = [obj]
 
-                if (d := _data[attr]) == []:
-                    empty = True
-                else:
-                    empty = False
-                _data[attr] = StatisticNumpy(np.array(d), empty=empty)
+                    if (d := _data[attr]) == []:
+                        empty = True
+                    else:
+                        empty = False
+                    _data[attr] = StatisticNumpy(np.array(d), empty=empty)
 
         return _data
 
@@ -134,8 +134,8 @@ class StatisticsSklearnDecisionTreeRegressor(StatisticSklearn):
     def parse_data(self, data):
         _data = dict()
         for attr in self.__attributes:
-            if hasattr(value, attr):
-                for value in data:
+            for value in data:
+                if hasattr(value, attr):
                     obj = getattr(value, attr, None)
                     if obj is None:
                         _data[attr] = []
@@ -146,11 +146,11 @@ class StatisticsSklearnDecisionTreeRegressor(StatisticSklearn):
                     else:
                         _data[attr] = [obj]
 
-                if (d := _data[attr]) == []:
-                    empty = True
-                else:
-                    empty = False
-                _data[attr] = StatisticNumpy(np.array(d), empty=empty)
+                    if (d := _data[attr]) == []:
+                        empty = True
+                    else:
+                        empty = False
+                    _data[attr] = StatisticNumpy(np.array(d), empty=empty)
 
         tree_list = list()
         for value in data:
@@ -174,18 +174,19 @@ class StatisticsSklearnTree(StatisticSklearn):
     def parse_data(self, data):
         _data = dict()
         for attr in self.__attributes:
-            if hasattr(value, attr):
-                attr_name = f"Tree.{attr}"
-                for value in data:
+            for value in data:
+                if hasattr(value, attr):
+                    attr_name = f"Tree.{attr}"
                     if attr_name in _data:
                         _data[attr_name].append(getattr(value, attr))
                     else:
                         _data[attr_name] = [getattr(value, attr)]
 
-                if (d := _data[attr_name]) == []:
-                    _data[attr_name] = StatisticNumpy(np.array(d), empty=True)
-                else:
-                    _data[attr_name] = StatisticNumpy(np.array(d))
+                    if (d := _data[attr_name]) == []:
+                        _data[attr_name] = StatisticNumpy(
+                            np.array(d), empty=True)
+                    else:
+                        _data[attr_name] = StatisticNumpy(np.array(d))
 
         return _data
 
@@ -203,18 +204,19 @@ class StatisticsSklearnPCA(StatisticSklearn):
     def parse_data(self, data):
         _data = dict()
         for attr in self.__attributes:
-            if hasattr(value, attr):
-                attr_name = f"PCA.{attr}"
-                for value in data:
+            for value in data:
+                if hasattr(value, attr):
+                    attr_name = f"PCA.{attr}"
                     if attr_name in _data:
                         _data[attr_name].append(getattr(value, attr))
                     else:
                         _data[attr_name] = [getattr(value, attr)]
 
-                if (d := _data[attr_name]) == []:
-                    _data[attr_name] = StatisticNumpy(np.array(d), empty=True)
-                else:
-                    _data[attr_name] = StatisticNumpy(np.array(d))
+                    if (d := _data[attr_name]) == []:
+                        _data[attr_name] = StatisticNumpy(
+                            np.array(d), empty=True)
+                    else:
+                        _data[attr_name] = StatisticNumpy(np.array(d))
 
         return _data
 
@@ -230,18 +232,19 @@ class StatisticsSklearnSGDClassifier(StatisticSklearn):
     def parse_data(self, data):
         _data = dict()
         for attr in self.__attributes:
-            if hasattr(value, attr):
-                attr_name = f"SGDClassifier.{attr}"
-                for value in data:
+            for value in data:
+                if hasattr(value, attr):
+                    attr_name = f"SGDClassifier.{attr}"
                     if attr_name in _data:
                         _data[attr_name].append(getattr(value, attr))
                     else:
                         _data[attr_name] = [getattr(value, attr)]
 
-                if (d := _data[attr_name]) == []:
-                    _data[attr_name] = StatisticNumpy(np.array(d), empty=True)
-                else:
-                    _data[attr_name] = StatisticNumpy(np.array(d))
+                    if (d := _data[attr_name]) == []:
+                        _data[attr_name] = StatisticNumpy(
+                            np.array(d), empty=True)
+                    else:
+                        _data[attr_name] = StatisticNumpy(np.array(d))
 
         return _data
 
@@ -258,17 +261,18 @@ class StatisticsSklearnLasso(StatisticSklearn):
         _data = dict()
         for attr in self.__attributes:
             attr_name = f"Lasso.{attr}"
-            if hasattr(value, attr):
-                for value in data:
+            for value in data:
+                if hasattr(value, attr):
                     if attr_name in _data:
                         _data[attr_name].append(getattr(value, attr))
                     else:
                         _data[attr_name] = [getattr(value, attr)]
 
-                if (d := _data[attr_name]) == []:
-                    _data[attr_name] = StatisticNumpy(np.array(d), empty=True)
-                else:
-                    _data[attr_name] = StatisticNumpy(np.array(d))
+                    if (d := _data[attr_name]) == []:
+                        _data[attr_name] = StatisticNumpy(
+                            np.array(d), empty=True)
+                    else:
+                        _data[attr_name] = StatisticNumpy(np.array(d))
 
         return _data
 
@@ -284,18 +288,19 @@ class StatisticsSklearnMultiTaskLasso(StatisticSklearn):
     def parse_data(self, data):
         _data = dict()
         for attr in self.__attributes:
-            if hasattr(value, attr):
-                attr_name = f"MultiTaskLasso.{attr}"
-                for value in data:
+            for value in data:
+                if hasattr(value, attr):
+                    attr_name = f"MultiTaskLasso.{attr}"
                     if attr_name in _data:
                         _data[attr_name].append(getattr(value, attr))
                     else:
                         _data[attr_name] = [getattr(value, attr)]
 
-                if (d := _data[attr_name]) == []:
-                    _data[attr_name] = StatisticNumpy(np.array(d), empty=True)
-                else:
-                    _data[attr_name] = StatisticNumpy(np.array(d))
+                    if (d := _data[attr_name]) == []:
+                        _data[attr_name] = StatisticNumpy(
+                            np.array(d), empty=True)
+                    else:
+                        _data[attr_name] = StatisticNumpy(np.array(d))
 
         return _data
 
@@ -312,8 +317,8 @@ class StatisticsSklearnAdaBoostRegressor(StatisticSklearn):
     def parse_data(self, data):
         _data = dict()
         for attr in self.__attributes:
-            if hasattr(value, attr):
-                for value in data:
+            for value in data:
+                if hasattr(value, attr):
                     obj = getattr(value, attr, None)
                     if obj is None:
                         _data[attr] = []
@@ -324,11 +329,11 @@ class StatisticsSklearnAdaBoostRegressor(StatisticSklearn):
                     else:
                         _data[attr] = [obj]
 
-                if (d := _data[attr]) == []:
-                    empty = True
-                else:
-                    empty = False
-                _data[attr] = StatisticNumpy(np.array(d), empty=empty)
+                    if (d := _data[attr]) == []:
+                        empty = True
+                    else:
+                        empty = False
+                    _data[attr] = StatisticNumpy(np.array(d), empty=empty)
 
         return _data
 
@@ -367,8 +372,8 @@ class StatisticsSklearnLinearRegression(StatisticSklearn):
     def parse_data(self, data):
         _data = dict()
         for attr in self.__attributes:
-            if hasattr(value, attr):
-                for value in data:
+            for value in data:
+                if hasattr(value, attr):
                     obj = getattr(value, attr, None)
                     if obj is None:
                         _data[attr] = []
@@ -379,10 +384,10 @@ class StatisticsSklearnLinearRegression(StatisticSklearn):
                     else:
                         _data[attr] = [obj]
 
-                if (d := _data[attr]) == []:
-                    empty = True
-                else:
-                    empty = False
-                _data[attr] = StatisticNumpy(np.array(d), empty=empty)
+                    if (d := _data[attr]) == []:
+                        empty = True
+                    else:
+                        empty = False
+                    _data[attr] = StatisticNumpy(np.array(d), empty=empty)
 
         return _data
