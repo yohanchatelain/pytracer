@@ -167,7 +167,7 @@ def wrapper_class(self, info, *args, **kwargs):
 
     try:
         outputs = function(*bind.args, **bind.kwargs)
-    except:
+    except TypeError:
         outputs = function(*(bind.args[1:]), **bind.kwargs)
 
     _outputs = format_output(outputs)
