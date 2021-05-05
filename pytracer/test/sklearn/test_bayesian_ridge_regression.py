@@ -100,7 +100,7 @@ def test_trace_only_ufunc_on(script_runner):
     assert ret.success
 
 
-@pytest.mark.xfail(raises=ValueError)
+@pytest.mark.xfail
 @pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir")
 def test_trace_only_ufunc_off(script_runner):
     ret = script_runner.run("pytracer", "trace",
@@ -108,7 +108,7 @@ def test_trace_only_ufunc_off(script_runner):
     assert ret.success
 
 
-@pytest.mark.xfail(raises=ValueError)
+@pytest.mark.xfail
 @pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir", "parse")
 def test_trace_parse(nsamples, script_runner):
     for _ in range(nsamples):
