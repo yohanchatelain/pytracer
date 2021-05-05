@@ -82,10 +82,10 @@ class StatisticsSklearnKMeans(StatisticSklearn):
                     else:
                         _data[attr] = [getattr(value, attr)]
 
-                    if (d := _data[attr]) == []:
-                        _data[attr] = StatisticNumpy(np.array(d), empty=True)
-                    else:
-                        _data[attr] = StatisticNumpy(np.array(d))
+            if (d := _data[attr]) == []:
+                _data[attr] = StatisticNumpy(np.array(d), empty=True)
+            else:
+                _data[attr] = StatisticNumpy(np.array(d))
 
         return _data
 
@@ -114,11 +114,11 @@ class StatisticsSklearnSVC(StatisticSklearn):
                     else:
                         _data[attr] = [obj]
 
-                    if (d := _data[attr]) == []:
-                        empty = True
-                    else:
-                        empty = False
-                    _data[attr] = StatisticNumpy(np.array(d), empty=empty)
+            if (d := _data[attr]) == []:
+                empty = True
+            else:
+                empty = False
+            _data[attr] = StatisticNumpy(np.array(d), empty=empty)
 
         return _data
 
@@ -146,11 +146,11 @@ class StatisticsSklearnDecisionTreeRegressor(StatisticSklearn):
                     else:
                         _data[attr] = [obj]
 
-                    if (d := _data[attr]) == []:
-                        empty = True
-                    else:
-                        empty = False
-                    _data[attr] = StatisticNumpy(np.array(d), empty=empty)
+            if (d := _data[attr]) == []:
+                empty = True
+            else:
+                empty = False
+            _data[attr] = StatisticNumpy(np.array(d), empty=empty)
 
         tree_list = list()
         for value in data:
@@ -182,11 +182,11 @@ class StatisticsSklearnTree(StatisticSklearn):
                     else:
                         _data[attr_name] = [getattr(value, attr)]
 
-                    if (d := _data[attr_name]) == []:
-                        _data[attr_name] = StatisticNumpy(
-                            np.array(d), empty=True)
-                    else:
-                        _data[attr_name] = StatisticNumpy(np.array(d))
+            if (d := _data[attr_name]) == []:
+                _data[attr_name] = StatisticNumpy(
+                    np.array(d), empty=True)
+            else:
+                _data[attr_name] = StatisticNumpy(np.array(d))
 
         return _data
 
@@ -212,11 +212,11 @@ class StatisticsSklearnPCA(StatisticSklearn):
                     else:
                         _data[attr_name] = [getattr(value, attr)]
 
-                    if (d := _data[attr_name]) == []:
-                        _data[attr_name] = StatisticNumpy(
-                            np.array(d), empty=True)
-                    else:
-                        _data[attr_name] = StatisticNumpy(np.array(d))
+            if (d := _data[attr_name]) == []:
+                _data[attr_name] = StatisticNumpy(
+                    np.array(d), empty=True)
+            else:
+                _data[attr_name] = StatisticNumpy(np.array(d))
 
         return _data
 
@@ -240,11 +240,11 @@ class StatisticsSklearnSGDClassifier(StatisticSklearn):
                     else:
                         _data[attr_name] = [getattr(value, attr)]
 
-                    if (d := _data[attr_name]) == []:
-                        _data[attr_name] = StatisticNumpy(
-                            np.array(d), empty=True)
-                    else:
-                        _data[attr_name] = StatisticNumpy(np.array(d))
+            if (d := _data[attr_name]) == []:
+                _data[attr_name] = StatisticNumpy(
+                    np.array(d), empty=True)
+            else:
+                _data[attr_name] = StatisticNumpy(np.array(d))
 
         return _data
 
@@ -268,11 +268,11 @@ class StatisticsSklearnLasso(StatisticSklearn):
                     else:
                         _data[attr_name] = [getattr(value, attr)]
 
-                    if (d := _data[attr_name]) == []:
-                        _data[attr_name] = StatisticNumpy(
-                            np.array(d), empty=True)
-                    else:
-                        _data[attr_name] = StatisticNumpy(np.array(d))
+            if (d := _data[attr_name]) == []:
+                _data[attr_name] = StatisticNumpy(
+                    np.array(d), empty=True)
+            else:
+                _data[attr_name] = StatisticNumpy(np.array(d))
 
         return _data
 
@@ -296,11 +296,11 @@ class StatisticsSklearnMultiTaskLasso(StatisticSklearn):
                     else:
                         _data[attr_name] = [getattr(value, attr)]
 
-                    if (d := _data[attr_name]) == []:
-                        _data[attr_name] = StatisticNumpy(
-                            np.array(d), empty=True)
-                    else:
-                        _data[attr_name] = StatisticNumpy(np.array(d))
+            if (d := _data[attr_name]) == []:
+                _data[attr_name] = StatisticNumpy(
+                    np.array(d), empty=True)
+            else:
+                _data[attr_name] = StatisticNumpy(np.array(d))
 
         return _data
 
@@ -329,11 +329,11 @@ class StatisticsSklearnAdaBoostRegressor(StatisticSklearn):
                     else:
                         _data[attr] = [obj]
 
-                    if (d := _data[attr]) == []:
-                        empty = True
-                    else:
-                        empty = False
-                    _data[attr] = StatisticNumpy(np.array(d), empty=empty)
+            if (d := _data[attr]) == []:
+                empty = True
+            else:
+                empty = False
+            _data[attr] = StatisticNumpy(np.array(d), empty=empty)
 
         return _data
 
@@ -384,10 +384,10 @@ class StatisticsSklearnLinearRegression(StatisticSklearn):
                     else:
                         _data[attr] = [obj]
 
-                    if (d := _data[attr]) == []:
-                        empty = True
-                    else:
-                        empty = False
-                    _data[attr] = StatisticNumpy(np.array(d), empty=empty)
+            if (d := _data[attr]) == []:
+                empty = True
+            else:
+                empty = False
+            _data[attr] = StatisticNumpy(np.array(d), empty=empty)
 
         return _data
