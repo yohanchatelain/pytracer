@@ -32,9 +32,9 @@ info_table = html.Div(
         html.Div(id="data-choosen", className="mini_container",
                  children=dcc.Markdown(id="data-choosen-txt"))
     ],
-    # style={"display": "flex", "flex-direction": "column",
-    #        "justify-content": "start", "align-items": "flex-start"},
-    className="pretty_container three columns"
+    style={"display": "flex", "flex-direction": "column",
+           "justify-content": "start", "align-items": "flex-start"},
+    className="pretty_container"
 )
 
 mode_selector = html.Div([
@@ -298,7 +298,8 @@ def get_rootpanel(args):
                     time_range_selector,
                 ],
                 className="pretty_container",
-                style={"display": "flex", "flex-direction": "row"},
+                style={"display": "flex",
+                       "flex-direction": "row", "width": '90vh'},
                 id="cross-filter-options"
             ),
             html.Div(
@@ -306,18 +307,20 @@ def get_rootpanel(args):
                     get_gantt(args.callgraph),
                 ],
                 className="pretty_container",
-                style={"display": "flex", "flex-direction": "column"}
+                style={"display": "flex",
+                       "flex-direction": "column", 'width': '90vh'}
             ),
             html.Div(
                 [
                     timeline_graph,
                 ],
                 className="pretty_container",
-                style={"display": "flex", "flex-direction": "column"}
+                style={"display": "flex",
+                       "flex-direction": "column", 'width': '90vh'}
             )
         ],
         id="mainContainer",
         style={"display": "flex", "flex-direction": "column",
                "justify-direction": "stretch",
-               "width": "100%"}
+               'width': '100vh'}
     )

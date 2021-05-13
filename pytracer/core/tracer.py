@@ -75,6 +75,8 @@ class Myloader(Loader):
                 logger.debug(f"symbol {sym} is missing")
             except ModuleNotFoundError:
                 has_attr = False
+            except ImportError:
+                has_attr = False
             if not has_attr:
                 continue
             logger.debug(f"{indent+' '}checking symbol {sym}", caller=self)
