@@ -58,6 +58,9 @@ optional arguments:
   --module MODULE  path of the module to trace
   --dry-run        Run the module wihtout tracing it
 ```
+
+After trace, the .\__pytracercache\__ folder will be created, with traces under the traces folder. Make sure only one pickle file is under the traces directory for the parse command.
+
 ## Parse module
 
 The parse module aggregates traces and produce a hdf5 file.
@@ -102,7 +105,24 @@ Dash is running on http://127.0.0.1:8050/
 
 You must open the address in a browser to see the trace.
 
+## Complete example
+
+```bash
+  pytracer --clean # if run before
+  pytracer trace --module ./pytracer/test/sklearn/test_basic_tests
+  pytracer parse
+  pytracer visualize --filename test.h5 --callgraph callgraph.pkl
+```
+
 ## Config file
+
+Before being able to use pytracer, do
+
+```bash
+export PYTRACER_CONFIG=~/Workspace/pytracer/pytracer/data/config/config.json
+```
+
+where the value is the absolute path to the config.json
 
 The configuration file is a `json` file containing several entries:
 
