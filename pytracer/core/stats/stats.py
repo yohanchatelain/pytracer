@@ -115,8 +115,12 @@ def get_stats(values):
             else:
                 _stats.append(StatisticNumpy(np.array(v)))
     elif _type == TypeValue.NUMPY:
-        array = np.array(values)
-        _stats = StatisticNumpy(array)
+        try:
+            array = np.array(values)
+            _stats = StatisticNumpy(array)
+        except:
+            logger.debug(f"Could not parse {values}")
+            _stats = StatisticNumpy(values, empty=True)
     elif _type == TypeValue.SKLEARN:
         _stats = get_sklearn_stat(values, type(values[0]))
     else:

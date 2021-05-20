@@ -35,7 +35,6 @@ class ReaderPickle(_reader.Reader):
             fi = open(filename, "rb")
             unpickler = pickle.Unpickler(fi)
             data = []
-            i = 0
             while True:
                 try:
                     _obj = unpickler.load()

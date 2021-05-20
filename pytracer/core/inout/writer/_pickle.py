@@ -56,8 +56,8 @@ class WriterPickle(_writer.Writer):
         else:
             now = datetime.datetime.now().strftime(self.datefmt)
             filename = f"{now}{constant.pickle_ext}"
+            filename = ptutils.get_filename(filename)
             self.filename = self.get_filename_path(filename)
-
         try:
             if hasattr(self, "ostream"):
                 self.ostream.close()
@@ -88,7 +88,7 @@ class WriterPickle(_writer.Writer):
         except Exception as e:
             try:
                 obj.pop("args")
-            except AttributeError:
+            except (AttributeError, KeyError):
                 pass
             logger.warning(
                 f"Object is not writable: {obj}", caller=self, error=e)
@@ -153,7 +153,7 @@ class WriterPickle(_writer.Writer):
                 error=e, caller=self)
         except (AttributeError, TypeError) as e:
             logger.warning(
-                f"Unable to pickle object: {args}", caller=self, error=e)
+                f"Unable to pickle object: {args} {function_name}", caller=self, error=e)
         except Exception as e:
             logger.debug(f"Writing pickle object: {to_write}", caller=self)
             logger.critical("Unexpected error while writing",

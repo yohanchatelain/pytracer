@@ -506,10 +506,9 @@ class Wrapper(metaclass=ABCMeta):
 
         if exclude:
             self.handle_excluded_function(alias_function_name, function)
-        elif not is_arithmetic_operator(name) and \
-            (function_name.startswith("_") or
-                function_name == "generic_wrapper" or
-             function_name == "_generic_wrapper"):
+        elif is_arithmetic_operator(name):
+            self.handle_included_function(alias_function_name, function)
+        elif function_name == ("generic_wrapper", "_generic_wrapper"):
             self.handle_excluded_function(alias_function_name, function)
         elif self.included.has_module(module_name):
             if self.included.has_function(names, module_name):

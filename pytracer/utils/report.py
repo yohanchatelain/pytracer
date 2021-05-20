@@ -1,3 +1,4 @@
+import os
 import csv
 import sys
 from enum import Enum, auto
@@ -60,9 +61,20 @@ def report(key, value):
     increment_memory_report(key, sizeof)
 
 
+def get_filename(name):
+    i = 0
+    while os.path.isfile(name):
+        name = f"{name}.{i}"
+        i += 1
+    return name
+
+
 def dump_report():
     fieldnames = ["module", "function", "call", "memory"]
-    with open("report.csv", "w") as csvfile:
+
+    report_filename = get_filename("report.csv")
+
+    with open(report_filename, "w") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         total_call = 0

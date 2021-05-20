@@ -189,7 +189,7 @@ class Parser:
                    f"You are trying to merge data from different "
                    f"program executions or your program is non deterministic {os.linesep}"
                    f"sizes: {sizes}")
-            logger.error(msg, caller=self)
+            logger.warning(msg, caller=self)
         else:
             print(f"Filesize: {sizes}")
         logger.debug(f"List of files to parse: {filenames}")
