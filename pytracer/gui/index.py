@@ -19,7 +19,7 @@ def init_layout(app, args):
                 sidebar,
                 get_rootpanel(args)
             ],
-            style={"display": "flex", "flex-direction": "row", 'width': '100vh'}
+            style={"display": "flex", "flex-direction": "row", 'width': '100%'}
         ),
     ], style={"display": "flex", "flex-direction": "column", 'width': '100%'},
         className='container')

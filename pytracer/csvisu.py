@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 
 from pytracer.utils import get_human_size
 
-sort_keys = ["module", "function", "calls", "memory"]
+sort_keys = ["module", "function", "call", "memory"]
 
 
 def parse_args():

@@ -96,122 +96,17 @@ def frame_args(duration):
     [dash.dependencies.Input("timeline", "hoverData"),
      dash.dependencies.Input("timeline-mode", "value"),
      dash.dependencies.Input('color-heatmap', 'value'),
+     dash.dependencies.Input('z-scale', 'value'),
      dash.dependencies.State('info-data-timeline-heatmap', 'figure'),
      dash.dependencies.State('lines-start', 'value'),
-     dash.dependencies.State('lines-end', 'value')])
-def print_heatmap(hover_data, mode, color, fig, lstart, lend):
+     dash.dependencies.State('lines-end', 'value'),
+     ])
+def print_heatmap(hover_data, mode, color, zscale, fig, lstart, lend):
     b = time.perf_counter()
     figure = dict()
     display = {"display": "flex", "display-direction": "row"}
 
     ctx = dash.callback_context
-    print(ctx.triggered)
-    # if ctx.triggered:
-    #     trigger = ctx.triggered[0]['prop_id']
-    #     if trigger == "animate-heatmap.n_clicks":
-    #         print("Animate triggered")
-    #         if hover_data:
-    #             print('HoverData')
-    #             x = hover_data['points'][0]['x']
-    #             info = hover_data['points'][0]['customdata']
-    #             module = info['module']
-    #             function = info['function']
-    #             label = info['label']
-    #             arg = info['arg']
-    #             filename = info['filename']
-    #             lineno = info['lineno']
-    #             name = info['name']
-
-    #             time_start = lstart if lstart else 0
-    #             time_end = lend if lend else sys.maxsize
-
-    #             filename_index = 0
-    #             lineno_index = 2
-    #             name_index = 3
-
-    #             def get_x(row):
-    #                 return row["label"] == str_to_utf8(label) and \
-    #                     row["name"] == str_to_utf8(arg) and \
-    #                     row["BacktraceDescription"][filename_index] == str_to_utf8(filename) and \
-    #                     row["BacktraceDescription"][lineno_index] == lineno and \
-    #                     row["BacktraceDescription"][name_index] == str_to_utf8(name) and \
-    #                     row['time'] >= time_start and \
-    #                     row['time'] <= time_end
-
-    #             x = pgc.data.filter(module, function, get_x, "time")
-    #             extra_values = list()
-    #             for i in x:
-    #                 extra_value = pgc.data.get_extra_value(
-    #                     module, function, label, arg, i, mode)
-    #                 if extra_value:
-    #                     _ndarray = extra_value.read()
-    #                     ndim = _ndarray.ndim
-
-    #                     if ndim == 1:
-    #                         _ndarray = _ndarray.reshape(_ndarray.shape+(1,))
-    #                     _row, _col = _ndarray.shape
-    #                     _x = [i for i in range(_row)]
-    #                     _y = [i for i in range(_col)]
-    #                     if mode == "sig":
-    #                         heatmap = go.Heatmap(x=_x,
-    #                                              y=_y,
-    #                                              z=_ndarray,
-    #                                              zmin=0,
-    #                                              zmax=64)
-    #                     else:
-    #                         heatmap = go.Heatmap(x=_x,
-    #                                              y=_y,
-    #                                              z=_ndarray)
-
-    #                     figure = heatmap
-    #                     extra_values.append(go.Frame(data=figure, name=str(i)))
-    #             fig = go.Figure(frames=extra_values)
-    #             sliders = [
-    #                 {
-    #                     "pad": {"b": 10, "t": 60},
-    #                     "len": 0.9,
-    #                     "x": 0.1,
-    #                     "y": 0,
-    #                     "steps": [
-    #                         {
-    #                             "args": [[f.name], frame_args(0)],
-    #                             "label": str(k),
-    #                             "method": "animate",
-    #                         }
-    #                         for k, f in enumerate(fig.frames)
-    #                     ],
-    #                 }
-    #             ]
-    #             fig.update_layout(
-    #                 title='Slices in volumetric data',
-    #                 width=700,
-    #                 height=700,
-    #                 updatemenus=[
-    #                     {
-    #                         "buttons": [
-    #                             {
-    #                                 "args": [None, frame_args(len(extra_values))],
-    #                                 "label": "&#9654;",  # play symbol
-    #                                 "method": "animate",
-    #                             },
-    #                             {
-    #                                 "args": [[None], frame_args(0)],
-    #                                 "label": "&#9724;",  # pause symbol
-    #                                 "method": "animate",
-    #                             },
-    #                         ],
-    #                         "direction": "left",
-    #                         "pad": {"r": 10, "t": 70},
-    #                         "type": "buttons",
-    #                         "x": 0.1,
-    #                         "y": 0,
-    #                     }
-    #                 ], sliders=sliders
-    #             )
-    #             fig.add_trace(go.Heatmap(extra_values[0]))
-    #             return (fig, display)
-
-    print(f'Change color {color}')
 
     extra_value = None
     if hover_data:
@@ -225,7 +120,6 @@ def print_heatmap(hover_data, mode, color, fig, lstart, lend):
                                                    info['arg'],
                                                    x,
                                                    mode)
-            print("Extra value", extra_value)
 
         except KeyError:
             extra_value = None
@@ -236,6 +130,18 @@ def print_heatmap(hover_data, mode, color, fig, lstart, lend):
 
         if ndim == 1:
             _ndarray = _ndarray.reshape(_ndarray.shape+(1,))
+        if ndim == 3:
+            _row = _ndarray.shape[0]
+            _col = _ndarray.shape[1] * _ndarray.shape[2]
+            _ndarray = _ndarray.reshape((_row, _col))
+        if ndim > 3:
+            _row = _ndarray.shape[0]
+            _col = np.prod(_ndarray.shape[1:])
+            _ndarray = _ndarray.reshape((_row, _col))
+
+        if zscale == 'log':
+            _ndarray = np.log(np.abs(_ndarray))
+
         _row, _col = _ndarray.shape
         _x = [i for i in range(_row)]
         _y = [i for i in range(_col)]
@@ -254,7 +160,7 @@ def print_heatmap(hover_data, mode, color, fig, lstart, lend):
 
         figure = heatmap
         figure.update_layout(width=700, height=700)
-        print('One extra value')
+
         if color:
             colorscale = dict(colorscale=color)
             if mode == "sig":
@@ -264,7 +170,6 @@ def print_heatmap(hover_data, mode, color, fig, lstart, lend):
 
     if ctx.triggered:
         if ctx.triggered[0]['prop_id'] == 'color-heatmap.value':
-            print('Change color 2')
             colorscale = dict(colorscale=color)
             if mode == "sig":
                 colorscale['cmin'] = 0
@@ -407,9 +312,10 @@ def print_modal_source(on, href, href_description):
 
 @ app.callback(
     dash.dependencies.Output("info-data-timeline-summary", "children"),
-    dash.dependencies.Input("timeline", "hoverData"),
+    [dash.dependencies.Input("timeline", "hoverData"),
+     dash.dependencies.Input("info-data-timeline-heatmap", "figure")],
     dash.dependencies.State('timeline-mode', 'value'))
-def print_datahover_summary(hover_data, mode):
+def print_datahover_summary(hover_data, fig, mode):
     b = time.perf_counter()
     text = ""
     if hover_data:
@@ -435,23 +341,35 @@ def print_datahover_summary(hover_data, mode):
                 (_size,) = _ndarray.shape
                 norm_fro = np.linalg.norm(_ndarray)
                 norm_inf = np.linalg.norm(_ndarray, ord=np.inf)
+                cond = 1/norm_fro
                 text = (f"Function={info['function']}{os.linesep*2}"
                         f"Arg={info['arg']}{os.linesep*2}"
                         f"shape={_size}{os.linesep}{os.linesep}"
                         f"Frobenius norm={norm_fro:.2}{os.linesep}{os.linesep}"
-                        f"Inf norm={norm_inf:.2}{os.linesep}{os.linesep}")
+                        f"Inf norm={norm_inf:.2}{os.linesep}{os.linesep}"
+                        f"Cond={cond:.2e}{os.linesep}{os.linesep}")
 
             elif ndim == 2:
                 _row, _col = _ndarray.shape
                 norm_fro = np.linalg.norm(_ndarray)
                 norm_inf = np.linalg.norm(_ndarray, ord=np.inf)
+                norm_2 = np.linalg.norm(_ndarray, ord=2)
                 cond = np.linalg.cond(_ndarray)
                 text = (f"Function={info['function']}{os.linesep*2}"
                         f"Arg={info['arg']}{os.linesep*2}",
                         f"shape={_row}x{_col}{os.linesep}{os.linesep}"
                         f"Frobenius norm={norm_fro:.2}{os.linesep}{os.linesep}"
                         f"Inf norm={norm_inf:.2}{os.linesep}{os.linesep}"
+                        f"2-norm={norm_2:.2}{os.linesep}{os.linesep}"
                         f"Cond={cond:.2e}{os.linesep}{os.linesep}")
+
+            elif ndim > 2:
+                shape = "x".join(map(str, _ndarray.shape))
+                norm_fro = np.linalg.norm(_ndarray)
+                text = (f"Function={info['function']}{os.linesep*2}"
+                        f"Arg={info['arg']}{os.linesep*2}"
+                        f"shape={shape}{os.linesep}{os.linesep}"
+                        f"Frobenius norm={norm_fro:.2}{os.linesep}{os.linesep}")
 
     e = time.perf_counter()
     print("print_datahover_summary", e-b)

@@ -28,12 +28,13 @@ info_table = html.Div(
             fixed_columns={"headers": True, "data": 0},
             style_table={
                 "overflowY": "auto"
-            }, css=[{"selector": ".row", "rule": "margin: 0"}]),
+            }, css=[{"selector": ".row", "rule": "margin: 0", "rule": "max-width: 36vh"}]),
         html.Div(id="data-choosen", className="mini_container",
+                 style={'width': '36vh', 'max-width': '33vh'},
                  children=dcc.Markdown(id="data-choosen-txt"))
     ],
     style={"display": "flex", "flex-direction": "column",
-           "justify-content": "start", "align-items": "flex-start"},
+           "justify-content": "start", "align-items": "flex-start", "width": '36vh'},
     className="pretty_container"
 )
 
@@ -143,6 +144,19 @@ heatmap_colors_selector = html.Div([
                         id='color-heatmap',
                         options=[]
                     )], className='mini_container'),
+        html.Div([
+            html.P("Z-scale:",
+                   className="control_label"),
+            dcc.RadioItems(
+                id="z-scale",
+                options=[
+                    {"label": "linear", "value": "linear"},
+                    {"label": "log", "value": "log"},
+                ],
+                value="linear",
+                labelStyle={"display": "inline-block"},
+                className="dcc_control",
+            )], className="mini_container")
         # html.Button('Animation', id='animate-heatmap', n_clicks=0)],
     ],
         className="mini_container",
@@ -299,7 +313,10 @@ def get_rootpanel(args):
                 ],
                 className="pretty_container",
                 style={"display": "flex",
-                       "flex-direction": "row", "width": '90vh'},
+                       "flex-direction": "row",
+                       "width": 'auto',
+                       "min-width": "100vh",
+                       "max-width": "130vh"},
                 id="cross-filter-options"
             ),
             html.Div(
@@ -308,7 +325,10 @@ def get_rootpanel(args):
                 ],
                 className="pretty_container",
                 style={"display": "flex",
-                       "flex-direction": "column", 'width': '90vh'}
+                       "flex-direction": "column",
+                       "width": 'auto',
+                       "min-width": "100vh",
+                       "max-width": "130vh"}
             ),
             html.Div(
                 [
@@ -316,11 +336,14 @@ def get_rootpanel(args):
                 ],
                 className="pretty_container",
                 style={"display": "flex",
-                       "flex-direction": "column", 'width': '90vh'}
+                       "flex-direction": "column",
+                       "width": 'auto',
+                       "min-width": "100vh",
+                       "max-width": "130vh"}
             )
         ],
         id="mainContainer",
         style={"display": "flex", "flex-direction": "column",
                "justify-direction": "stretch",
-               'width': '100vh'}
+               'width': '100%'}
     )

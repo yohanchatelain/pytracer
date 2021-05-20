@@ -995,7 +995,6 @@ def get_gantt_child(graph, gantt, node):
 def get_gantt(graph):
     core_graph = CoreGraph(graph, 0)
     root = core_graph.unique_root()
-    print(root)
     function = get_name(root)
     start_time = get_time(root)
     end_time = 0
