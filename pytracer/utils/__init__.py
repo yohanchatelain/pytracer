@@ -71,3 +71,11 @@ def str2bool(v):
         return False
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
+def get_filename(name):
+    i = 0
+    while os.path.isfile(name):
+        name = f"{name}.{i}"
+        i += 1
+    return name
