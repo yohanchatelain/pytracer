@@ -15,4 +15,6 @@ def init_module(subparser):
                               help="run dash server in debug mode")
     index_parser.add_argument("--filename", required=True,
                               help="file to visualize")
-    index_parser.add_argument('--callgraph', required=True, help='Call graph file')
+    index_parser.add_argument(
+        '--callgraph', required=True, help='Call graph file')
+    index_parser.add_argument('--host', default='0.0.0.0', help='IP to run on')

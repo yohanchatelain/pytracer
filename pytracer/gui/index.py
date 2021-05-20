@@ -31,7 +31,7 @@ def main(args):
 
     init_layout(app, args)
     pgc.init_data(args)
-    app.run_server(debug=args.debug, threaded=False)
+    app.run_server(debug=args.debug, threaded=False, host=args.host)
 
 
 if __name__ == '__main__':
