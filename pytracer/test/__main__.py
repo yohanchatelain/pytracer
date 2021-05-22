@@ -39,7 +39,7 @@ def check_args(args):
 
 def list_directory(directory):
 
-    ldir = dict()
+    ldir = {}
 
     ls = os.listdir(directory)
     ls_prefixed = [f"{directory}{os.sep}{f}" for f in ls]
@@ -72,7 +72,7 @@ def get_abs(file, prefix=""):
 
 def get_tests(args):
 
-    tests = dict()
+    tests = {}
 
     if not args.directories and not args.filenames:
         directory = os.path.split(__file__)[0]

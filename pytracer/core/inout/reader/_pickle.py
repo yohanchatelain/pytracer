@@ -14,17 +14,18 @@ logger = get_logger()
 
 class ReaderPickle(_reader.Reader):
 
-    modules_to_load = list()
+    modules_to_load = []
 
     def __init__(self):
         self.parameters = _init.IOInitializer()
         self._import_modules()
 
     def _import_modules(self):
+        append = self.modules_to_load.append
         if self.modules_to_load == []:
             for module in cfg.modules_to_load:
                 module_name = module.strip()
-                self.modules_to_load.append(module_name)
+                append(module_name)
         for module in self.modules_to_load:
             importlib.import_module(module)
 

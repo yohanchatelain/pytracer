@@ -12,8 +12,8 @@ class Report(Enum):
 
 
 _report_type = None
-_report_call_dict = dict()
-_report_memory_dict = dict()
+_report_call_dict = {}
+_report_memory_dict = {}
 
 
 report_type_default = Report.OFF.name

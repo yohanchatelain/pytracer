@@ -35,10 +35,10 @@ class NoneDict:
 
 
 class DictAt:
-    _attributes = dict().__dir__()
+    _attributes = {}.__dir__()
 
     def __init__(self, _dict):
-        _new_dict = dict()
+        _new_dict = {}
         for key, value in _dict.items():
             new_value = value
             if isinstance(value, dict):
@@ -166,7 +166,7 @@ class _Config(object, metaclass=Singleton):
                    "numpy.ufunc"
                    ]
 
-    _data = dict()
+    _data = {}
 
     def __init__(self):
         self.read_config()

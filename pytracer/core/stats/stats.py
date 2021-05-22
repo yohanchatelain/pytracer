@@ -83,7 +83,7 @@ def get_type(value):
 
 
 def check_type(values):
-    types = [type(value) for value in values]
+    types = [*map(type, values)]
     # Ensure that values have all the same type
     assert(len(set(types)) == 1)
 
@@ -105,15 +105,16 @@ def get_stats(values):
         array = np.array(values)
         _stats = StatisticNumpy(array)
     elif _type == TypeValue.TUPLE:
-        types = [get_type(t) for t in values[0]]
+        types = [*map(get_type, values[0])]
         _stats = []
         zipv = zip(*values)
         [(t, v) for t, v in zip(types, zipv)]
+        append = _stats.append
         for ty, v in zip(types, zipv):
             if ty == TypeValue.OTHER:
-                _stats.append(StatisticNumpy(v, empty=True))
+                append(StatisticNumpy(v, empty=True))
             else:
-                _stats.append(StatisticNumpy(np.array(v)))
+                append(StatisticNumpy(np.array(v)))
     elif _type == TypeValue.NUMPY:
         try:
             array = np.array(values)
@@ -136,7 +137,7 @@ def tohex(value):
         return hex(v)
     except TypeError:
         try:
-            v = [tohex(v) for v in value]
+            v = [*map(tohex, value)]
             return v
         except TypeError:
             return value

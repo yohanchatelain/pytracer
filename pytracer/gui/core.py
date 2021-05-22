@@ -49,7 +49,7 @@ class NodeNotFound(DataError):
 
 class Data:
 
-    __cache = dict()
+    __cache = {}
     __labels = {"inputs", "outputs"}
     __modes = ("mean", "std", "sig")
 
@@ -75,7 +75,7 @@ class Data:
         if hasattr(self, "cached_header"):
             return self.cached_header
 
-        self.cached_header = list()
+        self.cached_header = []
         modules = self.data.iter_nodes("/")
         for module in modules:
             for function in module:
@@ -216,10 +216,11 @@ def is_scalar(value):
 
 def get_gantt(callgraph):
     pc.core.raw_graphs = pc.core.load(callgraph)
-    gantt = list()
+    gantt = []
+    extend = gantt.extend
     for _, g in pc.core.raw_graphs.items():
-        gantt += pc.core.get_gantt(g)
+        extend(pc.core.get_gantt(g))
     return gantt
 
 
-bt_to_id = dict()
+bt_to_id = {}

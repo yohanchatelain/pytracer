@@ -1,4 +1,4 @@
 # Map that associates function to their id
-id_dict = dict()
-visited_functions = dict()
+id_dict = {}
+visited_functions = {}
 visited_files = set()

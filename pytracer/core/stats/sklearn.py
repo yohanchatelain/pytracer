@@ -79,7 +79,7 @@ class StatisticsSklearnKMeans(StatisticSklearn):
         self._data = self.parse_data(data)
 
     def parse_data(self, data):
-        _data = dict()
+        _data = {}
         for attr in self.__attributes:
             for value in data:
                 if hasattr(value, attr):
@@ -107,7 +107,7 @@ class StatisticsSklearnSVC(StatisticSklearn):
         self._data = self.parse_data(data)
 
     def parse_data(self, data):
-        _data = dict()
+        _data = {}
         for attr in self.__attributes:
             for value in data:
                 if hasattr(value, attr):
@@ -140,7 +140,7 @@ class StatisticsSklearnDecisionTreeRegressor(StatisticSklearn):
         self._data = self.parse_data(data)
 
     def parse_data(self, data):
-        _data = dict()
+        _data = {}
         for attr in self.__attributes:
             for value in data:
                 if hasattr(value, attr):
@@ -161,7 +161,7 @@ class StatisticsSklearnDecisionTreeRegressor(StatisticSklearn):
                     empty = False
                 _data[attr] = StatisticNumpy(np.array(d), empty=empty)
 
-        tree_list = list()
+        tree_list = []
         for value in data:
             tree = getattr(value, "tree_", None)
             if tree is None:
@@ -181,7 +181,7 @@ class StatisticsSklearnTree(StatisticSklearn):
         self._data = self.parse_data(data)
 
     def parse_data(self, data):
-        _data = dict()
+        _data = {}
         for attr in self.__attributes:
             for value in data:
                 if hasattr(value, attr):
@@ -212,7 +212,7 @@ class StatisticsSklearnPCA(StatisticSklearn):
         self._data = self.parse_data(data)
 
     def parse_data(self, data):
-        _data = dict()
+        _data = {}
         for attr in self.__attributes:
             for value in data:
                 if hasattr(value, attr):
@@ -241,7 +241,7 @@ class StatisticsSklearnSGDClassifier(StatisticSklearn):
         self._data = self.parse_data(data)
 
     def parse_data(self, data):
-        _data = dict()
+        _data = {}
         for attr in self.__attributes:
             attr_name = f"SGDClassifier.{attr}"
             for value in data:
@@ -270,7 +270,7 @@ class StatisticsSklearnLasso(StatisticSklearn):
         self._data = self.parse_data(data)
 
     def parse_data(self, data):
-        _data = dict()
+        _data = {}
         for attr in self.__attributes:
             attr_name = f"Lasso.{attr}"
             for value in data:
@@ -299,7 +299,7 @@ class StatisticsSklearnMultiTaskLasso(StatisticSklearn):
         self._data = self.parse_data(data)
 
     def parse_data(self, data):
-        _data = dict()
+        _data = {}
         for attr in self.__attributes:
             for value in data:
                 if hasattr(value, attr):
@@ -329,7 +329,7 @@ class StatisticsSklearnAdaBoostRegressor(StatisticSklearn):
         self._data = self.parse_data(data)
 
     def parse_data(self, data):
-        _data = dict()
+        _data = {}
         for attr in self.__attributes:
             for value in data:
                 if hasattr(value, attr):
@@ -362,9 +362,9 @@ class StatisticsSklearnRANSACRegressor(StatisticSklearn):
         self._data = self.parse_data(data)
 
     def parse_data(self, data):
-        _data = dict()
+        _data = {}
 
-        estimator_list = list()
+        estimator_list = []
         for value in data:
             estimator = getattr(value, "estimator_", None)
             if estimator is None:
@@ -385,7 +385,7 @@ class StatisticsSklearnLinearRegression(StatisticSklearn):
         self._data = self.parse_data(data)
 
     def parse_data(self, data):
-        _data = dict()
+        _data = {}
         for attr in self.__attributes:
             for value in data:
                 if hasattr(value, attr):

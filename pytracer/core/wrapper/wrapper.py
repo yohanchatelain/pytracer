@@ -32,7 +32,7 @@ class Filter:
     _wildcard = ".*"
 
     def __init__(self, filenames):
-        self.__modules = dict()
+        self.__modules = {}
         for filename in filenames:
             self.load_file(filename)
 
@@ -264,11 +264,11 @@ class Wrapper(metaclass=ABCMeta):
     cache = set()
     wrapped_cache = set()
     wrapper_visited = set()
-    m2wm = dict()
-    modules_not_initialized = dict()
-#    visited_functions = dict()
-    # id_dict = dict()
-#    lazy_dict = dict()
+    m2wm = {}
+    modules_not_initialized = {}
+#    visited_functions = {}
+    # id_dict = {}
+#    lazy_dict = {}
 
     def __init__(self, obj, parent=None):
         if hasattr(obj, visited_attr):
@@ -277,7 +277,7 @@ class Wrapper(metaclass=ABCMeta):
             # self.real_obj = obj
         else:
             self.writer = iowriter.Writer()
-            self.lazy_dict = dict()
+            self.lazy_dict = {}
             self.included = FilterInclusion()
             self.excluded = FilterExclusion()
             self.real_obj = obj
@@ -889,7 +889,7 @@ class WrapperModule(Wrapper):
 
 class WrapperClass(Wrapper):
 
-    visited_class = dict()
+    visited_class = {}
     special_attributes = ["__class__", "__dict__", "__base__", "__bases__",
                           "__basicsize__", "__dictoffset__", "__flags__",
                           "__itemsize__", "__mro__", "__text_signature__",

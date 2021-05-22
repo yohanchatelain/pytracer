@@ -28,6 +28,6 @@
         }
     },
     "numpy": {
-        "ufunc": true
+        "ufunc": false
     }
 }

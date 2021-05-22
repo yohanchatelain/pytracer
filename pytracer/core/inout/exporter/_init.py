@@ -26,7 +26,7 @@ class IOType(IntEnum):
 
 class IOInitializer(metaclass=Singleton):
 
-    parameters = dict()
+    parameters = {}
     type_default = IOType.PICKLE
     filename_default = None
     cache_default = {"root": constant.cache.root,

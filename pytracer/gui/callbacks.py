@@ -103,7 +103,7 @@ def frame_args(duration):
      ])
 def print_heatmap(hover_data, mode, color, zscale, fig, lstart, lend):
     b = time.perf_counter()
-    figure = dict()
+    figure = {}
     display = {"display": "flex", "display-direction": "row"}
 
     ctx = dash.callback_context
@@ -143,8 +143,8 @@ def print_heatmap(hover_data, mode, color, zscale, fig, lstart, lend):
             _ndarray = np.log(np.abs(_ndarray))
 
         _row, _col = _ndarray.shape
-        _x = [i for i in range(_row)]
-        _y = [i for i in range(_col)]
+        _x = list(range(_row))
+        _y = list(range(_col))
         if mode == "sig":
             heatmap = go.Figure(data=go.Heatmap(x=_x,
                                                 y=_y,
@@ -183,7 +183,7 @@ def print_heatmap(hover_data, mode, color, zscale, fig, lstart, lend):
     return (figure, display)
 
 
-path_cache = dict()
+path_cache = {}
 
 
 def find_file_in_path(path, filename):
@@ -207,7 +207,7 @@ def find_file_in_path(path, filename):
     return file_found
 
 
-__source_line_cache = dict()
+__source_line_cache = {}
 
 
 def get_full_source_line(path, line):
@@ -419,8 +419,8 @@ def get_scatter_timeline(module, function, label, backtrace, arg, mode, marker_s
             'lineno': lineno,
             'name': name.decode('utf-8')}
 
-    customdata = list()
-    hovertext = list()
+    customdata = []
+    hovertext = []
     for i in x:
         info['time'] = i
         customdata.append(info)
@@ -498,7 +498,7 @@ def get_first_call_from_line(lfile, lstart):
         src = "\n".join([_ for _ in fi])
     m = astroid.parse(src)
     calls = m.nodes_of_class(astroid.Call)
-    calls_list = list()
+    calls_list = []
     for call in calls:
         if call.lineno == lstart:
             calls_list.append(get_name(call.func))
@@ -551,12 +551,13 @@ def update_timeline(selected_rows, data, mode, xscale, yscale,
     fig.update_yaxes(title_text=ylabel,
                      rangemode="tozero", type=yscale)
 
-    module_and_function = [data[selected_row]
-                           for selected_row in selected_rows]
+    # module_and_function = [data[selected_row]
+    #                        for selected_row in selected_rows]
+    module_and_function = [*map(lambda x: data[x], selected_rows)]
 
     if line_on:
         if os.path.isfile(lfile):
-            calls = get_first_call_from_line(lfile, lstart)
+            # calls = get_first_call_from_line(lfile, lstart)
             pgc.data.get_first_call_from_line(lstart)
         else:
             print(f"File {lfile} does not exit")

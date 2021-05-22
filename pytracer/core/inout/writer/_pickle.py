@@ -131,7 +131,7 @@ class WriterPickle(_writer.Writer):
 
             else:
                 logger.warning(f"Iterate over args")
-                args_ = dict()
+                args_ = {}
                 for name, arg in args.items():
                     if not self.is_writable(arg):
                         args_[name] = None
