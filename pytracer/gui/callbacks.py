@@ -395,15 +395,25 @@ def get_scatter_timeline(module, function, label, backtrace, arg, mode, marker_s
 
     b1 = time.perf_counter()
 
-    def get_x(row):
-        return row["label"] == bytes(label, "utf-8") and \
-            row["name"] == arg and \
-            row["BacktraceDescription"] == backtrace and \
-            row['time'] >= time_start and \
-            row['time'] <= time_end
+    # def get_x(row):
+    #     return row["label"] == bytes(label, "utf-8") and \
+    #         row["name"] == arg and \
+    #         row["BacktraceDescription"] == backtrace and \
+    #         row['time'] >= time_start and \
+    #         row['time'] <= time_end
 
-    x = pgc.data.filter(module, function, get_x, "time")
-    y = pgc.data.filter(module, function, get_x, mode)
+    def get_x(values, col, *argv):
+        arg = argv[0]
+        label = argv[1]
+        b_label = bytes(label, "utf-8")
+        return [x[col] for x in values.where(
+                        '((name == arg) & (label == b_label))')
+                    if x["BacktraceDescription"] == backtrace
+                    and x["label"] == bytes(label, "utf-8")
+                    and time_start <= x['time'] <= time_end]
+
+    x = pgc.data.filter(module, function, get_x, "time", arg, label)
+    y = pgc.data.filter(module, function, get_x, mode, arg, label)
     (filename, line, lineno, name) = backtrace
 
     e1 = time.perf_counter()
@@ -421,10 +431,12 @@ def get_scatter_timeline(module, function, label, backtrace, arg, mode, marker_s
 
     customdata = []
     hovertext = []
+    customdata_append = customdata.append
+    hovertext_append = hovertext.append
     for i in x:
         info['time'] = i
-        customdata.append(info)
-        hovertext.append(f"{function}{os.linesep}{arg.decode('utf-8')}")
+        customdata_append(info)
+        hovertext_append(f"{function}{os.linesep}{arg.decode('utf-8')}")
 
     e2 = time.perf_counter()
     print("extra_value", e2-b2)
@@ -470,8 +482,7 @@ def add_scatter(fig, module, function,
                                            time_start=time_start,
                                            time_end=time_end)
 
-            if scatter:
-                fig.add_trace(scatter)
+            fig.add_trace(scatter)
 
     e = time.perf_counter()
     print("add_scatter", e-b)
@@ -565,18 +576,26 @@ def update_timeline(selected_rows, data, mode, xscale, yscale,
     time_start = -1 if time_start is None else int(time_start)
     time_end = sys.maxsize if time_end is None else int(time_end)
 
+    def get_x_in(values, col):
+        b_inputs = b"inputs"
+        return [x[col] for x in values.where('((label == b_inputs))')]
+
+    def get_x_out(values, col, *argv):
+        b_outputs = b"outputs"
+        return [x[col] for x in values.where('((label == b_outputs))')]
+
     for mf in module_and_function:
         module = mf["module"]
         function = mf["function"]
 
         backtraces = pgc.data.filter(
-            module, function, lambda row: row["label"] == b"inputs", "BacktraceDescription")
+            module, function, get_x_in, "BacktraceDescription")
         backtraces_set = set(backtraces)
         colors = {bt: pcolors.qualitative.Alphabet[i]
                   for i, bt in enumerate(backtraces_set)}
 
         names = pgc.data.filter(
-            module, function, lambda row: row["label"] == b"inputs", "name")
+            module, function, get_x_in, "name")
         argsname = set(names)
 
         add_scatter(fig=fig,
@@ -586,7 +605,7 @@ def update_timeline(selected_rows, data, mode, xscale, yscale,
                     time_start=time_start, time_end=time_end)
 
         names = pgc.data.filter(
-            module, function, lambda row: row["label"] == b"outputs", "name")
+            module, function, get_x_out, "name")
         argsname = set(names)
 
         add_scatter(fig=fig,

@@ -232,6 +232,7 @@ class ExporterHDF5(_exporter.Exporter):
             table = function_grp["values"]
         else:
             function_grp = self.h5file.create_group(module_grp, function)
+            # TODO: Add expectedrows argument for optimization http://www.pytables.org/usersguide/optimization.html
             table = self.h5file.create_table(
                 function_grp, "values", description=ExportDescription)
         row = table.row

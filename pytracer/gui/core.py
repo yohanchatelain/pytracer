@@ -2,6 +2,7 @@ import pytracer.callgraph as pc
 import tables
 import os
 import re
+import time
 
 
 ylabel = {"mean": "Mean", "sig": "Significant bits",
@@ -91,7 +92,6 @@ class Data:
         return getattr(self.data.root, module)
 
     def get_function(self, module, function):
-        modulenode = None
         if isinstance(module, tables.Group):
             modulenode = module
         elif isinstance(module, str):
@@ -153,7 +153,7 @@ class Data:
 
         return extra_value
 
-    def filter(self, module, function, filters, col):
+    def filter(self, module, function, filters, col, *argv):
         if self.data is None:
             return None
 
@@ -162,7 +162,29 @@ class Data:
 
         functionnode = self.get_function(module, function)
         values = functionnode.values
-        ret = [x[col] for x in values.iterrows() if filters(x)]
+        # ret = [x[col] for x in values.iterrows() if filters(x)]
+        ret = filters(values, col, *argv)
+        # print("VALUES", dir(values))
+        # print("VALUES", type(values))
+        # if(filters1):
+        #     s = time.time()
+        #     ret = [x[col] for x in values.iterrows() if filters(x)]
+        #     e = time.time()
+        #     print("#1", e - s)
+        #
+        #     # print(values.coldescrs.keys())
+        #     s = time.time()
+        #     ret1 = filters(values, col, *argv)
+        #     e = time.time()
+        #     print("#2", e - s)
+        #
+        #     if ret != ret1:
+        #         print("RET FALSE", ret)
+        #         print("RET1 FALSE", ret1)
+        #         with open('ret.txt', 'w') as f:
+        #             print(ret, file=f)
+        #         with open('ret1.txt', 'w') as f:
+        #             print(ret1, file=f)
 
         key = (module, function, col, filters)
         Data.__cache[key] = ret
