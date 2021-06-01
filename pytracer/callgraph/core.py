@@ -978,7 +978,7 @@ def get_gantt_child(graph, gantt, node):
         start_time = get_time(node)
         end_time = 0
         for child in graph.successors(node, view=EdgeType.HIERARCHICAL):
-            end_time = max(end_time, get_gantt_child(graph, gantt, child))
+            end_time = get_gantt_child(graph, gantt, child)
         gantt.append({'Task': function,
                       'Start': convert_time_to_date(start_time),
                       'Finish': convert_time_to_date(end_time)})
@@ -997,7 +997,7 @@ def get_gantt(graph):
         end_time = start_time + 1
     else:
         for child in core_graph.successors(root, view=EdgeType.HIERARCHICAL):
-            end_time = max(end_time, get_gantt_child(core_graph, gantt, child))
+            end_time = get_gantt_child(core_graph, gantt, child)
     gantt.append({'Task': function,
                   'Start': convert_time_to_date(start_time),
                   'Finish': convert_time_to_date(end_time)})
