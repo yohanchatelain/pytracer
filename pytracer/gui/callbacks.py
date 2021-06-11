@@ -18,6 +18,9 @@ from pytracer.gui.app import app
 import pytracer.gui.core as pgc
 import dash_core_components as dcc
 import dash_html_components as html
+import threading
+
+lock = threading.Lock()
 
 TIMEOUT = 60
 
@@ -25,25 +28,6 @@ cache = Cache(app.server, config={
     'CACHE_TYPE': 'filesystem',
     'CACHE_DIR': 'cache-directory'
 })
-
-class Semaphore:
-    def __init__(self, filename='semaphore.txt'):
-        self.filename = filename
-        with open(self.filename, 'w') as f:
-            f.write('done')
-
-    def lock(self):
-        with open(self.filename, 'w') as f:
-            f.write('working')
-
-    def unlock(self):
-        with open(self.filename, 'w') as f:
-            f.write('done')
-
-    def is_locked(self):
-        return open(self.filename, 'r').read() == 'working'
-
-# semaphore = Semaphore()
 
 @app.callback(
     dash.dependencies.Output("info-table", "data"),
@@ -136,7 +120,8 @@ def print_heatmap(hover_data, mode, color, zscale, fig, lstart, lend):
         info = hover_data['points'][0]['customdata']
 
         try:
-            extra_value = pgc.data.get_extra_value(info['module'],
+            with lock:
+                extra_value = pgc.data.get_extra_value(info['module'],
                                                    info['function'],
                                                    info['label'],
                                                    info['arg'],
@@ -147,7 +132,8 @@ def print_heatmap(hover_data, mode, color, zscale, fig, lstart, lend):
             extra_value = None
 
     if extra_value:
-        _ndarray = extra_value.read()
+        with lock:
+            _ndarray = extra_value.read()
         ndim = _ndarray.ndim
 
         if ndim == 1:
@@ -349,7 +335,8 @@ def print_datahover_summary(hover_data, fig, mode):
         info = hover_data['points'][0]['customdata']
         extra_value = None
         try:
-            extra_value = pgc.data.get_extra_value(info['module'],
+            with lock:
+                extra_value = pgc.data.get_extra_value(info['module'],
                                                    info['function'],
                                                    info['label'],
                                                    info['arg'],
@@ -359,7 +346,8 @@ def print_datahover_summary(hover_data, fig, mode):
             extra_value = None
 
         if extra_value:
-            _ndarray = extra_value.read()
+            with lock:
+                _ndarray = extra_value.read()
             ndim = _ndarray.ndim
 
             if ndim == 1:
@@ -431,10 +419,10 @@ def get_scatter_timeline(module, function, label, backtrace, arg, mode, marker_s
         arg = argv[0]
         label = argv[1]
         b_label = bytes(label, "utf-8")
-        return [x[col] for x in values.where(
+        with lock:
+            return [x[col] for x in values.where(
                         '((name == arg) & (label == b_label))')
                     if x["BacktraceDescription"] == backtrace
-                    and x["label"] == bytes(label, "utf-8")
                     and time_start <= x['time'] <= time_end]
 
     x = pgc.data.filter(module, function, get_x, "time", arg, label)
@@ -606,12 +594,14 @@ def update_timeline(selected_rows, data, mode, xscale, yscale,
     # @cache.memoize(timeout=TIMEOUT)
     def get_x_in(values, col):
         b_inputs = b"inputs"
-        return [x[col] for x in values.where('((label == b_inputs))')]
+        with lock:
+            return [x[col] for x in values.where('((label == b_inputs))')]
 
     # @cache.memoize(timeout=TIMEOUT)
     def get_x_out(values, col, *argv):
         b_outputs = b"outputs"
-        return [x[col] for x in values.where('((label == b_outputs))')]
+        with lock:
+            return [x[col] for x in values.where('((label == b_outputs))')]
 
     for mf in module_and_function:
         module = mf["module"]
