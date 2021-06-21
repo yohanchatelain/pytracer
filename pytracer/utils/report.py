@@ -61,12 +61,13 @@ def report(key, value):
     increment_memory_report(key, sizeof)
 
 
-def get_filename(name):
+def get_filename(basename):
     i = 0
-    while os.path.isfile(name):
-        name = f"{name}.{i}"
+    filename = basename
+    while os.path.isfile(filename):
+        filename = f"{basename}.{i}"
         i += 1
-    return name
+    return filename
 
 
 def dump_report():
