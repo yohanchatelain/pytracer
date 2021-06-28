@@ -287,30 +287,15 @@ sidebar = info_table
 
 
 def get_gantt(callgraph):
-    # import time as time
     gantt = pgc.get_gantt(callgraph)
-    # Time improvement
-    # #0 0.0001552104949951172
-    # #1 0.004629611968994141
 
-    # s = time.time()
     start_time = np.arange(0, pcc.convert_date_to_time(gantt[-1]['Start'])+1, 1.0).tolist()
     end_time = np.arange(0, pcc.convert_date_to_time(gantt[-1]['Finish'])+1, 1.0).tolist()
-    # e = time.time()
-    # print("#0", e - s)
-    # s = time.time()
-    # start_time = [pcc.convert_date_to_time(point['Start']) for point in gantt]
-    # end_time = [pcc.convert_date_to_time(point['Finish']) for point in gantt]
-    # e = time.time()
-    # print("#1", e-s)
     if start_time == [] or end_time == []:
         return dcc.Graph(id='gantt', figure=None)
     max_time = int(end_time[-1])
-    # max_time = int(max(max(start_time), max(end_time)))
     time = list(range(max_time+1))
-    # time = [t for t in range(max_time+1)]
     date = [*map(pcc.convert_time_to_date, time)]
-    # date = [pcc.convert_time_to_date(t) for t in time]
     fig = px.timeline(gantt, y="Task", x_start='Start', x_end='Finish')
     fig.update_xaxes(tickformat=f'%s', overwrite=True)
     fig.update_yaxes(tickwidth=1, ticklen=1)

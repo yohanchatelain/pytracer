@@ -555,8 +555,11 @@ class CallChain:
 
 
 def main(args):
-    pr = cProfile.Profile()
-    pr.enable()
+    # pr = cProfile.Profile()
+    # pr.enable()
+    print("STARTING")
+    start = time.time()
+
     parser = Parser(args)
 
     stats_values = parser.parse_directory()
@@ -565,6 +568,8 @@ def main(args):
     callchain = CallChain()
 
     export = ioexporter.Exporter()
+    expectedrows = [10]
+
     if args.online:
         for stats_value in tqdm(stats_values,
                                 desc="Exporting...",
@@ -572,7 +577,7 @@ def main(args):
                                 maxinterval=1):
             call = callchain.to_call(stats_value)
             callchain.push(call, short=True)
-            export.export(stats_value)
+            export.export(stats_value, expectedrows)
     else:
         for stats_value_batch in tqdm(stats_values,
                                       desc="Exporting...",
@@ -581,15 +586,19 @@ def main(args):
             for stats_value in stats_value_batch:
                 call = callchain.to_call(stats_value)
                 callchain.push(call, short=True)
-                export.export(stats_value)
-    pr.disable()
-    pr.print_stats(sort="cumtime")
-    pr.dump_stats("output.prof")
+                export.export(stats_value, expectedrows)
 
-    stream = open('output.txt', 'w')
-    stats = pstats.Stats('output.prof', stream=stream)
-    stats.sort_stats('cumtime')
-    stats.print_stats()
+    end = time.time()
+    print(f"DONE in time: {end - start}")
+
+    # pr.disable()
+    # pr.print_stats(sort="cumtime")
+    # pr.dump_stats("output.prof")
+    #
+    # stream = open('output.txt', 'w')
+    # stats = pstats.Stats('output.prof', stream=stream)
+    # stats.sort_stats('cumtime')
+    # stats.print_stats()
 
 
 if __name__ == "__main__":

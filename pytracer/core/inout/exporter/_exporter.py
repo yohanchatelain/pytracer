@@ -6,5 +6,5 @@ from pytracer.utils.singleton import Singleton
 class Exporter(metaclass=Singleton):
 
     @abstractmethod
-    def export(self, obj):
+    def export(self, obj, expectedrows):
         pass

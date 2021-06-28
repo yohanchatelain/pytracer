@@ -408,13 +408,6 @@ def get_scatter_timeline(module, function, label, backtrace, arg, mode, marker_s
 
     # b1 = time.perf_counter()
 
-    # def get_x(row):
-    #     return row["label"] == bytes(label, "utf-8") and \
-    #         row["name"] == arg and \
-    #         row["BacktraceDescription"] == backtrace and \
-    #         row['time'] >= time_start and \
-    #         row['time'] <= time_end
-
     def get_x(values, col, *argv):
         arg = argv[0]
         label = argv[1]
@@ -567,9 +560,6 @@ def update_timeline(selected_rows, data, mode, xscale, yscale,
                 fig.update_yaxes(type=value)
             elif trigger == 'y-format.value':
                 fig.update_yaxes(tickformat=value)
-            # semaphore.lock()
-            # time.sleep(1)
-            # semaphore.unlock()
             print("Return fig")
             return fig
 
