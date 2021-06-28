@@ -19,6 +19,7 @@ import pytracer.gui.core as pgc
 import dash_core_components as dcc
 import dash_html_components as html
 import threading
+import random
 
 lock = threading.Lock()
 
@@ -600,7 +601,9 @@ def update_timeline(selected_rows, data, mode, xscale, yscale,
         backtraces = pgc.data.filter(
             module, function, get_x_in, "BacktraceDescription")
         backtraces_set = set(backtraces)
-        colors = {bt: pcolors.qualitative.Alphabet[i]
+        _colors = pcolors.qualitative.Alphabet * 10
+        random.shuffle(_colors)
+        colors = {bt: _colors[i]
                   for i, bt in enumerate(backtraces_set)}
 
         names = pgc.data.filter(
