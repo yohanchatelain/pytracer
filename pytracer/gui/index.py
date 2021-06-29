@@ -29,10 +29,11 @@ def init_layout(app, args):
 
 
 def main(args):
-    print("STARTING")
-    start = time.time()
-    # pr = cProfile.Profile()
-    # pr.enable()
+    enable_timer = False
+
+    if enable_timer:
+        print("STARTING")
+        start = time.time()
 
     import pytracer.gui.callbacks
     from pytracer.gui.app import app
@@ -40,20 +41,13 @@ def main(args):
     init_layout(app, args)
     pgc.init_data(args)
 
-    end = time.time()
-    print(f"DONE in time: {end - start}")
+    if enable_timer:
+        end = time.time()
+        print(f"DONE in time: {end - start}")
 
     print("Threaded:", args.threaded)
 
     app.run_server(debug=args.debug, threaded=args.threaded, host=args.host)
-    # pr.disable()
-    # pr.print_stats(sort="cumtime")
-    # pr.dump_stats("output.prof")
-    #
-    # stream = open('output.txt', 'w')
-    # stats = pstats.Stats('output.prof', stream=stream)
-    # stats.sort_stats('cumtime')
-    # stats.print_stats()
 
 
 if __name__ == '__main__':

@@ -266,9 +266,6 @@ class Wrapper(metaclass=ABCMeta):
     wrapper_visited = set()
     m2wm = {}
     modules_not_initialized = {}
-#    visited_functions = {}
-    # id_dict = {}
-#    lazy_dict = {}
 
     def __init__(self, obj, parent=None):
         if hasattr(obj, visited_attr):

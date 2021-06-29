@@ -34,10 +34,7 @@ cache = Cache(app.server, config={
     dash.dependencies.Output("info-table", "data"),
     dash.dependencies.Input("output-clientsid", "loading_state"))
 def init_info_table(loading_state):
-    # b = time.perf_counter()
     header = pgc.get_data().get_header()
-    # e = time.perf_counter()
-    # print("init_info_table", e-b)
     return header
 
 
@@ -47,13 +44,10 @@ def init_info_table(loading_state):
      dash.dependencies.Input("info-table", "data")])
 # @cache.memoize(timeout=TIMEOUT)
 def update_table_active_cell(selected_rows, data):
-    # b = time.perf_counter()
     rows = pgc.get_active_row(selected_rows, data)
     rows_str = [
         f"module: {d['module']}, function: {d['function']}" for d in rows]
     msg = f"Selected rows:\n {os.linesep.join(rows_str)}"
-    # e = time.perf_counter()
-    # print("update_table_active_cell", e-b)
     return msg
 
 
@@ -109,7 +103,6 @@ def frame_args(duration):
      ],
     prevent_initial_call=True)
 def print_heatmap(hover_data, mode, color, zscale, fig, lstart, lend):
-    # b = time.perf_counter()
     figure = {}
     display = {"display": "flex", "display-direction": "row"}
 
@@ -187,8 +180,6 @@ def print_heatmap(hover_data, mode, color, zscale, fig, lstart, lend):
             fig.update_layout(coloraxis=colorscale)
             figure = fig
 
-    # e = time.perf_counter()
-    # print("print_heatmap", e-b)
     return (figure, display)
 
 
@@ -243,7 +234,6 @@ def get_full_source_line(path, line):
     prevent_initial_call=True)
 # @cache.memoize(timeout=TIMEOUT)
 def print_source(hover_data):
-    # b = time.perf_counter()
 
     line = ""
     source = ""
@@ -261,8 +251,6 @@ def print_source(hover_data):
             raise FileNotFoundError
         description = f"{source}:{_lineno}"
 
-    # e = time.perf_counter()
-    # print("print_source", e-b)
     return line, source, description
 
 
@@ -282,7 +270,6 @@ def print_line_selection(start, end):
     prevent_initial_call=True)
 # @cache.memoize(timeout=TIMEOUT)
 def print_modal_source(on, href, href_description):
-    # b = time.perf_counter()
     source_code = "No source code found..."
     md = None
     if on:
@@ -316,8 +303,6 @@ def print_modal_source(on, href, href_description):
                                         annotations=[{'row': line_start-1,
                                                       'type': 'error', 'text': 'Current call'}])
 
-    # e = time.perf_counter()
-    # print("print_modal_source", e-b)
     return md
 
 
@@ -328,7 +313,6 @@ def print_modal_source(on, href, href_description):
     dash.dependencies.State('timeline-mode', 'value'),
     prevent_initial_call=True)
 def print_datahover_summary(hover_data, fig, mode):
-    # b = time.perf_counter()
     text = ""
     if hover_data:
         print(f'hover_data {hover_data}')
@@ -385,8 +369,6 @@ def print_datahover_summary(hover_data, fig, mode):
                         f"shape={shape}{os.linesep}{os.linesep}"
                         f"Frobenius norm={norm_fro:.2}{os.linesep}{os.linesep}")
 
-    # e = time.perf_counter()
-    # print("print_datahover_summary", e-b)
     return text
 
 
@@ -394,20 +376,14 @@ def print_datahover_summary(hover_data, fig, mode):
     dash.dependencies.Output("source-file", "style"),
     dash.dependencies.Input("source-button", "on"))
 def open_modal_source(on):
-    # b = time.perf_counter()
     style_off = {"display": "none"}
     style_on = {"display": "block", "width": "100%", "height": 300}
-    # e = time.perf_counter()
-    # print("open_modal_source", e-b)
     return style_on if on else style_off
 
 
 # @cache.memoize(timeout=TIMEOUT)
 def get_scatter_timeline(module, function, label, backtrace, arg, mode, marker_symbol,
                          marker_color, customdata=None, time_start=-1, time_end=sys.maxsize):
-    # b = time.perf_counter()
-
-    # b1 = time.perf_counter()
 
     def get_x(values, col, *argv):
         arg = argv[0]
@@ -422,11 +398,6 @@ def get_scatter_timeline(module, function, label, backtrace, arg, mode, marker_s
     x = pgc.data.filter(module, function, get_x, "time", arg, label)
     y = pgc.data.filter(module, function, get_x, mode, arg, label)
     (filename, line, lineno, name) = backtrace
-
-    # e1 = time.perf_counter()
-    # print("pgc.data.filter x,y", e1-b1)
-
-    # b2 = time.perf_counter()
 
     info = {'module': module,
             'function': function,
@@ -445,10 +416,6 @@ def get_scatter_timeline(module, function, label, backtrace, arg, mode, marker_s
         customdata_append(info)
         hovertext_append(f"{function}{os.linesep}{arg.decode('utf-8')}")
 
-    # e2 = time.perf_counter()
-    # print("extra_value", e2-b2)
-
-    # b3 = time.perf_counter()
     scatter = go.Scattergl(name=f"{function} - {arg.decode('utf-8')} - {lineno}",
                            #    legendgroup=f"group{backtrace}",
                            x=x,
@@ -461,11 +428,6 @@ def get_scatter_timeline(module, function, label, backtrace, arg, mode, marker_s
                            mode="markers",
                            marker_symbol=marker_symbol,
                            marker_color=marker_color)
-    # e3 = time.perf_counter()
-    # print("scattergl", b3-e3)
-
-    # e = time.perf_counter()
-    # print("get_scatter_timeline", e-b)
     return scatter
 
 # @cache.memoize(timeout=TIMEOUT)
@@ -473,7 +435,6 @@ def add_scatter(fig, module, function,
                 label, backtraces_set,
                 argsname, colors, marker, mode,
                 time_start=0, time_end=sys.maxsize):
-    # b = time.perf_counter()
 
     for backtrace in backtraces_set:
         for arg in argsname:
@@ -490,9 +451,6 @@ def add_scatter(fig, module, function,
                                            time_end=time_end)
 
             fig.add_trace(scatter)
-
-    # e = time.perf_counter()
-    # print("add_scatter", e-b)
 
 # @cache.memoize(timeout=TIMEOUT)
 def get_name(astname):
@@ -543,7 +501,6 @@ def get_first_call_from_line(lfile, lstart):
 def update_timeline(selected_rows, data, mode, xscale, yscale,
                     xfmt, yfmt, line_on, curr_fig, lstart, lend, lfile,
                     time_start, time_end):
-    selected_rows = range(len(data))
     ctx = dash.callback_context
 
     b = time.perf_counter()
@@ -570,11 +527,10 @@ def update_timeline(selected_rows, data, mode, xscale, yscale,
     fig.update_yaxes(title_text=ylabel,
                      rangemode="tozero", type=yscale)
 
-    module_and_function = [*map(lambda x: data[x], selected_rows)]
+    module_and_function = [data[x] for x in selected_rows]
 
     if line_on:
         if os.path.isfile(lfile):
-            # calls = get_first_call_from_line(lfile, lstart)
             pgc.data.get_first_call_from_line(lstart)
         else:
             print(f"File {lfile} does not exit")

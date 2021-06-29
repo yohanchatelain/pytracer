@@ -17,7 +17,7 @@ _report_memory_dict = {}
 
 
 report_type_default = Report.OFF.name
-report_type = list(map(lambda x: x.lower(), Report.__members__.keys()))
+report_type = [x.lower() for x in Report.__members__.keys()]
 
 
 def set_report(report_str):

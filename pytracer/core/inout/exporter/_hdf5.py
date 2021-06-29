@@ -235,6 +235,7 @@ class ExporterHDF5(_exporter.Exporter):
             table = self.h5file.create_table(
                 function_grp, "values", description=ExportDescription, expectedrows=expectedrows[0])
         expectedrows[0] = table.nrows + 1000
+        print(expectedrows[0])
         row = table.row
         for name, stats in args.items():
 

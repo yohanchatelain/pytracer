@@ -128,8 +128,7 @@ def _replace_abs_path(cfg_path, _key, _dict):
             if type(_value) is str:
                 _dict[_key] = _get_abs_path(cfg_path, _value)
             elif type(_value) is list:
-                _dict[_key] = list(
-                    map(lambda x: _get_abs_path(cfg_path, x), _value))
+                _dict[_key] = [_get_abs_path(cfg_path, x) for x in _value]
             else:
                 sys.exit(f"Error while parsing config file {config} ",
                          f"value of key {_key} has invalid type {type(_value)}")

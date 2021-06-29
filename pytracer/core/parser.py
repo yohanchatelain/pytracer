@@ -116,14 +116,13 @@ class Parser:
 
     def merge_dict(self, args):
         from pytracer.core.stats.stats import get_stats
-        args_name = [*map(lambda arg: arg.keys(), args)]
+        args_name = [arg.keys() for arg in args]
         for arg_name in args_name:
-            assert(all(map(lambda d: d == arg_name, args_name)))
+            assert (all([d == arg_name for d in args_name]))
 
         stats_dict = {}
         for arg_name in args_name[0]:
-            # arg_value = [arg[arg_name] for arg in args]
-            arg_value = [*map(lambda arg: arg[arg_name], args)]
+            arg_value = [arg[arg_name] for arg in args]
             arg_stat = get_stats(arg_value)
             stats_dict[arg_name] = arg_stat
 
@@ -135,7 +134,7 @@ class Parser:
     def _merge(self, values, attr, do_not_check=False):
         attrs = None
         if isinstance(attr, str):
-            attrs = [*map(lambda value: value[attr], values)]
+            attrs = [value[attr] for value in values]
         elif callable(attr):
             attrs = [*map(attr, values)]
         else:
@@ -369,7 +368,7 @@ class CallChain:
         if short:
             def pp(call):
                 if isinstance(call, list):
-                    return list(map(lambda c: stack_nb[c], call))
+                    return [stack_nb[c] for c in call]
                 else:
                     return stack_nb[call]
         else:
@@ -530,7 +529,7 @@ class CallChain:
                 if short:
                     def pp(call):
                         if isinstance(call, list):
-                            return list(map(lambda c: stack_nb[c], call))
+                            return [stack_nb[c] for c in call]
                         else:
                             return stack_nb[call]
                 else:
@@ -555,10 +554,11 @@ class CallChain:
 
 
 def main(args):
-    # pr = cProfile.Profile()
-    # pr.enable()
-    print("STARTING")
-    start = time.time()
+    enable_timer = False
+
+    if enable_timer:
+        print("STARTING")
+        start = time.time()
 
     parser = Parser(args)
 
@@ -588,17 +588,9 @@ def main(args):
                 callchain.push(call, short=True)
                 export.export(stats_value, expectedrows)
 
-    end = time.time()
-    print(f"DONE in time: {end - start}")
-
-    # pr.disable()
-    # pr.print_stats(sort="cumtime")
-    # pr.dump_stats("output.prof")
-    #
-    # stream = open('output.txt', 'w')
-    # stats = pstats.Stats('output.prof', stream=stream)
-    # stats.sort_stats('cumtime')
-    # stats.print_stats()
+    if enable_timer:
+        end = time.time()
+        print(f"DONE in time: {end - start}")
 
 
 if __name__ == "__main__":
