@@ -16,6 +16,10 @@ from pytracer.core.stats.stats import print_stats
 from pytracer.utils.log import get_logger
 from tqdm import tqdm
 
+import time
+import cProfile
+import pstats
+
 logger = get_logger()
 
 
@@ -32,7 +36,7 @@ class Group:
 
     # Data: List of filename
     def parse_filenames(self, data):
-        self._filenames = dict()
+        self._filenames = {}
         for filename in data:
             _, count, _ = ptinout.split_filename(filename)
             self._filenames[int(count)] = filename
@@ -100,7 +104,7 @@ class Parser:
     # ie, sharing the same date
     # <date>.<count>.<filename>.<ext>
     def group_files(self, iotype, filenames):
-        groups = dict()
+        groups = {}
         while len(filenames) > 0:
             filename = filenames[0]
             name, _, _ = ptinout.split_filename(filename)
@@ -114,9 +118,9 @@ class Parser:
         from pytracer.core.stats.stats import get_stats
         args_name = [arg.keys() for arg in args]
         for arg_name in args_name:
-            assert(all(map(lambda d: d == arg_name, args_name)))
+            assert (all([d == arg_name for d in args_name]))
 
-        stats_dict = dict()
+        stats_dict = {}
         for arg_name in args_name[0]:
             arg_value = [arg[arg_name] for arg in args]
             arg_stat = get_stats(arg_value)
@@ -132,7 +136,7 @@ class Parser:
         if isinstance(attr, str):
             attrs = [value[attr] for value in values]
         elif callable(attr):
-            attrs = [attr(value) for value in values]
+            attrs = [*map(attr, values)]
         else:
             logger.error(f"Unknow type attribute during merging: {attr}")
 
@@ -176,7 +180,7 @@ class Parser:
 
     def parse_directory(self):
 
-        filenames = list()
+        filenames = []
         sizes = set()
         for file in os.listdir(self.directory):
             abs_file = os.path.abspath(f"{self.directory}{os.sep}{file}")
@@ -202,9 +206,10 @@ class Parser:
             for value in tqdm(zip(*filenames_grouped.values()), desc="Parsing..."):
                 yield self.merge(value)
         else:
-            stats_values = list()
+            stats_values = []
+            append = stats_values.append
             for value in tqdm(zip(*filenames_grouped.values()), desc="Parsing..."):
-                stats_values.append(self.merge(value))
+                append(self.merge(value))
                 if len(stats_values) % self.batch_size == 0:
                     yield stats_values
                     stats_values.clear()
@@ -363,7 +368,7 @@ class CallChain:
         if short:
             def pp(call):
                 if isinstance(call, list):
-                    return list(map(lambda c: stack_nb[c], call))
+                    return [stack_nb[c] for c in call]
                 else:
                     return stack_nb[call]
         else:
@@ -484,14 +489,14 @@ class CallChain:
     def to_number(self, as_dict=False):
 
         counter = 1
-        call_to_id = dict()
+        call_to_id = {}
         for call in self._stack:
             key = f"{call[self._id_index]}{call[self._name_index]}{call[self._bt_index]}"
             if key not in call_to_id:
                 call_to_id[key] = f"{counter}"
                 counter += 1
 
-        _str = "" if not as_dict else dict()
+        _str = "" if not as_dict else {}
         for call in self._stack:
             key = f"{call[self._id_index]}{call[self._name_index]}{call[self._bt_index]}"
             dir = "<" if call[self._label_index] == self._input_label else ">"
@@ -524,7 +529,7 @@ class CallChain:
                 if short:
                     def pp(call):
                         if isinstance(call, list):
-                            return list(map(lambda c: stack_nb[c], call))
+                            return [stack_nb[c] for c in call]
                         else:
                             return stack_nb[call]
                 else:
@@ -549,6 +554,11 @@ class CallChain:
 
 
 def main(args):
+    enable_timer = False
+
+    if enable_timer:
+        print("STARTING")
+        start = time.time()
 
     parser = Parser(args)
 
@@ -558,6 +568,8 @@ def main(args):
     callchain = CallChain()
 
     export = ioexporter.Exporter()
+    expectedrows = [10]
+
     if args.online:
         for stats_value in tqdm(stats_values,
                                 desc="Exporting...",
@@ -565,7 +577,7 @@ def main(args):
                                 maxinterval=1):
             call = callchain.to_call(stats_value)
             callchain.push(call, short=True)
-            export.export(stats_value)
+            export.export(stats_value, expectedrows)
     else:
         for stats_value_batch in tqdm(stats_values,
                                       desc="Exporting...",
@@ -574,7 +586,11 @@ def main(args):
             for stats_value in stats_value_batch:
                 call = callchain.to_call(stats_value)
                 callchain.push(call, short=True)
-                export.export(stats_value)
+                export.export(stats_value, expectedrows)
+
+    if enable_timer:
+        end = time.time()
+        print(f"DONE in time: {end - start}")
 
 
 if __name__ == "__main__":

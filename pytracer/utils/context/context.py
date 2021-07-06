@@ -17,7 +17,7 @@ class ContextManager(Singleton):
         """
         self._include_env = env
         self._exclude_env = exclude
-        self._contexts = dict()
+        self._contexts = {}
 
     def _save_contexts(self):
         if self._include_env is not None:

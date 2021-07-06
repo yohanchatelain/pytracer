@@ -21,8 +21,7 @@ class Backend:
         self._options = kwargs
 
     def __options_str(self):
-        options_str = map(lambda item: f"--{item[0]}={item[1]}",
-                          self._options.items())
+        options_str = [f"--{item[0]}={item[1]}" for item in self._options.items()]
         return " ".join(options_str)
 
     def getenv(self):

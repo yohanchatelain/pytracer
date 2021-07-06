@@ -124,7 +124,7 @@ class Myloader(Loader):
 
 class MyImporter(MetaPathFinder):
 
-    modules_to_load = list()
+    modules_to_load = []
 
     def __init__(self):
         self._get_modules_to_load()

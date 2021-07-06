@@ -209,7 +209,7 @@ class ExporterHDF5(_exporter.Exporter):
                 atom=atom_type, shape=shape, filters=filters)
             sig_array[:] = raw_sig
 
-    def export(self, obj):
+    def export(self, obj, expectedrows):
         module = obj["module"]  # .replace(".", "$")
         function = obj["function"]  # .replace(".", "$")
         label = obj["label"]
@@ -233,7 +233,9 @@ class ExporterHDF5(_exporter.Exporter):
         else:
             function_grp = self.h5file.create_group(module_grp, function)
             table = self.h5file.create_table(
-                function_grp, "values", description=ExportDescription)
+                function_grp, "values", description=ExportDescription, expectedrows=expectedrows[0])
+        expectedrows[0] = table.nrows + 1000
+        print(expectedrows[0])
         row = table.row
         for name, stats in args.items():
 

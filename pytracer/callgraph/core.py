@@ -427,20 +427,16 @@ class CoreGraph:
         return root
 
     def is_root(self, core_node, view=None):
-        graph = self._get_view(view)
-        return len(graph.in_edges(core_node)) == 0
+        return len(self._get_view(view).in_edges(core_node)) == 0
 
     def is_leaf(self, core_node, view=None):
-        graph = self._get_view(view)
-        return len(graph.out_edges(core_node)) == 0
+        return len(self._get_view(view).out_edges(core_node)) == 0
 
     def leaves(self, view=None):
-        graph = self._get_view(view)
-        return [v for v, d in graph.out_degree() if d == 0]
+        return [v for v, d in self._get_view(view).out_degree() if d == 0]
 
     def successors(self, core_node, view=None):
-        graph = self._get_view(view)
-        return graph.successors(core_node)
+        return self._get_view(view).successors(core_node)
 
     def edges(self, core_node, view=None, where='all'):
         graph = self._get_view(view)
@@ -793,8 +789,8 @@ def nx_to_cyto(graph, graph_id=0, depth=None):
         'data': {'id': graph_id, 'label': graph_id, 'depth': 0}}
     elements.append(cyto_graph_group)
 
-    nx_to_cyto = dict()
-    nx_to_children = dict()
+    nx_to_cyto = {}
+    nx_to_children = {}
 
     for node in graph.nodes():
         _id_node = get_cytonode_id(node, graph_id)
@@ -941,7 +937,7 @@ def find_cytonode(elements, key):
 def load(filename):
     fi = open(filename, "rb")
     unpickler = pickle.Unpickler(fi)
-    graphs = dict()
+    graphs = {}
     graph_id = 0
     while True:
         try:
@@ -961,13 +957,11 @@ def get_name(node):
 
 
 def convert_time_to_date(time):
-    s = datetime.fromtimestamp(time+18000)
-    return datetime.isoformat(s)
+    return datetime.isoformat(datetime.fromtimestamp(time+18000))
 
 
 def convert_date_to_time(date):
-    s = datetime.fromisoformat(date)
-    return datetime.timestamp(s)-18000
+    return datetime.timestamp(datetime.fromisoformat(date))-18000
 
 
 def get_gantt_child(graph, gantt, node):
@@ -984,7 +978,7 @@ def get_gantt_child(graph, gantt, node):
         start_time = get_time(node)
         end_time = 0
         for child in graph.successors(node, view=EdgeType.HIERARCHICAL):
-            end_time = max(end_time, get_gantt_child(graph, gantt, child))
+            end_time = get_gantt_child(graph, gantt, child)
         gantt.append({'Task': function,
                       'Start': convert_time_to_date(start_time),
                       'Finish': convert_time_to_date(end_time)})
@@ -998,12 +992,12 @@ def get_gantt(graph):
     function = get_name(root)
     start_time = get_time(root)
     end_time = 0
-    gantt = list()
+    gantt = []
     if core_graph.is_leaf(root, view=EdgeType.HIERARCHICAL):
         end_time = start_time + 1
     else:
         for child in core_graph.successors(root, view=EdgeType.HIERARCHICAL):
-            end_time = max(end_time, get_gantt_child(core_graph, gantt, child))
+            end_time = get_gantt_child(core_graph, gantt, child)
     gantt.append({'Task': function,
                   'Start': convert_time_to_date(start_time),
                   'Finish': convert_time_to_date(end_time)})
@@ -1012,5 +1006,5 @@ def get_gantt(graph):
 
 
 raw_graphs = None
-core_graphs = dict()
-view_graphs = dict()
+core_graphs = {}
+view_graphs = {}

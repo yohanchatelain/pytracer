@@ -35,10 +35,10 @@ class NoneDict:
 
 
 class DictAt:
-    _attributes = dict().__dir__()
+    _attributes = {}.__dir__()
 
     def __init__(self, _dict):
-        _new_dict = dict()
+        _new_dict = {}
         for key, value in _dict.items():
             new_value = value
             if isinstance(value, dict):
@@ -128,8 +128,7 @@ def _replace_abs_path(cfg_path, _key, _dict):
             if type(_value) is str:
                 _dict[_key] = _get_abs_path(cfg_path, _value)
             elif type(_value) is list:
-                _dict[_key] = list(
-                    map(lambda x: _get_abs_path(cfg_path, x), _value))
+                _dict[_key] = [_get_abs_path(cfg_path, x) for x in _value]
             else:
                 sys.exit(f"Error while parsing config file {config} ",
                          f"value of key {_key} has invalid type {type(_value)}")
@@ -166,7 +165,7 @@ class _Config(object, metaclass=Singleton):
                    "numpy.ufunc"
                    ]
 
-    _data = dict()
+    _data = {}
 
     def __init__(self):
         self.read_config()

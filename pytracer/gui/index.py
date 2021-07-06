@@ -6,6 +6,9 @@ import dash_html_components as html
 
 import pytracer.gui.core as pgc
 import pytracer.gui.index_init as index_init
+import time
+import cProfile
+import pstats
 
 
 def init_layout(app, args):
@@ -26,12 +29,25 @@ def init_layout(app, args):
 
 
 def main(args):
+    enable_timer = False
+
+    if enable_timer:
+        print("STARTING")
+        start = time.time()
+
     import pytracer.gui.callbacks
     from pytracer.gui.app import app
 
     init_layout(app, args)
     pgc.init_data(args)
-    app.run_server(debug=args.debug, threaded=False, host=args.host)
+
+    if enable_timer:
+        end = time.time()
+        print(f"DONE in time: {end - start}")
+
+    print("Threaded:", args.threaded)
+
+    app.run_server(debug=args.debug, threaded=args.threaded, host=args.host)
 
 
 if __name__ == '__main__':

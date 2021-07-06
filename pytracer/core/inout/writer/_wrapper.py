@@ -184,7 +184,7 @@ def wrapper_class(self, info, *args, **kwargs):
 
 def get_ufunc_inputs_type(inputs):
     import numpy as np
-    inputs_type = list()
+    inputs_type = []
 
     for input_ in inputs:
         if np.isscalar(input_):

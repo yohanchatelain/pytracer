@@ -58,7 +58,7 @@ class StatisticNumpy:
     def _preprocess_values(self, values):
         x0 = values[0]
         if spr.issparse(x0):
-            return np.array(list(map(lambda x: x.toarray(), values)))
+            return np.array([x.toarray() for x in values])
         else:
             return values
 

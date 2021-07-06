@@ -11,6 +11,8 @@ import plotly.express as px
 import pytracer.gui.core as pgc
 import pytracer.callgraph.core as pcc
 
+import numpy as np
+
 # TODO: Use regexp to get original module
 # >>> c=re.compile(r"[a-zA-Z0-9][_]{1}")
 # >>> c.sub(".", module)
@@ -286,13 +288,14 @@ sidebar = info_table
 
 def get_gantt(callgraph):
     gantt = pgc.get_gantt(callgraph)
-    start_time = [pcc.convert_date_to_time(point['Start']) for point in gantt]
-    end_time = [pcc.convert_date_to_time(point['Finish']) for point in gantt]
+
+    start_time = np.arange(0, pcc.convert_date_to_time(gantt[-1]['Start'])+1, 1.0).tolist()
+    end_time = np.arange(0, pcc.convert_date_to_time(gantt[-1]['Finish'])+1, 1.0).tolist()
     if start_time == [] or end_time == []:
         return dcc.Graph(id='gantt', figure=None)
-    max_time = int(max(max(start_time), max(end_time)))
-    time = [t for t in range(max_time+1)]
-    date = [pcc.convert_time_to_date(t) for t in time]
+    max_time = int(end_time[-1])
+    time = list(range(max_time+1))
+    date = [*map(pcc.convert_time_to_date, time)]
     fig = px.timeline(gantt, y="Task", x_start='Start', x_end='Finish')
     fig.update_xaxes(tickformat=f'%s', overwrite=True)
     fig.update_yaxes(tickwidth=1, ticklen=1)
