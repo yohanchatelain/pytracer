@@ -62,11 +62,15 @@ def get_type(value):
     elif StatisticNumpy.hasinstance(value):
         _type = TypeValue.NUMPY
     elif isinstance(value, list):
-        array = np.array(value, dtype=np.object)
-        if StatisticNumpy.hasinstance(array):
-            _type = TypeValue.LIST
-        else:
-            _type = TypeValue.OTHER
+        try:
+            array = np.array(value, dtype=np.object)
+            if StatisticNumpy.hasinstance(array):
+                _type = TypeValue.LIST
+            else:
+                _type = TypeValue.OTHER
+        except ValueError:
+            array = tuple(value)
+            _type = TypeValue.TUPLE
     elif isinstance(value, tuple):
         _type = TypeValue.TUPLE
     elif isinstance(value, FunctionType):
@@ -120,7 +124,7 @@ def get_stats(values):
             array = np.array(values)
             _stats = StatisticNumpy(array)
         except:
-            logger.debug(f"Could not parse {values}")
+            logger.debug(f"Cannot parse {values}")
             _stats = StatisticNumpy(values, empty=True)
     elif _type == TypeValue.SKLEARN:
         _stats = get_sklearn_stat(values, type(values[0]))

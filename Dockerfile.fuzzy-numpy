@@ -1,4 +1,4 @@
-FROM yohanchatelain/fuzzy:python-numpy-v0.4.1 AS buider
+FROM verificarlo/fuzzy:v0.5.0-lapack-python3.8.5-numpy AS builder
 
 COPY . /opt/build/pytracer 
 
