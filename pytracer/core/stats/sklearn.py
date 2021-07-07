@@ -20,7 +20,8 @@ supported_instance = (sklearn.cluster.KMeans,
                       sklearn.linear_model.RANSACRegressor,
                       sklearn.linear_model.LinearRegression,
                       sklearn.linear_model.LogisticRegression,
-                      sklearn.linear_model.MultiTaskLasso)
+                      sklearn.linear_model.MultiTaskLasso,
+                      sklearn.linear_model.OrthogonalMatchingPursuit)
 
 
 def is_sklearn_value(value):
@@ -54,6 +55,8 @@ def get_sklearn_stat(data, type_):
         return StatisticsSklearnLogisticRegression(data).to_dict()
     elif type_ == sklearn.linear_model.MultiTaskLasso:
         return StatisticsSklearnMultiTaskLasso(data).to_dict()
+    elif type_ == sklearn.linear_model.OrthogonalMatchingPursuit:
+        return StatisticsSklearnOrthogonalMatchingPursuit(data).to_dict()
     else:
         raise TypeError(f"{type_}")
 
@@ -448,6 +451,39 @@ class StatisticsSklearnMultiTaskLasso(StatisticSklearn):
 
     def __init__(self, data):
         self.__attributes = StatisticsSklearnMultiTaskLasso.__attributes
+        self._data = self.parse_data(data)
+
+    def parse_data(self, data):
+        _data = dict()
+        for attr in self.__attributes:
+            for value in data:
+                if hasattr(value, attr):
+                    obj = getattr(value, attr, None)
+                    if obj is None:
+                        _data[attr] = []
+                        continue
+
+                    if attr in _data:
+                        _data[attr].append(obj)
+                    else:
+                        _data[attr] = [obj]
+
+            if attr in _data:
+                if (d := _data[attr]) == []:
+                    empty = True
+                else:
+                    empty = False
+                _data[attr] = StatisticNumpy(np.array(d), empty=empty)
+
+        return _data
+
+
+class StatisticsSklearnOrthogonalMatchingPursuit(StatisticSklearn):
+
+    __attributes = ("coef_", "intercept_")
+
+    def __init__(self, data):
+        self.__attributes = StatisticsSklearnOrthogonalMatchingPursuit.__attributes
         self._data = self.parse_data(data)
 
     def parse_data(self, data):

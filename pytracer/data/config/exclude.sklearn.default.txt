@@ -1,6 +1,5 @@
 sklearn* clone
 sklearn* fetch_openml
-sklearn.utils* *
 sklearn.svm* _base
 sklearn.svm* sparse
 sklearn* _libsvm_sparse

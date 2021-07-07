@@ -1,8 +1,6 @@
 import argparse
-import copy
 import os
 import pickle
-import tempfile
 from enum import Enum, auto
 
 import networkx as nx
@@ -10,63 +8,39 @@ import pytracer.core.inout as ptinout
 import pytracer.core.inout.exporter as ioexporter
 import pytracer.core.inout.reader as ioreader
 import pytracer.core.parser_init as parser_init
-import pytracer.utils.context as ptcontext
 from pytracer.core.config import constant
 from pytracer.core.stats.stats import print_stats
 from pytracer.utils.log import get_logger
 from tqdm import tqdm
 
 import time
-import cProfile
-import pstats
 
 logger = get_logger()
 
 
 class Group:
 
-    def __init__(self, iotype, data):
+    '''
+    Group class holds several traces and
+    facilitates iteration over them
+    '''
+
+    def __init__(self, iotype, filenames):
         self.iotype = iotype
-        self.reader = ioreader.Reader()
-        self.parse_filenames(data)
-        self.init_reader()
+        self.init_reader(filenames)
 
-    def __repr__(self):
-        return str(self._data)
-
-    # Data: List of filename
-    def parse_filenames(self, data):
-        self._filenames = {}
-        for filename in data:
-            _, count, _ = ptinout.split_filename(filename)
-            self._filenames[int(count)] = filename
-
-    def init_reader(self):
-        self._index_file = min(self._filenames)
-        self._nb_file = len(self._filenames)
-        filename = self._filenames[self._index_file]
-        self._data = self.reader.read(filename)
-        self._index_data = 0
-        self._nb_data = len(self._data)
+    def init_reader(self, filenames):
+        self.readers = [iter(ioreader.Reader(f)) for f in filenames]
 
     def __iter__(self):
+        self.iterator = zip(*self.readers)
         return self
 
     def __next__(self):
-        if self._index_data >= self._nb_data:
-            # We have finish to read this index
-            # Look if there is a another file
-            self._index_file += 1
-            if self._index_file >= self._nb_file:
-                raise StopIteration
-            filename = self._filenames[self._index_file]
-            self._data = self.reader.read(filename)
-            self._index_data = 0
-            self._nb_data = len(self._data)
-
-        data = self._data[self._index_data]
-        self._index_data += 1
-        return data
+        try:
+            return next(self.iterator)
+        except EOFError:
+            raise StopIteration
 
 
 class Parser:
@@ -100,20 +74,6 @@ class Parser:
             return ptinout.IOType.PICKLE
         return None
 
-    # Regroup files that belongs to the same trace
-    # ie, sharing the same date
-    # <date>.<count>.<filename>.<ext>
-    def group_files(self, iotype, filenames):
-        groups = {}
-        while len(filenames) > 0:
-            filename = filenames[0]
-            name, _, _ = ptinout.split_filename(filename)
-            similar = [f for f in filenames if name in f]
-            groups[name] = Group(iotype, similar)
-            for visited in similar:
-                filenames.pop(filenames.index(visited))
-        return groups
-
     def merge_dict(self, args):
         from pytracer.core.stats.stats import get_stats
         args_name = [arg.keys() for arg in args]
@@ -127,9 +87,6 @@ class Parser:
             stats_dict[arg_name] = arg_stat
 
         return stats_dict
-
-    # def merge_raw(self, raws):
-    #     return stats.get_stats(raws)
 
     def _merge(self, values, attr, do_not_check=False):
         attrs = None
@@ -194,25 +151,26 @@ class Parser:
                    f"program executions or your program is non deterministic {os.linesep}"
                    f"sizes: {sizes}")
             logger.warning(msg, caller=self)
-        else:
-            print(f"Filesize: {sizes}")
+
         logger.debug(f"List of files to parse: {filenames}")
+        logger.debug(f"Filesize: {sizes}", caller=self)
 
         iotype = self.auto_detect_format(filenames[0])
         logger.info(f"Auto-detection type: {iotype.name} file")
-        filenames_grouped = self.group_files(iotype, filenames)
-
+        filenames_grouped = Group(iotype, filenames)
         if self.online:
-            for value in tqdm(zip(*filenames_grouped.values()), desc="Parsing..."):
+            for value in tqdm(filenames_grouped, desc="Parsing..."):
                 yield self.merge(value)
         else:
             stats_values = []
             append = stats_values.append
-            for value in tqdm(zip(*filenames_grouped.values()), desc="Parsing..."):
+            for value in tqdm(filenames_grouped, desc="Parsing..."):
                 append(self.merge(value))
                 if len(stats_values) % self.batch_size == 0:
                     yield stats_values
                     stats_values.clear()
+            if len(stats_values) > 0:
+                yield stats_values
 
 
 def parse_stat_value(stats_value, info_dict, counter):
@@ -602,13 +560,3 @@ if __name__ == "__main__":
     parser_init.init_module(subparser)
     args = parser.parse_args()
     main(args)
-
-    # t = tempfile.NamedTemporaryFile()
-    # t.write(ptcontext.verificarlo.getenv(
-    #     ptcontext.verificarlo.BackendType.IEEE))
-    # env = {"VFC_BACKENDS_FROM_FILE": t.name}
-    # env_excluded = ["VFC_BACKENDS"]
-
-    # with ptcontext.context.ContextManager(env, env_excluded):
-
-    # t.close()

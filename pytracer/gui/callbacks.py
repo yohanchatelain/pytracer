@@ -30,6 +30,7 @@ cache = Cache(app.server, config={
     'CACHE_DIR': 'cache-directory'
 })
 
+
 @app.callback(
     dash.dependencies.Output("info-table", "data"),
     dash.dependencies.Input("output-clientsid", "loading_state"))
@@ -73,10 +74,14 @@ def fill_heatmap_color(color_style):
     return colors
 
 # @cache.memoize(timeout=TIMEOUT)
+
+
 def str_to_utf8(string):
     return bytes(string, 'utf-8')
 
 # @cache.memoize(timeout=TIMEOUT)
+
+
 def utf8_to_str(utf8):
     return utf8.decode('utf-8')
 
@@ -116,11 +121,11 @@ def print_heatmap(hover_data, mode, color, zscale, fig, lstart, lend):
         try:
             with lock:
                 extra_value = pgc.data.get_extra_value(info['module'],
-                                                   info['function'],
-                                                   info['label'],
-                                                   info['arg'],
-                                                   x,
-                                                   mode)
+                                                       info['function'],
+                                                       info['label'],
+                                                       info['arg'],
+                                                       x,
+                                                       mode)
 
         except KeyError:
             extra_value = None
@@ -322,11 +327,11 @@ def print_datahover_summary(hover_data, fig, mode):
         try:
             with lock:
                 extra_value = pgc.data.get_extra_value(info['module'],
-                                                   info['function'],
-                                                   info['label'],
-                                                   info['arg'],
-                                                   x,
-                                                   mode)
+                                                       info['function'],
+                                                       info['label'],
+                                                       info['arg'],
+                                                       x,
+                                                       mode)
         except KeyError:
             extra_value = None
 
@@ -391,9 +396,9 @@ def get_scatter_timeline(module, function, label, backtrace, arg, mode, marker_s
         b_label = bytes(label, "utf-8")
         with lock:
             return [x[col] for x in values.where(
-                        '((name == arg) & (label == b_label))')
-                    if x["BacktraceDescription"] == backtrace
-                    and time_start <= x['time'] <= time_end]
+                '((name == arg) & (label == b_label))')
+                if x["BacktraceDescription"] == backtrace
+                and time_start <= x['time'] <= time_end]
 
     x = pgc.data.filter(module, function, get_x, "time", arg, label)
     y = pgc.data.filter(module, function, get_x, mode, arg, label)
@@ -431,6 +436,8 @@ def get_scatter_timeline(module, function, label, backtrace, arg, mode, marker_s
     return scatter
 
 # @cache.memoize(timeout=TIMEOUT)
+
+
 def add_scatter(fig, module, function,
                 label, backtraces_set,
                 argsname, colors, marker, mode,
@@ -453,6 +460,8 @@ def add_scatter(fig, module, function,
             fig.add_trace(scatter)
 
 # @cache.memoize(timeout=TIMEOUT)
+
+
 def get_name(astname):
     if isinstance(astname, astroid.Attribute):
         name = get_name(astname.expr)
@@ -468,6 +477,8 @@ def get_name(astname):
         raise TypeError
 
 # @cache.memoize(timeout=TIMEOUT)
+
+
 def get_first_call_from_line(lfile, lstart):
     src = None
     with open(lfile) as fi:
@@ -479,6 +490,33 @@ def get_first_call_from_line(lfile, lstart):
         if call.lineno == lstart:
             calls_list.append(get_name(call.func))
     return calls_list
+
+
+_colors_map = dict()
+
+
+def get_colors(module, function):
+    if (key := (module, function)) in _colors_map:
+        return _colors_map[key]
+
+    def get_x_in(values, col):
+        b_inputs = b"inputs"
+        with lock:
+            return [x[col] for x in values.where('((label == b_inputs))')]
+
+    backtraces = pgc.data.filter(
+        module, function, get_x_in, "BacktraceDescription")
+
+    backtraces_set = set(backtraces)
+    _colors = pcolors.qualitative.Alphabet * 10
+    random.shuffle(_colors)
+    colors = {bt: _colors[i]
+              for i, bt in enumerate(backtraces_set)}
+
+    key = (module, function)
+    value = (colors, backtraces_set)
+    _colors_map[key] = value
+    return value
 
 
 @ app.callback(
@@ -554,13 +592,7 @@ def update_timeline(selected_rows, data, mode, xscale, yscale,
         module = mf["module"]
         function = mf["function"]
 
-        backtraces = pgc.data.filter(
-            module, function, get_x_in, "BacktraceDescription")
-        backtraces_set = set(backtraces)
-        _colors = pcolors.qualitative.Alphabet * 10
-        random.shuffle(_colors)
-        colors = {bt: _colors[i]
-                  for i, bt in enumerate(backtraces_set)}
+        colors, backtraces_set = get_colors(module, function)
 
         names = pgc.data.filter(
             module, function, get_x_in, "name")

@@ -143,12 +143,11 @@ class MyImporter(MetaPathFinder):
 
     def need_real_module(self):
         for stack in inspect.stack():
-            filename = stack.filename
-            if filename.find("/pytracer/core"):
-                if filename.endswith(__file__):
+            if "/pytracer/core" in stack.filename:
+                if stack.filename.endswith(__file__):
                     if stack.function == "create_module":
                         return True
-                if filename.endswith("_wrapper.py"):
+                if stack.filename.endswith("_wrapper.py"):
                     return True
         return False
 

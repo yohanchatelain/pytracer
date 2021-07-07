@@ -6,6 +6,7 @@ import os
 import pickle
 import traceback
 import shutil
+import inspect
 
 import pytracer.utils as ptutils
 from pytracer.core.config import config as cfg
@@ -81,7 +82,15 @@ class WriterPickle(_writer.Writer):
                 f"{filename}{os.extsep}"
                 f"{self.count_ofile}{ext}")
 
+    def is_looping(self):
+
+        def aux(stack):
+            return '/pytracer/core' in stack.filename and stack.function == 'write'
+        return sum(map(aux, inspect.stack())) >= 2
+
     def is_writable(self, obj):
+        if self.is_looping():
+            return False
         try:
             pickle.dump(obj, io.BytesIO())
             return True
@@ -129,23 +138,26 @@ class WriterPickle(_writer.Writer):
                 if not report.report_only():
                     self._write(to_write)
 
-            else:
-                logger.warning(f"Iterate over args")
-                args_ = {}
-                for name, arg in args.items():
-                    if not self.is_writable(arg):
-                        args_[name] = None
-                    else:
-                        args_[name] = arg
+            # TODO: Iterate over args causes segfault
+            #        and recursive calls to generic_wrapper
+            #
+            # else:
+            #     logger.warning(f"Iterate over args")
+            #     args_ = {}
+            #     for name, arg in args.items():
+            #         if not self.is_writable(arg):
+            #             args_[name] = None
+            #         else:
+            #             args_[name] = arg
 
-                to_write['args'] = args_
-                if report.report_enable():
-                    key = (module_name, function_name)
-                    value = to_write
-                    report.report(key, value)
+            #     to_write['args'] = args_
+            #     if report.report_enable():
+            #         key = (module_name, function_name)
+            #         value = to_write
+            #         report.report(key, value)
 
-                if not report.report_only():
-                    self._write(to_write)
+            #     if not report.report_only():
+            #         self._write(to_write)
 
         except pickle.PicklingError as e:
             logger.error(
