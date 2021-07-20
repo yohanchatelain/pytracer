@@ -49,6 +49,21 @@ _id_to_times = dict()
 class ExporterHDF5(_exporter.Exporter):
 
     count_ofile = 0
+    group_id = dict()
+
+    def _get_path(self, path):
+        if path not in ExporterHDF5.group_id:
+            ExporterHDF5.group_id[path] = 0
+            _path = f"{path};{ExporterHDF5.group_id[path]}"
+        else:
+            _path = f"{path};{ExporterHDF5.group_id[path]}"
+            node = self.h5file.get_node(_path)
+
+            if len(node._v_groups) >= node._v_max_group_width:
+                ExporterHDF5.group_id[path] += 1
+                _path = f"{path};{ExporterHDF5.group_id[path]}"
+
+        return _path
 
     def __init__(self):
         self.parameters = _init.IOInitializer()
@@ -186,12 +201,15 @@ class ExporterHDF5(_exporter.Exporter):
         # We create array to keep the object
         if ndim > 0:
             filters = tables.Filters(complevel=9, complib='zlib')
+
             unique_id = "/".join([label, name])
             atom_type = tables.Atom.from_dtype(stats.dtype())
             shape = stats.shape()
-
             path = tables.path.join_path(function_grp._v_pathname, unique_id)
-            group = self.h5file.create_group(path,
+
+            path_ = self._get_path(path)
+
+            group = self.h5file.create_group(path_,
                                              str(time), createparents=True)
 
             mean_array = self.h5file.create_carray(

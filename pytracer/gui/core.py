@@ -125,7 +125,7 @@ class Data:
     def has_extra_value(self, module, function, label, arg):
         functionnode = self.get_function(module, function)
         if labelnode := getattr(functionnode, label, None):
-            if getattr(labelnode, arg, None):
+            if any(map(lambda a: arg in a, [arg._v_name for arg in labelnode])):
                 return True
         return False
 
@@ -144,9 +144,14 @@ class Data:
         functionnode = self.get_function(module, function)
 
         labelnode = getattr(functionnode, label)
-        argnode = getattr(labelnode, arg)
-        timenode = getattr(argnode, str(time))
-        extra_value = getattr(timenode, mode)
+
+        for argnode in labelnode:
+            if arg in (argnode_name := argnode._v_name):
+                argnode = getattr(labelnode, argnode_name)
+                if hasattr(argnode, str(time)):
+                    timenode = getattr(argnode, str(time))
+                    extra_value = getattr(timenode, mode)
+                    break
 
         key = (module, function, searchnodename)
         Data.__cache[key] = extra_value
