@@ -438,11 +438,12 @@ class CallChain:
         (id1, name1, _, bt1, t1) = call1
         (id2, name2, _, bt2, t2) = call2
 
-        if call1 == (id2, name2, self._input_label, bt2, t2) and \
-                call2 == (id1, name1, self._output_label, bt1, t1):
-            return True
+        if call1 == (id2, name2, self._input_label, bt2, t2) and call2 == (id1, name1, self._output_label, bt1, t1):
+            is_closure = True
         else:
-            return False
+            is_closure = False
+
+        return is_closure
 
     def to_number(self, as_dict=False):
 
@@ -466,7 +467,6 @@ class CallChain:
         return _str
 
     def push(self, call, short=False):
-        # print(f"{self._indent}Push {call} onto stack -> {self._stack}")
 
         if self._stack == []:
             self._stack.append(call)

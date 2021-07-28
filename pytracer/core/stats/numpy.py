@@ -16,6 +16,7 @@ with warnings.catch_warnings():
 class StatisticNumpy:
 
     __max_sig = {
+        np.dtype("bool"): 1,
         np.dtype("uint8"): 8,
         np.dtype("int8"): 8,
         np.dtype("int16"): 16,
@@ -28,7 +29,8 @@ class StatisticNumpy:
         np.dtype("float32"): 24,
         np.dtype("float64"): 53,
         # Warning: float128 in numpy means fp80!
-        np.dtype("float128"): 80
+        np.dtype("float128"): 80,
+        np.dtype("object"): 0
     }
 
     def __init__(self, values, empty=False):
@@ -94,7 +96,10 @@ class StatisticNumpy:
                 #     print("DATA", self._data)
                 #     spr.csr_matrix.mean(self._data, axis=0)
                 # else:
-                _mean = np.mean(self._data, axis=0, dtype=np.float64)
+                try:
+                    _mean = np.mean(self._data, axis=0, dtype=np.float64)
+                except Exception:
+                    _mean = 0.0
         self.cached_mean = _mean
         return _mean
 
@@ -103,10 +108,14 @@ class StatisticNumpy:
         if _std is None:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                if spr.issparse(self._data[0]):
-                    spr.csr_matrix.std(self._data, axis=0, dtype=np.float64)
-                else:
-                    _std = np.std(self._data, axis=0, dtype=np.float64)
+                try:
+                    if spr.issparse(self._data[0]):
+                        spr.csr_matrix.std(
+                            self._data, axis=0, dtype=np.float64)
+                    else:
+                        _std = np.std(self._data, axis=0, dtype=np.float64)
+                except Exception:
+                    _std = 0.0
         self.cached_std = _std
         return _std
 
@@ -130,7 +139,11 @@ class StatisticNumpy:
                 masked_mean = np.ma.masked_equal(mean, 0.0)
                 sig = np.log2(np.abs(masked_mean/masked_std))
                 if hasattr(sig, "filled"):
-                    sig = sig.filled(self.__max_sig[self._type])
+                    if self._type.kind in ('U', 'S'):
+                        sig = sig.filled(8)
+                    else:
+                        sig = sig.filled(self.__max_sig[self._type])
+
             else:
                 sig = np.log2(np.abs(mean/std))
         return sig
@@ -146,4 +159,4 @@ class StatisticNumpy:
         if getattr(obj, "size", -1) == 0:
             return False
 
-        return np.issubdtype(obj.dtype, np.number)
+        return np.issubdtype(obj.dtype, np.number) or np.issubdtype(obj.dtype, np.bool_)

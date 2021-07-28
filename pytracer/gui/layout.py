@@ -18,6 +18,8 @@ import numpy as np
 # >>> c.sub(".", module)
 info_table = html.Div(
     [
+        dcc.Store(id='current-selected-rows', data=[]),
+        dcc.Store(id='previous-selected-rows', data=[]),
         dt.DataTable(
             id="info-table",
             columns=[{"id": "module", "name": "module"},
@@ -30,9 +32,9 @@ info_table = html.Div(
             fixed_columns={"headers": True, "data": 0},
             style_table={
                 "overflowY": "auto"
-            }, css=[{"selector": ".row", "rule": "margin: 0", "rule": "max-width: 36vh"}]),
+            }, css=[{"selector": ".row", "rule": "margin: 0", "rule": "width: auto", "rule": "max-width: 36vh"}]),
         html.Div(id="data-choosen", className="mini_container",
-                 style={'width': '36vh', 'max-width': '33vh'},
+                 style={'width': 'auto', 'max-width': '33vh'},
                  children=dcc.Markdown(id="data-choosen-txt"))
     ],
     style={"display": "flex", "flex-direction": "column",
@@ -67,7 +69,7 @@ xscale_selector = html.Div([
             {"label": "log", "value": "log"}
         ],
         value="linear",
-        labelStyle={"display": "inline-block"},
+        labelStyle={"display": "column"},
         className="dcc_control",
     )], className="mini_container")
 
@@ -81,7 +83,7 @@ yscale_selector = html.Div([
             {"label": "log", "value": "log"},
         ],
         value="linear",
-        labelStyle={"display": "inline-block"},
+        labelStyle={"display": "column"},
         className="dcc_control",
     )], className="mini_container")
 
@@ -95,7 +97,7 @@ xformat_selector = html.Div([
             {"label": "exponent", "value": "e"},
         ],
         value="",
-        labelStyle={"display": "inline-block"},
+        labelStyle={"display": "column"},
         className="dcc_control",
     )], className="mini_container")
 
@@ -109,16 +111,10 @@ yformat_selector = html.Div([
             {"label": "exponent", "value": "e"},
         ],
         value="",
-        labelStyle={"display": "inline-block"},
+        labelStyle={"display": "column"},
         className="dcc_control",
     )], className="mini_container")
 
-time_range_selector = html.Div([
-    html.P("Filter time",
-           className='control_label'),
-    dcc.Input(id='time-start', placeholder='Start'),
-    dcc.Input(id='time-end', placeholder='End')
-])
 
 timeline_hover_info = html.Div(
     dcc.Markdown(id="info-data-timeline-summary"),
@@ -158,24 +154,68 @@ heatmap_colors_selector = html.Div([
                 value="linear",
                 labelStyle={"display": "inline-block"},
                 className="dcc_control",
-            )], className="mini_container")
+            )], className="mini_container"),
+        html.Div([
+            html.P("Histogram normalization", className="control_label"),
+            dcc.RadioItems(id='histo_normalization',
+                           options=[
+                               {"label": "none", "value": ""},
+                               {"label": "density", "value": "density"},
+                               {"label": "percentage", "value": "percent"},
+                               {"label": "probability density",
+                                   "value": "probability density"},
+                           ],
+                           value="",
+                           labelStyle={"display": "column"},
+                           className='dcc-control')
+        ], className="mini_container"),
         # html.Button('Animation', id='animate-heatmap', n_clicks=0)],
     ],
         className="mini_container",
-        style={"display": "flex", "display-direction": "row", 'width': '100%'})
+        style={"display": "flex", "display-direction": "row", 'width': 'auto'})
 ]
+)
+
+histo_heatmap = html.Div(
+    dcc.Graph(id="histo_heatmap"),
+    className="pretty_container",
+    style={"display": "flex", "display-direction": "row", 'width': 'auto'}
+)
+
+
+histo_bins_selector = html.Div(
+    [
+        daq.NumericInput(
+            id="histo_bin_selector",
+            min=1,
+            max=10**3,
+            value=1),
+        dcc.Markdown(id="histo_bin_selected")
+    ],
+)
+
+selector_histo_div = html.Div(
+    [
+        heatmap_colors_selector,
+        histo_heatmap,
+        histo_bins_selector
+    ],
+    id="info-heatmap",
+    className="pretty_container",
+    style={"display": "flex", "flex-direction": "column", "width": "auto"}
 )
 
 timeline_hover = html.Div(
     [
         timeline_hover_info,
         timeline_hover_heatmap,
-        heatmap_colors_selector
+        selector_histo_div
     ],
     id="info-timeline",
     className="pretty_container",
-    style={"display": "flex", "display-direction": "row"}
+    style={"display": "flex", "display-direction": "row", "width": "auto"}
 )
+
 
 modal = html.Div(
     [
@@ -198,10 +238,14 @@ modal = html.Div(
     style={"display": "flex", "height": 400})
 
 timeline_graph = html.Div([
-    dcc.Graph(id="timeline",
-              config={'responsive': False,
-                      'autosizable': True,
-                      'showLink': True}),
+    html.Div([
+        dcc.Graph(id="timeline",
+                  config={'responsive': False,
+                          'autosizable': True,
+                          'showLink': True})
+    ],
+        id="timeline_div",
+        className="pretty_container"),
     html.Div(
         [
             html.Div(
@@ -211,25 +255,18 @@ timeline_graph = html.Div([
                                  style={"overflowY": "auto",
                                         "height": "200"}),
                 ], className="mini_container",
-                style={'width': "100%"}
+                style={'width': "auto"}
             ),
+            html.Div([
+                html.Button('Dump timeline', id='dump-timeline', n_clicks=0),
+                dcc.Download(id='download-timeline')
+            ], className='mini_container', style={'width': 'auto'}),
             html.Div(
                 [
                     daq.BooleanSwitch(label="Show source",
                                       id="source-button", on=False)
                 ], className="mini_container",
-                style={'width': "25%"}),
-            html.Div(
-                [
-                    dcc.Input(id='lines-start', placeholder='Start'),
-                    dcc.Input(id='lines-end', placeholder='End'),
-                    dcc.Input(id='lines-file-selection',
-                              placeholder='Filename'),
-                    daq.BooleanSwitch(label="Fix source range",
-                                      id='line-button', on=False),
-                    html.Div(id='lines-slider-selection'),
-                ], className="mini_container",
-                style={'width': "100%", 'align-items': 'center', 'justify-content': 'center'})
+                style={'width': "auto"}),
         ], className="mini_container",
         style={"display": "flex", "flex-direction": "row"},
     ),
@@ -289,8 +326,10 @@ sidebar = info_table
 def get_gantt(callgraph):
     gantt = pgc.get_gantt(callgraph)
 
-    start_time = np.arange(0, pcc.convert_date_to_time(gantt[-1]['Start'])+1, 1.0).tolist()
-    end_time = np.arange(0, pcc.convert_date_to_time(gantt[-1]['Finish'])+1, 1.0).tolist()
+    start_time = np.arange(0, pcc.convert_date_to_time(
+        gantt[-1]['Start'])+1, 1.0).tolist()
+    end_time = np.arange(0, pcc.convert_date_to_time(
+        gantt[-1]['Finish'])+1, 1.0).tolist()
     if start_time == [] or end_time == []:
         return dcc.Graph(id='gantt', figure=None)
     max_time = int(end_time[-1])
@@ -312,14 +351,11 @@ def get_rootpanel(args):
                     yscale_selector,
                     xformat_selector,
                     yformat_selector,
-                    time_range_selector,
                 ],
                 className="pretty_container",
                 style={"display": "flex",
                        "flex-direction": "row",
-                       "width": 'auto',
-                       "min-width": "100vh",
-                       "max-width": "130vh"},
+                       "width": 'auto', },
                 id="cross-filter-options"
             ),
             html.Div(
@@ -329,9 +365,7 @@ def get_rootpanel(args):
                 className="pretty_container",
                 style={"display": "flex",
                        "flex-direction": "column",
-                       "width": 'auto',
-                       "min-width": "100vh",
-                       "max-width": "130vh"}
+                       "width": 'auto'},
             ),
             html.Div(
                 [
@@ -340,9 +374,7 @@ def get_rootpanel(args):
                 className="pretty_container",
                 style={"display": "flex",
                        "flex-direction": "column",
-                       "width": 'auto',
-                       "min-width": "100vh",
-                       "max-width": "130vh"}
+                       "width": 'auto'},
             )
         ],
         id="mainContainer",

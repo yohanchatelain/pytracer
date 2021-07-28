@@ -1,23 +1,16 @@
+import json
 import plotly.express as px
-import sys
 import astroid
-import cProfile
-from threading import TIMEOUT_MAX
 import dash
-from dash import dependencies
-from pkg_resources import resource_string
 import plotly.graph_objs as go
 import os
 import numpy as np
 import plotly.colors as pcolors
-import tables
 import time
 from flask_caching import Cache
 import dash_ace
 from pytracer.gui.app import app
 import pytracer.gui.core as pgc
-import dash_core_components as dcc
-import dash_html_components as html
 import threading
 import random
 
@@ -103,11 +96,9 @@ def frame_args(duration):
      dash.dependencies.Input('color-heatmap', 'value'),
      dash.dependencies.Input('z-scale', 'value'),
      dash.dependencies.State('info-data-timeline-heatmap', 'figure'),
-     dash.dependencies.State('lines-start', 'value'),
-     dash.dependencies.State('lines-end', 'value'),
      ],
     prevent_initial_call=True)
-def print_heatmap(hover_data, mode, color, zscale, fig, lstart, lend):
+def print_heatmap(hover_data, mode, color, zscale, fig):
     figure = {}
     display = {"display": "flex", "display-direction": "row"}
 
@@ -133,6 +124,7 @@ def print_heatmap(hover_data, mode, color, zscale, fig, lstart, lend):
     if extra_value:
         with lock:
             _ndarray = extra_value.read()
+
         ndim = _ndarray.ndim
 
         if ndim == 1:
@@ -259,13 +251,6 @@ def print_source(hover_data):
     return line, source, description
 
 
-@ app.callback(dash.dependencies.Output('lines-slider-selection', 'children'),
-               dash.dependencies.Input('lines-start', 'value'),
-               dash.dependencies.Input('lines-end', 'value'))
-def print_line_selection(start, end):
-    return f"Selected lines: {start}:{end}"
-
-
 @ app.callback(
     # dash.dependencies.Output("source-modal-body-md", "children"),
     dash.dependencies.Output("source-file", "children"),
@@ -284,7 +269,6 @@ def print_modal_source(on, href, href_description):
             line = get_full_source_line(path, lineno)
             line_start = line.fromlineno
             line_end = line.tolineno
-            print(f"Line {line_start}:{line_end}")
             if os.path.isfile(path):
                 fi = open(path)
                 source_code = fi.read()
@@ -320,7 +304,6 @@ def print_modal_source(on, href, href_description):
 def print_datahover_summary(hover_data, fig, mode):
     text = ""
     if hover_data:
-        print(f'hover_data {hover_data}')
         x = hover_data['points'][0]['x']
         info = hover_data['points'][0]['customdata']
         extra_value = None
@@ -388,7 +371,7 @@ def open_modal_source(on):
 
 # @cache.memoize(timeout=TIMEOUT)
 def get_scatter_timeline(module, function, label, backtrace, arg, mode, marker_symbol,
-                         marker_color, customdata=None, time_start=-1, time_end=sys.maxsize):
+                         marker_color, customdata=None):
 
     def get_x(values, col, *argv):
         arg = argv[0]
@@ -398,7 +381,7 @@ def get_scatter_timeline(module, function, label, backtrace, arg, mode, marker_s
             return [x[col] for x in values.where(
                 '((name == arg) & (label == b_label))')
                 if x["BacktraceDescription"] == backtrace
-                and time_start <= x['time'] <= time_end]
+            ]
 
     x = pgc.data.filter(module, function, get_x, "time", arg, label)
     y = pgc.data.filter(module, function, get_x, mode, arg, label)
@@ -432,7 +415,8 @@ def get_scatter_timeline(module, function, label, backtrace, arg, mode, marker_s
                            customdata=customdata,
                            mode="markers",
                            marker_symbol=marker_symbol,
-                           marker_color=marker_color)
+                           marker_color=marker_color,
+                           meta={'module': module, 'function': function})
     return scatter
 
 # @cache.memoize(timeout=TIMEOUT)
@@ -440,8 +424,7 @@ def get_scatter_timeline(module, function, label, backtrace, arg, mode, marker_s
 
 def add_scatter(fig, module, function,
                 label, backtraces_set,
-                argsname, colors, marker, mode,
-                time_start=0, time_end=sys.maxsize):
+                argsname, colors, marker, mode):
 
     for backtrace in backtraces_set:
         for arg in argsname:
@@ -453,9 +436,7 @@ def add_scatter(fig, module, function,
                                            arg,
                                            mode,
                                            marker,
-                                           colors[backtrace],
-                                           time_start=time_start,
-                                           time_end=time_end)
+                                           colors[backtrace])
 
             fig.add_trace(scatter)
 
@@ -504,10 +485,19 @@ def get_colors(module, function):
         with lock:
             return [x[col] for x in values.where('((label == b_inputs))')]
 
-    backtraces = pgc.data.filter(
+    def get_x_out(values, col):
+        b_outputs = b"outputs"
+        with lock:
+            return [x[col] for x in values.where('((label == b_outputs))')]
+
+    backtraces_in = pgc.data.filter(
         module, function, get_x_in, "BacktraceDescription")
 
-    backtraces_set = set(backtraces)
+    backtraces_out = pgc.data.filter(
+        module, function, get_x_out, "BacktraceDescription")
+
+    backtraces_set = set.union(set(backtraces_in), set(backtraces_out))
+
     _colors = pcolors.qualitative.Alphabet * 10
     random.shuffle(_colors)
     colors = {bt: _colors[i]
@@ -519,31 +509,52 @@ def get_colors(module, function):
     return value
 
 
-@ app.callback(
+def remove_scatter(figure, module, function):
+    meta_to_remove = {'module': module, "function": function}
+    for data in figure['data']:
+        if data['meta'] == meta_to_remove:
+            data['visible'] = False
+
+
+@app.callback(
+    dash.dependencies.Output("download-timeline", "data"),
+    dash.dependencies.Input("dump-timeline", "n_clicks"),
+    dash.dependencies.State("timeline", "figure"),
+    prevent_initial_call=True
+)
+def dump_timeline(n_clicks, figure):
+    data = json.dumps(figure, ensure_ascii=False, indent=2)
+    return dict(content=data, filename='timeline.json')
+
+
+@app.callback(
+    dash.dependencies.Output("current-selected-rows", "data"),
+    dash.dependencies.Output("previous-selected-rows", "data"),
+    dash.dependencies.Input("info-table", "selected_rows"),
+    dash.dependencies.State("current-selected-rows", "data")
+)
+def update_selected_rows(selected_rows, current_selection):
+    return (selected_rows, current_selection)
+
+
+@app.callback(
     dash.dependencies.Output("timeline", "figure"),
-    [dash.dependencies.Input("info-table", "selected_rows"),
+    [dash.dependencies.Input("current-selected-rows", "data"),
      dash.dependencies.Input("info-table", "data"),
      dash.dependencies.Input("timeline-mode", "value"),
      dash.dependencies.Input("x-scale", "value"),
      dash.dependencies.Input("y-scale", "value"),
      dash.dependencies.Input("x-format", "value"),
      dash.dependencies.Input("y-format", "value"),
-     dash.dependencies.Input("line-button", "on"),
      dash.dependencies.State("timeline", "figure"),
-     dash.dependencies.State("lines-start", "value"),
-     dash.dependencies.State("lines-end", "value"),
-     dash.dependencies.State("lines-file-selection", "value"),
-     dash.dependencies.State("time-start", "value"),
-     dash.dependencies.State("time-end", "value")
+     dash.dependencies.State("previous-selected-rows", "data"),
      ])
 def update_timeline(selected_rows, data, mode, xscale, yscale,
-                    xfmt, yfmt, line_on, curr_fig, lstart, lend, lfile,
-                    time_start, time_end):
+                    xfmt, yfmt, curr_fig, prev_selected_rows):
     ctx = dash.callback_context
 
     b = time.perf_counter()
     if ctx.triggered:
-        print(ctx.triggered)
         trigger = ctx.triggered[0]['prop_id']
         if trigger in ("x-scale.value", 'y-scale.value', 'x-format.value', 'y-format.value'):
             value = ctx.triggered[0]['value']
@@ -556,27 +567,33 @@ def update_timeline(selected_rows, data, mode, xscale, yscale,
                 fig.update_yaxes(type=value)
             elif trigger == 'y-format.value':
                 fig.update_yaxes(tickformat=value)
-            print("Return fig")
             return fig
 
-    fig = go.Figure(layout={'height': 800})
+    new_fig = go.Figure(layout={'height': 800})
+
+    if curr_fig is None:
+        fig = new_fig
+    else:
+        fig = go.Figure(curr_fig)
+
+    if selected_rows == []:
+        return new_fig
+    else:
+        rows_to_add = set.difference(
+            set(selected_rows), set(prev_selected_rows))
+        rows_to_remove = set.difference(
+            set(prev_selected_rows), set(selected_rows))
+
     ylabel = pgc.get_ylabel(mode)
     fig.update_xaxes(title_text="Invocation", type=xscale)
     fig.update_yaxes(title_text=ylabel,
                      rangemode="tozero", type=yscale)
 
-    module_and_function = [data[x] for x in selected_rows]
-
-    if line_on:
-        if os.path.isfile(lfile):
-            pgc.data.get_first_call_from_line(lstart)
-        else:
-            print(f"File {lfile} does not exit")
-
-    time_start = -1 if time_start is None else int(time_start)
-    time_end = sys.maxsize if time_end is None else int(time_end)
+    module_and_function_to_add = [data[x] for x in rows_to_add]
+    module_and_function_to_remove = [data[x] for x in rows_to_remove]
 
     # @cache.memoize(timeout=TIMEOUT)
+
     def get_x_in(values, col):
         b_inputs = b"inputs"
         with lock:
@@ -588,7 +605,7 @@ def update_timeline(selected_rows, data, mode, xscale, yscale,
         with lock:
             return [x[col] for x in values.where('((label == b_outputs))')]
 
-    for mf in module_and_function:
+    for mf in module_and_function_to_add:
         module = mf["module"]
         function = mf["function"]
 
@@ -601,8 +618,7 @@ def update_timeline(selected_rows, data, mode, xscale, yscale,
         add_scatter(fig=fig,
                     module=module, function=function,
                     label="inputs", backtraces_set=backtraces_set,
-                    argsname=argsname, colors=colors, marker="triangle-up", mode=mode,
-                    time_start=time_start, time_end=time_end)
+                    argsname=argsname, colors=colors, marker="triangle-up", mode=mode)
 
         names = pgc.data.filter(
             module, function, get_x_out, "name")
@@ -611,9 +627,45 @@ def update_timeline(selected_rows, data, mode, xscale, yscale,
         add_scatter(fig=fig,
                     module=module, function=function,
                     label="outputs", backtraces_set=backtraces_set,
-                    argsname=argsname, colors=colors, marker="triangle-down", mode=mode,
-                    time_start=time_start, time_end=time_end)
+                    argsname=argsname, colors=colors, marker="triangle-down", mode=mode)
+
+    for mf in module_and_function_to_remove:
+        module = mf["module"]
+        function = mf["function"]
+        remove_scatter(figure=fig, module=module, function=function)
 
     e = time.perf_counter()
     print("update_timeline", e-b)
+    # print(fig.data)
     return fig
+
+
+@app.callback(
+    dash.dependencies.Output("histo_bin_selected", "children"),
+    [dash.dependencies.Input("histo_bin_selector", "value")]
+)
+def update_histo_bin_selected(nb_bins):
+    return f"Nb bins: {nb_bins}"
+
+
+@app.callback(
+    dash.dependencies.Output("histo_heatmap", "figure"),
+    [dash.dependencies.Input("info-data-timeline-heatmap", "figure"),
+     dash.dependencies.Input("histo_bin_selector", "value"),
+     dash.dependencies.Input("histo_normalization", "value")],
+    dash.dependencies.State("timeline-mode", "value"))
+def update_histo(heatmap, nbins, normalization, mode):
+    if heatmap == {} or heatmap is None:
+        return {}
+    x = np.ravel(heatmap['data'][0]['z'])
+    fig = get_histo(x, nbins, normalization)
+
+    mode_str = {"sig": "Significant digits",
+                "mean": "Mean", "std": "Standard deviation"}
+    fig.update_xaxes({"title": mode_str[mode]})
+    fig.update_yaxes({"title": normalization if normalization else "count"})
+    return fig
+
+
+def get_histo(x, nbins, normalization):
+    return go.Figure(data=go.Histogram(x=x, nbinsx=nbins, histnorm=normalization))

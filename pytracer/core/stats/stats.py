@@ -19,7 +19,8 @@ class TypeValue(IntEnum):
 
     def is_scalar(self):
         if not hasattr(self, "__scalar"):
-            self.__scalar = (self.INT,
+            self.__scalar = (self.BOOL,
+                             self.INT,
                              self.FLOAT)
         return self in self.__scalar
 
@@ -55,7 +56,9 @@ def get_type(value):
     from pytracer.core.stats.sklearn import is_sklearn_value
     import numpy as np
     _type = None
-    if isinstance(value, int):
+    if isinstance(value, bool):
+        _type = TypeValue.BOOL
+    elif isinstance(value, int):
         _type = TypeValue.INT
     elif isinstance(value, float):
         _type = TypeValue.FLOAT
@@ -95,6 +98,7 @@ def check_type(values):
 def get_stats(values):
     from pytracer.core.stats.numpy import StatisticNumpy
     from pytracer.core.stats.sklearn import get_sklearn_stat
+    from pytracer.core.stats.generic import get_stat
     import numpy as np
     check_type(values)
     _type = get_type(values[0])
@@ -129,8 +133,7 @@ def get_stats(values):
     elif _type == TypeValue.SKLEARN:
         _stats = get_sklearn_stat(values, type(values[0]))
     else:
-        _stats = StatisticNumpy(values, empty=True)
-        # _stats = values[0]
+        _stats = get_stat(values)
 
     return _stats
 

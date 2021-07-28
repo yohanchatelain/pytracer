@@ -7,6 +7,7 @@ import pickle
 import traceback
 import shutil
 import inspect
+import threading
 
 import pytracer.utils as ptutils
 from pytracer.core.config import config as cfg
@@ -18,6 +19,8 @@ from pytracer.core.wrapper.cache import visited_files
 from . import _init, _writer
 
 logger = get_logger()
+
+lock = threading.Lock()
 
 
 class WriterPickle(_writer.Writer):
@@ -96,7 +99,7 @@ class WriterPickle(_writer.Writer):
             return True
         except Exception as e:
             try:
-                obj.pop("args")
+                obj["args"] = {}
             except (AttributeError, KeyError):
                 pass
             logger.warning(
@@ -127,6 +130,9 @@ class WriterPickle(_writer.Writer):
                     "args": args,
                     "backtrace": backtrace}
 
+        if lock.locked():
+            return
+        lock.acquire()
         try:
             if self.is_writable(to_write):
 
@@ -137,27 +143,9 @@ class WriterPickle(_writer.Writer):
 
                 if not report.report_only():
                     self._write(to_write)
-
-            # TODO: Iterate over args causes segfault
-            #        and recursive calls to generic_wrapper
-            #
-            # else:
-            #     logger.warning(f"Iterate over args")
-            #     args_ = {}
-            #     for name, arg in args.items():
-            #         if not self.is_writable(arg):
-            #             args_[name] = None
-            #         else:
-            #             args_[name] = arg
-
-            #     to_write['args'] = args_
-            #     if report.report_enable():
-            #         key = (module_name, function_name)
-            #         value = to_write
-            #         report.report(key, value)
-
-            #     if not report.report_only():
-            #         self._write(to_write)
+            else:
+                to_write['args'] = {}
+                self._write(to_write)
 
         except pickle.PicklingError as e:
             logger.error(
@@ -166,10 +154,13 @@ class WriterPickle(_writer.Writer):
         except (AttributeError, TypeError) as e:
             logger.warning(
                 f"Unable to pickle object: {args} {function_name}", caller=self, error=e)
+            to_write['args'] = {}
+            self._write(to_write)
         except Exception as e:
             logger.debug(f"Writing pickle object: {to_write}", caller=self)
             logger.critical("Unexpected error while writing",
                             error=e, caller=self)
+        lock.release()
 
     def inputs(self, **kwargs):
         self.write(**kwargs, label="inputs")
