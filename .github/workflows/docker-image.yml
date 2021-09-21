@@ -8,13 +8,25 @@ on:
 
 jobs:
 
-  build:
-
+  build_ieee:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
         dockerfile: [
-          "ieee",
+          "ieee"
+        ]
+    steps:
+    - name: Check Out Repo
+      uses: actions/checkout@v2
+    - name: Build the Docker image
+      run: |
+        docker build . --file Dockerfile.${{ matrix.dockerfile }} --tag ${{ matrix.dockerfile }}:$(date +%s)  
+
+  build_fuzzy:
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        dockerfile: [
           "fuzzy",
           "fuzzy-numpy",
           "fuzzy-numpy-scipy",
