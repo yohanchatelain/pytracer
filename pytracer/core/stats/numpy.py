@@ -142,7 +142,7 @@ class StatisticNumpy:
                     if self._type.kind in ('U', 'S'):
                         sig = sig.filled(8)
                     else:
-                        sig = sig.filled(self.__max_sig[self._type])
+                        sig = sig.filled(self.__max_sig.get(self._type, 0))
 
             else:
                 sig = np.log2(np.abs(mean/std))

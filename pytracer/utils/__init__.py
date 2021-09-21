@@ -1,3 +1,6 @@
+import inspect
+import traceback
+import collections
 from enum import Enum
 import sys
 import os
@@ -79,3 +82,38 @@ def get_filename(name):
         name = f"{name}.{i}"
         i += 1
     return name
+
+
+def ishashable(_object):
+    try:
+        hash(_object)
+    except TypeError:
+        return False
+    return isinstance(_object, collections.Hashable)
+
+
+def get_functions_from_traceback():
+    def pretty_print(stack):
+        function = stack.frame.f_globals[stack.function]
+        module = getattr(function, "__module__")
+        function = getattr(function, "__qualname__",
+                           getattr(function, "__name__"))
+        return f"{module}:{function}"
+
+    def is_exclude(module):
+        if module in ["__main__", "_frozen_importlib", "runpy"]:
+            return True
+        if module.startswith('pytracer'):
+            return True
+
+    def to_return(stack):
+        print(stack.function)
+        if stack.function not in stack.frame.f_globals:
+            return False
+        function = stack.frame.f_globals[stack.function]
+        module = getattr(function, "__module__")
+        if is_exclude(module):
+            return False
+        return True
+
+    return [pretty_print(stack) for stack in inspect.stack() if to_return(stack)]

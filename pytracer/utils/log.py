@@ -40,7 +40,7 @@ class LogInitializer(metaclass=singleton.Singleton):
     level_default = Level.INFO
 
     def __init__(self):
-        self.datefmt = "%H:%M:%S"
+        self.datefmt = "%H:%M:%S.%f"
         self.read_parameters()
 
     def read_parameters(self):
@@ -104,11 +104,11 @@ class Log(metaclass=singleton.Singleton):
         pass
 
     @ abstractmethod
-    def error(self, msg, caller=None, error=None):
+    def error(self, msg, caller=None, error=None, raise_error=True):
         pass
 
     @ abstractmethod
-    def critical(self, msg, caller=None, error=None):
+    def critical(self, msg, caller=None, error=None, raise_error=True):
         pass
 
 
@@ -183,17 +183,20 @@ class LogPrint(Log):
         if error:
             self._print(Level.WARNING, caller, error, ostream=sys.stderr)
 
-    def error(self, msg, caller=None, error=None):
+    def error(self, msg, caller=None, error=None, raise_error=None):
         self._print(Level.ERROR, caller, msg, ostream=sys.stderr)
         if error:
             self._print(Level.ERROR, caller, error, ostream=sys.stderr)
+            if raise_error:
+                raise error
         sys.exit(1)
 
-    def critical(self, msg, caller=None, error=None):
+    def critical(self, msg, caller=None, error=None, raise_error=None):
         self._print(Level.CRITICAL, caller, msg, ostream=sys.stderr)
         if error:
             self._print(Level.CRITICAL, caller, error, ostream=sys.stderr)
-            raise error
+            if raise_error:
+                raise error
         sys.exit(2)
 
 
@@ -246,23 +249,25 @@ class LogLogger(Log):
         if error:
             logging.warning(error)
 
-    def error(self, msg, caller=None, error=None):
+    def error(self, msg, caller=None, error=None, raise_error=None):
         _msg = self._caller_str(caller) + str(msg)
         logging.error(_msg)
         if error:
             logging.error(error)
             self.end()
-            raise error
+            if raise_error:
+                raise error
         self.end()
         sys.exit(1)
 
-    def critical(self, msg, caller=None, error=None):
+    def critical(self, msg, caller=None, error=None, raise_error=None):
         _msg = self._caller_str(caller) + str(msg)
         logging.critical(_msg)
         if error:
             logging.critical(error)
             self.end()
-            raise error
+            if raise_error:
+                raise error
         self.end()
         sys.exit(2)
 

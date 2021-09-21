@@ -1,3 +1,4 @@
+import pytracer.core.wrapper.cache as cache
 import inspect
 
 import pytracer.core.wrapper.cache as wrapper_cache
@@ -21,12 +22,6 @@ class Binding:
             self._default_initializer(*args, **kwargs)
 
     def _bind_initializer(self, sig, *args, **kwargs):
-        # Remove default kwarg that are present in *args
-        # Cause error if the same arg is provided twice
-        for name, arg in sig.parameters.items():
-            if name in kwargs:
-                if arg.default == kwargs[name]:
-                    kwargs.pop(name)
         bind = sig.bind(*args, **kwargs)
         self.arguments = bind.arguments
         self.args = bind.args
@@ -59,8 +54,8 @@ def wrapper(self,
     inputs = Binding(function, *args, **kwargs)
 
     stack = self.backtrace()
-    if hasattr(function, is_wrapper_attr):
-        logger.error(f"Function {function} is wrapped itself")
+    # if hasattr(function, is_wrapper_attr):
+    #     logger.error(f"Function {function} is wrapped itself")
 
     time = elements()
 
@@ -71,7 +66,11 @@ def wrapper(self,
                 args=inputs.arguments,
                 backtrace=stack)
 
-    outputs = function(*inputs.args, **inputs.kwargs)
+    try:
+        outputs = function(*inputs.args, **inputs.kwargs)
+    except Exception as e:
+        self.critical_writing_error(e)
+
     _outputs = format_output(outputs)
 
     self.outputs(time=time,
@@ -96,8 +95,8 @@ def wrapper_function(self,
     bind = Binding(function, *args, **kwargs)
     stack = self.backtrace()
 
-    if hasattr(function, is_wrapper_attr):
-        logger.error(f"Function {function} is wrapped itself")
+    # if hasattr(function, is_wrapper_attr):
+    #     logger.error(f"Function {function} is wrapped itself")
 
     time = elements()
 
@@ -108,7 +107,11 @@ def wrapper_function(self,
                 args=bind.arguments,
                 backtrace=stack)
 
-    outputs = function(*bind.args, **bind.kwargs)
+    try:
+        outputs = function(*bind.args, **bind.kwargs)
+    except Exception as e:
+        self.critical_writing_error(e)
+
     _outputs = format_output(outputs)
 
     self.outputs(time=time,
@@ -153,8 +156,8 @@ def wrapper_class(self, info, *args, **kwargs):
     bind = Binding(function, *args, **kwargs)
     stack = self.backtrace()
 
-    if hasattr(function, is_wrapper_attr):
-        logger.error(f"Function {function} {dir(function)} is wrapped itself")
+    # if hasattr(function, is_wrapper_attr):
+    #     logger.error(f"Function {function} {dir(function)} is wrapped itself")
 
     time = elements()
 
@@ -167,8 +170,8 @@ def wrapper_class(self, info, *args, **kwargs):
 
     try:
         outputs = function(*bind.args, **bind.kwargs)
-    except TypeError:
-        outputs = function(*(bind.args[1:]), **bind.kwargs)
+    except Exception as e:
+        self.critical_writing_error(e)
 
     _outputs = format_output(outputs)
 
@@ -183,22 +186,20 @@ def wrapper_class(self, info, *args, **kwargs):
 
 
 def get_ufunc_inputs_type(inputs):
-    import numpy as np
     inputs_type = []
 
     for input_ in inputs:
-        if np.isscalar(input_):
-            inputs_type.append(np.dtype(type(input_)))
-        elif np.issubdtype(input_, np.ndarray):
+        if cache.hidden.isscalar(input_):
+            inputs_type.append(cache.hidden.dtype(type(input_)))
+        elif cache.hidden.issubdtype(input_, cache.hidden.ndarray):
             inputs_type.append(input_.dtype)
         else:
-            inputs_type.append(np.ndarray(input_).dtype)
+            inputs_type.append(cache.hidden.ndarray(input_).dtype)
 
     return inputs_type
 
 
 def get_ufunc_output_type(args_type, sig_types):
-    import numpy as np
 
     inputs_sym = "".join([arg_type.char for arg_type in args_type])
     for sig_type in sig_types:
@@ -215,7 +216,7 @@ def get_ufunc_output_type(args_type, sig_types):
         casted_inputs_type = ""
         for i, ity in enumerate(input_type):
             casted_inputs_type = ""
-            if np.can_cast(inputs_sym[i], ity):
+            if cache.hidden.can_cast(inputs_sym[i], ity):
                 casted_inputs_type += ity
             else:
                 casted_inputs_type = ""

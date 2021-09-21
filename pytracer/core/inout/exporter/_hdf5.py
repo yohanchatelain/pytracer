@@ -203,7 +203,14 @@ class ExporterHDF5(_exporter.Exporter):
             filters = tables.Filters(complevel=9, complib='zlib')
 
             unique_id = "/".join([label, name])
-            atom_type = tables.Atom.from_dtype(stats.dtype())
+            _type = stats.dtype()
+            if _type == np.dtype("object"):
+                _type = np.dtype("float64")
+
+            try:
+                atom_type = tables.Atom.from_dtype(_type)
+            except:
+                return
             shape = stats.shape()
             path = tables.path.join_path(function_grp._v_pathname, unique_id)
 

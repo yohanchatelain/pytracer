@@ -88,6 +88,54 @@ def frame_args(duration):
     }
 
 
+def get_extra_value(extra_value):
+    with lock:
+        _ndarray = extra_value.read()
+
+    ndim = _ndarray.ndim
+
+    if ndim == 1:
+        _ndarray = _ndarray.reshape(_ndarray.shape+(1,))
+    if ndim == 3:
+        _row = _ndarray.shape[0]
+        _col = _ndarray.shape[1] * _ndarray.shape[2]
+        _ndarray = _ndarray.reshape((_row, _col))
+    if ndim > 3:
+        _row = _ndarray.shape[0]
+        _col = np.prod(_ndarray.shape[1:])
+        _ndarray = _ndarray.reshape((_row, _col))
+
+    _row, _col = _ndarray.shape
+    _x = list(range(_row))
+    _y = list(range(_col))
+
+    return _x, _y, _ndarray
+
+
+def get_heatmap(x, y, z, zmin=None, zmax=None):
+    heatmap = go.Figure(data=go.Heatmap(x=x,
+                                        y=y,
+                                        z=z,
+                                        zmin=None,
+                                        zmax=None,
+                                        coloraxis='coloraxis'))
+    heatmap.update_layout(width=700, height=700)
+    return heatmap
+
+
+# @app.callback(
+#     dash.dependencies.Output("info-data-timeline-heatmap", "figure"),
+#     [dash.dependencies.Input("minmax-heatmap-button", "n_clicks"),
+#      dash.dependencies.State("min-heatmap-input", "value"),
+#      dash.dependencies.State("max-heatmap-input", "value"),
+#      dash.dependencies.State('info-data-timeline-heatmap', 'figure')
+#      ]
+# )
+# def update_heatmap(valid, min_, max_, heatmap):
+#     print(heatmap)
+#     return heatmap
+
+
 @app.callback(
     dash.dependencies.Output("info-data-timeline-heatmap", "figure"),
     dash.dependencies.Output("info-timeline", "style"),
@@ -95,10 +143,13 @@ def frame_args(duration):
      dash.dependencies.Input("timeline-mode", "value"),
      dash.dependencies.Input('color-heatmap', 'value'),
      dash.dependencies.Input('z-scale', 'value'),
+     dash.dependencies.Input('minmax-heatmap-button', 'n_clicks'),
+     dash.dependencies.State('min-heatmap-input', 'value'),
+     dash.dependencies.State('max-heatmap-input', 'value'),
      dash.dependencies.State('info-data-timeline-heatmap', 'figure'),
      ],
     prevent_initial_call=True)
-def print_heatmap(hover_data, mode, color, zscale, fig):
+def print_heatmap(hover_data, mode, color, zscale, scale_button, min_scale, max_scale, fig):
     figure = {}
     display = {"display": "flex", "display-direction": "row"}
 
@@ -122,43 +173,15 @@ def print_heatmap(hover_data, mode, color, zscale, fig):
             extra_value = None
 
     if extra_value:
-        with lock:
-            _ndarray = extra_value.read()
-
-        ndim = _ndarray.ndim
-
-        if ndim == 1:
-            _ndarray = _ndarray.reshape(_ndarray.shape+(1,))
-        if ndim == 3:
-            _row = _ndarray.shape[0]
-            _col = _ndarray.shape[1] * _ndarray.shape[2]
-            _ndarray = _ndarray.reshape((_row, _col))
-        if ndim > 3:
-            _row = _ndarray.shape[0]
-            _col = np.prod(_ndarray.shape[1:])
-            _ndarray = _ndarray.reshape((_row, _col))
+        _x, _y, _z = get_extra_value(extra_value)
 
         if zscale == 'log':
-            _ndarray = np.log(np.abs(_ndarray))
+            _z = np.log(np.abs(_z))
 
-        _row, _col = _ndarray.shape
-        _x = list(range(_row))
-        _y = list(range(_col))
         if mode == "sig":
-            heatmap = go.Figure(data=go.Heatmap(x=_x,
-                                                y=_y,
-                                                z=_ndarray,
-                                                zmin=0,
-                                                zmax=64,
-                                                coloraxis='coloraxis'))
+            figure = get_heatmap(_x, _y, _z, zmin=0, zmax=64)
         else:
-            heatmap = go.Figure(data=go.Heatmap(x=_x,
-                                                y=_y,
-                                                z=_ndarray,
-                                                coloraxis='coloraxis'))
-
-        figure = heatmap
-        figure.update_layout(width=700, height=700)
+            figure = get_heatmap(_x, _y, _z)
 
         if color:
             colorscale = dict(colorscale=color)
@@ -170,12 +193,23 @@ def print_heatmap(hover_data, mode, color, zscale, fig):
     if ctx.triggered:
         if ctx.triggered[0]['prop_id'] == 'color-heatmap.value':
             colorscale = dict(colorscale=color)
-            if mode == "sig":
-                colorscale['cmin'] = 0
-                colorscale['cmax'] = 53
+            # if mode == "sig":
+            #     colorscale['cmin'] = 0
+            #     colorscale['cmax'] = 53
             fig = go.Figure(fig)
             fig.update_layout(coloraxis=colorscale)
             figure = fig
+        if ctx.triggered[0]['prop_id'] == 'minmax-heatmap-button.n_clicks':
+            colorscale = dict(colorscale=color)
+            colorscale['cmin'] = min_scale
+            colorscale['cmax'] = max_scale
+            fig = go.Figure(fig)
+            fig.update_layout(coloraxis=colorscale)
+            figure = fig
+
+    if figure:
+        figure.update_xaxes(side='top')
+        figure.update_yaxes(autorange='reversed')
 
     return (figure, display)
 
@@ -303,59 +337,62 @@ def print_modal_source(on, href, href_description):
     prevent_initial_call=True)
 def print_datahover_summary(hover_data, fig, mode):
     text = ""
+
+    if not fig or not hover_data:
+        return text
+
     if hover_data:
         x = hover_data['points'][0]['x']
         info = hover_data['points'][0]['customdata']
-        extra_value = None
-        try:
-            with lock:
-                extra_value = pgc.data.get_extra_value(info['module'],
-                                                       info['function'],
-                                                       info['label'],
-                                                       info['arg'],
-                                                       x,
-                                                       mode)
-        except KeyError:
-            extra_value = None
 
-        if extra_value:
-            with lock:
-                _ndarray = extra_value.read()
-            ndim = _ndarray.ndim
+    _ndarray = np.array(fig['data'][0]['z'])
+    _min = np.min(_ndarray)
+    _max = np.max(_ndarray)
 
-            if ndim == 1:
-                (_size,) = _ndarray.shape
-                norm_fro = np.linalg.norm(_ndarray)
-                norm_inf = np.linalg.norm(_ndarray, ord=np.inf)
-                cond = 1/norm_fro
-                text = (f"Function={info['function']}{os.linesep*2}"
-                        f"Arg={info['arg']}{os.linesep*2}"
-                        f"shape={_size}{os.linesep}{os.linesep}"
-                        f"Frobenius norm={norm_fro:.2}{os.linesep}{os.linesep}"
-                        f"Inf norm={norm_inf:.2}{os.linesep}{os.linesep}"
-                        f"Cond={cond:.2e}{os.linesep}{os.linesep}")
+    ndim = _ndarray.ndim
 
-            elif ndim == 2:
-                _row, _col = _ndarray.shape
-                norm_fro = np.linalg.norm(_ndarray)
-                norm_inf = np.linalg.norm(_ndarray, ord=np.inf)
-                norm_2 = np.linalg.norm(_ndarray, ord=2)
-                cond = np.linalg.cond(_ndarray)
-                text = (f"Function={info['function']}{os.linesep*2}"
-                        f"Arg={info['arg']}{os.linesep*2}",
-                        f"shape={_row}x{_col}{os.linesep}{os.linesep}"
-                        f"Frobenius norm={norm_fro:.2}{os.linesep}{os.linesep}"
-                        f"Inf norm={norm_inf:.2}{os.linesep}{os.linesep}"
-                        f"2-norm={norm_2:.2}{os.linesep}{os.linesep}"
-                        f"Cond={cond:.2e}{os.linesep}{os.linesep}")
+    if ndim == 1:
+        (_size,) = _ndarray.shape
+        norm_fro = np.linalg.norm(_ndarray)
+        norm_inf = np.linalg.norm(_ndarray, ord=np.inf)
+        cond = 1/norm_fro
+        text = (f"Function={info['function']}{os.linesep*2}"
+                f"Arg={info['arg']}{os.linesep*2}"
+                f"shape={_size}{os.linesep}{os.linesep}"
+                f"Frobenius norm={norm_fro:.2}{os.linesep}{os.linesep}"
+                f"Inf norm={norm_inf:.2}{os.linesep}{os.linesep}"
+                f"Cond={cond:.2e}{os.linesep}{os.linesep}"
+                f"Min={_min:.2e}{os.linesep}{os.linesep}"
+                f"Max={_max:.2e}{os.linesep}{os.linesep}"
+                )
 
-            elif ndim > 2:
-                shape = "x".join(map(str, _ndarray.shape))
-                norm_fro = np.linalg.norm(_ndarray)
-                text = (f"Function={info['function']}{os.linesep*2}"
-                        f"Arg={info['arg']}{os.linesep*2}"
-                        f"shape={shape}{os.linesep}{os.linesep}"
-                        f"Frobenius norm={norm_fro:.2}{os.linesep}{os.linesep}")
+    elif ndim == 2:
+        _row, _col = _ndarray.shape
+        norm_fro = np.linalg.norm(_ndarray)
+        norm_inf = np.linalg.norm(_ndarray, ord=np.inf)
+        norm_2 = np.linalg.norm(_ndarray, ord=2)
+        cond = np.linalg.cond(_ndarray)
+        text = (f"Function={info['function']}{os.linesep*2}"
+                f"Arg={info['arg']}{os.linesep*2}",
+                f"shape={_row}x{_col}{os.linesep}{os.linesep}"
+                f"Frobenius norm={norm_fro:.2}{os.linesep}{os.linesep}"
+                f"Inf norm={norm_inf:.2}{os.linesep}{os.linesep}"
+                f"2-norm={norm_2:.2}{os.linesep}{os.linesep}"
+                f"Cond={cond:.2e}{os.linesep}{os.linesep}"
+                f"Min={_min:.2e}{os.linesep}{os.linesep}"
+                f"Max={_max:.2e}{os.linesep}{os.linesep}"
+                )
+
+    elif ndim > 2:
+        shape = "x".join(map(str, _ndarray.shape))
+        norm_fro = np.linalg.norm(_ndarray)
+        text = (f"Function={info['function']}{os.linesep*2}"
+                f"Arg={info['arg']}{os.linesep*2}"
+                f"shape={shape}{os.linesep}{os.linesep}"
+                f"Frobenius norm={norm_fro:.2}{os.linesep}{os.linesep}"
+                f"Min={_min:.2e}{os.linesep}{os.linesep}"
+                f"Max={_max:.2e}{os.linesep}{os.linesep}"
+                )
 
     return text
 
@@ -516,7 +553,7 @@ def remove_scatter(figure, module, function):
             data['visible'] = False
 
 
-@app.callback(
+@ app.callback(
     dash.dependencies.Output("download-timeline", "data"),
     dash.dependencies.Input("dump-timeline", "n_clicks"),
     dash.dependencies.State("timeline", "figure"),
@@ -527,7 +564,7 @@ def dump_timeline(n_clicks, figure):
     return dict(content=data, filename='timeline.json')
 
 
-@app.callback(
+@ app.callback(
     dash.dependencies.Output("current-selected-rows", "data"),
     dash.dependencies.Output("previous-selected-rows", "data"),
     dash.dependencies.Input("info-table", "selected_rows"),
@@ -537,7 +574,7 @@ def update_selected_rows(selected_rows, current_selection):
     return (selected_rows, current_selection)
 
 
-@app.callback(
+@ app.callback(
     dash.dependencies.Output("timeline", "figure"),
     [dash.dependencies.Input("current-selected-rows", "data"),
      dash.dependencies.Input("info-table", "data"),

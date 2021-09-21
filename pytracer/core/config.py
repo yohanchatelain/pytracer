@@ -145,6 +145,7 @@ class _Config(object, metaclass=Singleton):
 
     _attributes = ["python_modules_path",
                    "modules_to_load",
+                   "modules_to_exclude",
                    "include_file",
                    "exclude_file",
                    "logger",
@@ -196,9 +197,11 @@ class _Config(object, metaclass=Singleton):
         cfg_path, _ = os.path.split(config)
         try:
             config_file = open(config)
+            cfg = json.load(config_file)
         except FileNotFoundError as e:
             sys.exit(f"Error while opening file {config}:{os.linesep} {e}")
-        cfg = json.load(config_file)
+        except json.decoder.JSONDecodeError as e:
+            sys.exit(f"Error while reading file {config}:{os.linesep} {e}")
         _fix_path(cfg_path, cfg)
         _Config._data = DictAt(cfg)
 

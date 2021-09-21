@@ -133,7 +133,7 @@ def get_stats(values):
     elif _type == TypeValue.SKLEARN:
         _stats = get_sklearn_stat(values, type(values[0]))
     else:
-        _stats = get_stat(values)
+        _stats = get_stat(np.array(values))
 
     return _stats
 

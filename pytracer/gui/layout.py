@@ -122,7 +122,17 @@ timeline_hover_info = html.Div(
 )
 
 timeline_hover_heatmap = html.Div(
-    dcc.Graph(id="info-data-timeline-heatmap"),
+    [
+        dcc.Graph(id="info-data-timeline-heatmap"),
+        html.Div([
+            dcc.Input(id="min-heatmap-input", type="number",
+                      debounce=True, placeholder="Min scale"),
+            dcc.Input(id="max-heatmap-input", type="number",
+                      debounce=True, placeholder="Max scale"),
+            html.Button("Apply", id="minmax-heatmap-button", n_clicks=0)
+        ], className="pretty_container"),
+
+    ],
     className="pretty_container"
 )
 

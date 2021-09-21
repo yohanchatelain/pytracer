@@ -7,7 +7,7 @@ import inspect
 builtin_types = (bool, list, str,  dict, type(
     None), types.FunctionType, types.ModuleType, types.MethodType,
     types.MappingProxyType, types.BuiltinFunctionType, types.BuiltinMethodType,
-    types.AsyncGeneratorType, frozenset, np.dtype)
+    types.AsyncGeneratorType, frozenset, np.dtype, type)
 
 
 def is_function(value):
@@ -37,15 +37,31 @@ def get_stat(values):
         if 0 in x0.shape:
             return StatisticNumpy(values, empty=True)
         else:
-            return StatisticNumpy(values)
+            return StatisticNumpy(np.array(values))
 
-    print(f"Generic parser for type {type(x0)}")
-    print(values)
     for attr in dir(x0):
-        attr_value = getattr(x0, attr, None)
+        try:
+            attr_value = getattr(x0, attr, None)
+        except:
+            continue
         if is_valid_attribute(attr_value):
-            print("Attribute", attr)
             if attr_value is not None:
-                _data[attr] = StatisticNumpy(
-                    np.array([getattr(x, attr) for x in values]))
+                try:
+                    xarray = np.array([getattr(x, attr) for x in values])
+                    empty = False
+                except ValueError:
+                    try:
+                        array_list = [getattr(x, attr) for x in values]
+                        flat_list = [
+                            item for sublist in array_list for item in sublist]
+                        xarray = np.array(flat_list)
+                        empty = False
+                    except:
+                        xarray = np.array([])
+                        empty = True
+                except:
+                    xarray = np.array([])
+                    empty = True
+                _data[attr] = StatisticNumpy(xarray, empty=empty)
+
     return _data
