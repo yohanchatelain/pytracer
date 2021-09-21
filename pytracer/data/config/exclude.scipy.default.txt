@@ -65,3 +65,4 @@ scipy.sparse.data _data_matrix.copy
 scipy.sparse.linalg.interface LinearOperator._init_dtype
 scipy.sparse.csc csc_matrix._swap
 scipy.sparse.csr csr_matrix._swap
+scipy.sparse.linalg.isolve.iterative set_docstring

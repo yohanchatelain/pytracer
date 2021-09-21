@@ -524,7 +524,7 @@ class Wrapper(metaclass=ABCMeta):
         function_wrapped = FunctionType(code.co_consts[0], func_dict, name)
 
         for attr in dir(function):
-            if attr in ("__globals__", "__code__"):
+            if attr in ("__globals__", "__code__", "__doc__"):
                 continue
             try:
                 obj = getattr(function, attr)
