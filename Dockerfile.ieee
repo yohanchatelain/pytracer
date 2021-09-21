@@ -3,7 +3,7 @@ FROM verificarlo/verificarlo:latest as builder
 COPY . /opt/build/pytracer 
 
 RUN cd /opt/build/pytracer && \
-    pip3 install . -r requirements.txt
+    pip3 install . -r requirements.txt && pip3 list
 
 ENV PYTRACER_CONFIG /opt/build/pytracer/pytracer/data/config/config.json
 
@@ -12,10 +12,10 @@ CMD ["pytracer trace --module "]
 #FROM builder 
 
 RUN cd /opt/build/pytracer && \
-    pytest --script-launch-mode=subprocess --nsamples=3 -m "not slow" -v -k "trace_only and ufunc_off"
+    pytest --script-launch-mode=subprocess --nsamples=3 -m "not slow" -v -k "trace_only and ufunc_off" && cat pytracer.log
 RUN cd /opt/build/pytracer && \
-    pytest --script-launch-mode=subprocess --nsamples=3 -m "not slow" -v -k "trace_only and ufunc_on"
+    pytest --script-launch-mode=subprocess --nsamples=3 -m "not slow" -v -k "trace_only and ufunc_on" && cat pytracer.log
 RUN cd /opt/build/pytracer && \
-    pytest --script-launch-mode=subprocess --nsamples=3 -m "not slow" -v -k "trace_parse"
+    pytest --script-launch-mode=subprocess --nsamples=3 -m "not slow" -v -k "trace_parse" && cat pytracer.log
 
 ENTRYPOINT [ "/bin/bash" ]
