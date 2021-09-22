@@ -9,6 +9,8 @@ modules_not_initialized = {}
 submodules = {}
 orispec_to_wrappedmodule = {}
 
+required_modules = {}
+
 visited_spec = {}
 
 hidden = types.ModuleType('cache.hidden')
@@ -28,6 +30,7 @@ dumped_functions = {}
 _global_mapping = {}
 _reverse_global_mapping = set()
 
+globals_to_update = {}
 
 def get_global_mapping(_object):
     _id = id(_object)

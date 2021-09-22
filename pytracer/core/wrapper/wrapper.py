@@ -180,12 +180,14 @@ def instance_wrapper(function):
 
     def wrapper(self, *args, **kwargs):
         return _wrapper(writer, self, *args, **kwargs)
-    for attr in dir(function):
-        try:
-            obj = getattr(function, attr, None)
-            setattr(function, attr, obj)
-        except Exception:
-            continue
+
+    # for attr in dir(function):
+    #     try:
+    #         obj = getattr(function, attr, None)
+    #         setattr(function, attr, obj)
+    #     except Exception:
+    #         continue
+
     return wrapper
 
 
@@ -242,36 +244,38 @@ def wrap_instance(name, instance):
         else:
             x = None
     else:
-        attributes = {name: getattr(instance, name)
-                      for name in dir(instance)}
 
-        new_attributes = prepare_attributes(attributes)
-        clss = instance.__class__
-        clss_name = clss.__name__
         try:
-            wrapped_instance = type(clss_name, (clss,), new_attributes)
-            x = wrapped_instance.__new__(wrapped_instance)
+            instance.__call__ = instance_wrapper(instance.__call__)
+            x = instance
+        except AttributeError:
+            pass
 
-            for attr_instance in dir(instance):
-                iv = getattr(instance, attr_instance)
-                ix = getattr(x, attr_instance)
-                if iv != ix:
-                    # if not cache.hidden.isnan(iv):
-                    if not str(float(iv)) == 'nan':
-                        logger.error(
-                            f"Attributes {attr_instance} differs {iv} {ix} {type(iv)} {type(ix)}")
+        # attributes = {name: getattr(instance, name)
+        #               for name in dir(instance)}
 
-        except Exception as e:
-            logger.warning(
-                f"Instance {name} of {repr(instance)} cannot be wrapped", error=e)
-            x = None
+        # new_attributes = prepare_attributes(attributes)
+        # clss = instance.__class__
+        # clss_name = clss.__name__
+        # try:
+        #     wrapped_instance = type(clss_name, (clss,), new_attributes)
+        #     x = wrapped_instance.__new__(wrapped_instance)
+
+        #     for attr_instance in dir(instance):
+        #         iv = getattr(instance, attr_instance)
+        #         ix = getattr(x, attr_instance)
+        #         if iv != ix:
+        #             # if not cache.hidden.isnan(iv):
+        #             if not str(float(iv)) == 'nan':
+        #                 logger.error(
+        #                     f"Attributes {attr_instance} differs {iv} {ix} {type(iv)} {type(ix)}")
+
+        # except Exception as e:
+        #     logger.warning(
+        #         f"Instance {name} of {repr(instance)} cannot be wrapped", error=e)
+        #     x = None
 
     return x
-
-
-def mark_function_as_visited(func):
-    logger.debug(f"Function {func} marked as visited")
-    setattr(func, visited_attr, True)
 
 
 class Wrapper(metaclass=ABCMeta):
@@ -297,6 +301,7 @@ class Wrapper(metaclass=ABCMeta):
             self.init_attributes()
             Wrapper.wrapped_cache.add(self.wrapped_obj)
             self.populate(self.real_obj, self.attributes)
+            self.update_globals()
             Wrapper.m2wm[self.real_obj] = self.wrapped_obj
             cache.add_global_mapping(self.real_obj, self.wrapped_obj)
             self.compute_dependencies(self.real_obj, self.wrapped_obj)
@@ -309,31 +314,50 @@ class Wrapper(metaclass=ABCMeta):
     def init_attributes(self):
         self.attributes = dir(self.real_obj)
 
+    def update_globals(self):
+
+        for _, _globals in cache.globals_to_update.items():
+            for _name, _value in _globals.items():
+                if _value_wrapped := cache.get_global_mapping(_value):
+                    _globals[_name] = _value_wrapped
+
+    def mark_function_as_visited(self, func):
+        logger.debug(f"Function {func} marked as visited", caller=self)
+        setattr(func, visited_attr, True)
+
     def assert_lazy_modules_loaded(self):
         entry = 0
         no_entry = 0
         total_entry = len(Wrapper.m2wm)
+
+        required_modules = cache.required_modules[self.real_obj]
+        total_entry = len(required_modules)
+
         logger.info(
             f"Lazy evaluation for module: {self.obj_name}", caller=self)
         logger.info(
             f"Ensure that all lazy modules ({total_entry}) have been initialized", caller=self)
-        for module, submodule in Wrapper.m2wm.items():
-            if submodule is None:
+        modules_not_init = []
+
+        for required_module in required_modules:
+            if cache.get_global_mapping(required_module) is None:
                 no_entry += 1
+                modules_not_init.append(str(required_module))
             else:
                 entry += 1
 
         logger.debug(f"\tTotal_entry: {total_entry}", caller=self)
         logger.debug(f"\t      entry: {entry}", caller=self)
         logger.debug(f"\t      empty: {no_entry}", caller=self)
-        # assert(entry == total_entry)
+
         if (entry == total_entry):
             logger.info("All modules have been initialized", caller=self)
         else:
-            logger.info(
-                f"{no_entry} modules have not been initialized", caller=self)
+            msg = "\n".join(modules_not_init)
+            logger.error(
+                f"{no_entry} modules have not been initialized{os.linesep}{msg}", caller=self)
 
-        cache.modules_not_initialized[self.wrapped_obj] = module
+        # cache.modules_not_initialized[self.wrapped_obj] = module
 
     def assert_lazy_attributes_are_initialized(self):
         for (submodule, attrs) in self.modules_not_initialized.items():
@@ -413,12 +437,16 @@ class Wrapper(metaclass=ABCMeta):
 
     def _get_dict(self, function, name):
 
+        _dict = getattr(function, '__global__', {})
+        _dict["generic_wrapper"] = getattr(self.wrapped_obj, "generic_wrapper")
+        return _dict
+
         new_func_dict = {
             "generic_wrapper": getattr(self.wrapped_obj, "generic_wrapper")}
 
         for attr in dir(function):
             # Cause segfault with dipy
-            if attr == "__kwdefaults__":
+            if attr in ("__kwdefaults__"):
                 continue
             new_func_dict[attr] = getattr(function, attr)
 
@@ -505,7 +533,8 @@ class Wrapper(metaclass=ABCMeta):
             return "<string>"
 
     def handle_included_function(self, name, function):
-        logger.debug(f"[{self.get_name()}] Included function {name}")
+        logger.debug(
+            f"[{self.get_name()}] Included function {name}", caller=self)
         if self.islambda(function):
             self.handle_included_lambda(name, function)
             return
@@ -524,28 +553,27 @@ class Wrapper(metaclass=ABCMeta):
         function_wrapped = FunctionType(code.co_consts[0], func_dict, name)
 
         for attr in dir(function):
-            if attr in ("__globals__", "__code__", "__doc__"):
+            if attr in ("__globals__", "__code__"):
                 continue
             try:
                 obj = getattr(function, attr)
                 new_obj = getattr(function_wrapped, attr)
-                if obj != new_obj:
+                if id(obj) != new_obj:
                     setattr(function_wrapped, attr, obj)
             except Exception:
                 continue
 
+        if _globals := getattr(function, '__global__', None):
+            cache.globals_to_update[id(_globals)] = _globals
+
         cache.add_global_mapping(function, function_wrapped)
-        setattr(function_wrapped, '__module__', func_dict['__module__'])
-        mark_function_as_visited(function_wrapped)
+        self.mark_function_as_visited(function_wrapped)
         setattr(self.wrapped_obj, name, function_wrapped)
         cache.id_dict[id(function)] = function
         cache.visited_functions[id(function)] = function_wrapped
         cache.add_global_mapping(function, function_wrapped)
         self.compute_dependencies(function, function_wrapped)
         self.update_dependencies(function, function_wrapped)
-
-        logger.debug(
-            f"Function {name} at {hex(id(function))} -> {hex(id(function_wrapped))}")
 
     def handle_function(self, name, function, module=None, exclude=False):
         """
@@ -605,9 +633,6 @@ class Wrapper(metaclass=ABCMeta):
         else:
             self.handle_included_function(alias_function_name, function)
 
-        logger.debug(
-            f"create function {function_name} in module {self.get_name()}", caller=self)
-
     def ismodule(self, attr):
         """
         Check if the attribute is a module
@@ -619,6 +644,16 @@ class Wrapper(metaclass=ABCMeta):
         Handler for submodules
         """
         logger.debug(f"[ModuleHandler] {attr} -> {submodule}", caller=self)
+
+        if submodule_wrapped := cache.get_global_mapping(submodule):
+            submodule = submodule_wrapped
+
+        if inspect.ismodule(self.real_obj) and not exclude:
+            if required_modules := cache.required_modules.get(self.real_obj, None):
+                required_modules.append(submodule)
+            else:
+                cache.required_modules[self.real_obj] = [submodule]
+
         setattr(self.wrapped_obj, attr, submodule)
 
     def isclass(self, attr):
@@ -725,7 +760,6 @@ class Wrapper(metaclass=ABCMeta):
         obj_name = getattr(obj, "__name__", "")
         names = (name, obj_name)
         module_name = self.get_name()
-        logger.debug(f"check object {name} in {module_name}", caller=self)
 
         if name == "__spec__":
             obj.origin = "Pytracer"
@@ -908,9 +942,6 @@ class Wrapper(metaclass=ABCMeta):
             Create wrapper for each attribute in the module
         """
         for attribute_name in _attributes_names:
-            logger.debug(
-                f"[{self.obj_name}] Checking {attribute_name}", caller=self)
-
             if isinstance(self, WrapperClass):
                 attribute = _object.__dict__[attribute_name]
                 attribute_obj = getattr(_object, attribute_name)
@@ -919,42 +950,39 @@ class Wrapper(metaclass=ABCMeta):
                 object_name = attribute_name
             else:
                 attribute = getattr(_object, attribute_name)
-                if hasattr(_object, "__module__") and hasattr(_object, "__qualname__"):
-                    modulename = getattr(_object, "__module__")
-                    qualname = getattr(_object, "__qualname__")
-                    qualname = ".".join(qualname.split(".")[:-1])
-                    obj_name = f"{modulename}.{qualname}"
+                if inspect.ismodule(attribute):
+                    module_name = getattr(attribute, '__name__')
+                    object_name = module_name
                 else:
-                    obj_name = getattr(_object, "__name__")
+                    if hasattr(_object, "__module__") and hasattr(_object, "__qualname__"):
+                        modulename = getattr(_object, "__module__")
+                        qualname = getattr(_object, "__qualname__")
+                        qualname = ".".join(qualname.split(".")[:-1])
+                        obj_name = f"{modulename}.{qualname}"
+                    else:
+                        obj_name = getattr(_object, "__name__")
 
-                module_name = self.get_module_name(attribute)
-                module_name = module_name if module_name else obj_name
-                object_name = self.get_object_name(attribute)
-                object_name = object_name if object_name else attribute_name
-
-            logger.debug(
-                f"Object {attribute_name} at {hex(id(attribute))}", caller=self)
+                    module_name = self.get_module_name(attribute)
+                    module_name = module_name if module_name else obj_name
+                    object_name = self.get_object_name(attribute)
+                    object_name = object_name if object_name else attribute_name
 
             exclude = self.is_excluded(
                 module_name, object_name, is_module=inspect.ismodule(attribute))
+
             logger.debug(
-                f"[{module_name}:{object_name}] is_excluded?{exclude}", caller=self)
+                f"[{self.obj_name}] Checking {attribute_name} at {hex(id(attribute))} : is excluded? {exclude}", caller=self)
 
             if self.isspecialattr(attribute_name):
-                logger.debug(f"handle_special", caller=self)
                 self.handle_special(attribute_name, attribute)
             elif self.isclass(attribute):
-                logger.debug(f"handle_class", caller=self)
                 self.handle_class(attribute_name, attribute, exclude=exclude)
             elif self.isfunction(attribute):
-                logger.debug(f"handle_function", caller=self)
                 self.handle_function(
                     attribute_name, attribute, exclude=exclude)
             elif self.ismodule(attribute):
-                logger.debug(f"handle_module", caller=self)
                 self.handle_module(attribute_name, attribute, exclude=exclude)
             else:
-                logger.debug(f"handle_basic", caller=self)
                 self.handle_basic(attribute_name, attribute, exclude=exclude)
 
 
@@ -999,7 +1027,7 @@ class WrapperClass(Wrapper):
 
         def _generic_wrapper(*args, **kwargs):
             return _wrapper(info, *args, **kwargs)
-        mark_function_as_visited(_generic_wrapper)
+        self.mark_function_as_visited(_generic_wrapper)
         return _generic_wrapper
 
     def __init__(self, clss):
@@ -1167,6 +1195,10 @@ class WrapperClass(Wrapper):
         cache.id_dict[function_id] = function
         cache.visited_functions[function_id] = wrapped_function
         cache.add_global_mapping(function, wrapped_function)
+
+        if _globals := getattr(function, '__global__', None):
+            cache.globals_to_update[id(_globals)] = _globals
+
         self.compute_dependencies(function, wrapped_function)
         self.update_dependencies(function, wrapped_function)
 

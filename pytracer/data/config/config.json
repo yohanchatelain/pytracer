@@ -14,7 +14,6 @@
         "numpy.core.arrayprint",
         "numpy.core.getlimits",
         "numpy.core.overrides",
-        "numpy.core.overrides",
         "numpy.lib.utils",
         "numpy.testing",
         "scipy._lib.doccer",

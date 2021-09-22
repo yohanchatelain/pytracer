@@ -2,8 +2,8 @@
 
 import json
 from pytracer.utils import ishashable
+import traceback
 
-from numpy.core.fromnumeric import trace
 import pytracer.core.wrapper.cache as cache
 import argparse
 import importlib.util
@@ -106,14 +106,25 @@ class Myloader(Loader):
     def create_module(self, spec):
         try:
             logger.debug(f"create module for spec {spec}")
-            cache.visited_spec[spec.name] = True
+            # cache.visited_spec[spec.name] = True
             real_module = importlib.import_module(spec.name)
             self.get_globals(spec, real_module)
             Wrapper.m2wm[real_module] = None
+
+            if cache.has_global_mapping(real_module):
+                logger.error(
+                    f"Module {real_module} has been created already", caller=self)
+            else:
+                cache.add_global_mapping(real_module, None)
+            cache.required_modules[real_module] = []
+
             logger.debug(
                 f"real module {real_module} imported ({hex(id(real_module))})")
             wrp = WrapperModule(real_module)
             wrapped_module = wrp.wrapped_obj
+
+            cache.add_global_mapping(real_module, wrapped_module)
+
             cache.orispec_to_wrappedmodule[cache.hash_spec(
                 spec)] = wrapped_module
             wrp.assert_lazy_modules_loaded()
@@ -127,11 +138,11 @@ class Myloader(Loader):
                 f"wrapper module for {spec.name} created", caller=self)
             return wrapped_module
         except ImportError as e:
-            logger.warning("ImportError", caller=self, error=e)
-            self.to_initialize.append(spec)
-            return None
+            logger.warning(f"ImportError encountered for {spec}", caller=self,
+                           error=e)
         except Exception as e:
-            logger.critical("Unknown exception", error=e, caller=self)
+            logger.critical("Unknown exception", error=e,
+                            caller=self, raise_error=True)
 
     def exec_module(self, module):
         logger.debug(f"exec module {module}", caller=self)
@@ -154,6 +165,7 @@ class MyImporter(MetaPathFinder):
     modules_to_load = []
 
     def __init__(self):
+        self.importing_module = set()
         self.find_true_spec = False
         self._get_modules_to_load()
 
@@ -180,8 +192,8 @@ class MyImporter(MetaPathFinder):
 
     def need_real_module(self):
         for stack in inspect.stack():
-            if self.is_internal_import(stack):
-                return False
+            # if self.is_internal_import(stack):
+            #     return False
             if "/pytracer/core" in stack.filename:
                 if stack.filename.endswith(__file__):
                     if stack.function == "create_module":
@@ -190,146 +202,134 @@ class MyImporter(MetaPathFinder):
                     return True
         return False
 
-    def find_original_spec(self, fullname):
-        self.find_true_spec = True
-        return importlib.util.find_spec(fullname)
+    def return_original_spec(self, fullname):
+        logger.debug(f"Need the original module {fullname}", caller=self)
+        self.importing_module.remove(fullname)
+        return None
 
     def find_spec(self, fullname, path=None, target=None):
+        logger.debug(f"find spec for {fullname} {path} {target}", caller=self)
 
-        if self.find_true_spec:
+        if fullname in ("sklearn.utils.collections", "sklearn.utils.enum"):
             return None
 
-        if self.find_original_spec(fullname) is None:
-            self.find_true_spec = False
-            return None
-        self.find_true_spec = False
-
-        if fullname in cache.visited_spec:
-            return None
-
-        to_load = False
+        if fullname in self.importing_module:
+            logger.debug(f"{fullname} in importing_module", caller=self)
+            return self.return_original_spec(fullname)
+        else:
+            self.importing_module.add(fullname)
 
         for to_exclude in cfg.modules_to_exclude:
             if fullname.startswith(to_exclude):
-                return None
+                logger.debug(f"{fullname} in to_exclude modules", caller=self)
+                return self.return_original_spec(fullname)
 
-        for module in self.modules_to_load:
-            if fullname.startswith(module):
-                to_load = True
-                break
+        to_load = any([fullname.startswith(module)
+                       for module in self.modules_to_load])
         if not to_load:
-            return None
-
-        logger.debug(f"find spec for {fullname} {path} {target}", caller=self)
+            logger.debug(
+                f"{fullname} is not in to_include modules", caller=self)
+            return self.return_original_spec(fullname)
 
         spec = ModuleSpec(fullname, Myloader(fullname), origin="Pytracer")
-
-        cache.visited_spec[fullname] = None
-
-        # if we are in the create_module function,
-        # we return the real module (return None)
-        # if self.need_real_module():
-        if cache.visited_spec.get(fullname):
-            logger.debug("need the original module {fullname}", caller=self)
-            return None
 
         logger.debug(f"{fullname} spec found", caller=self)
         return spec
 
 
-def install(loader):
-    # insert the path hook ahead of other path hooks
-    sys.meta_path.insert(0, loader)
-    # clear any loaders that might already be in use by the FileFinder
-    sys.path_importer_cache.clear()
-    invalidate_caches()
+class TracerRun:
 
+    def __init__(self, args):
+        self.args = args
+        logger.info(f"Trace {self.args.module}", caller=self)
 
-def fill_required_function(modules_state, global_state):
+    def install(self, loader):
+        # insert the path hook ahead of other path hooks
+        sys.meta_path.insert(0, loader)
+        # clear any loaders that might already be in use by the FileFinder
+        sys.path_importer_cache.clear()
+        invalidate_caches()
 
-    current_modules_state = list(sys.modules.keys())
-    current_globals_state = list(globals().keys())
+    def fill_required_function(self, modules_state, global_state):
 
-    for key in current_modules_state:
-        if key not in modules_state:
-            del sys.modules[key]
-    for key in current_globals_state:
-        if key not in global_state:
-            del globals()[key]
+        current_modules_state = list(sys.modules.keys())
+        current_globals_state = list(globals().keys())
 
-    keys = list(sys.modules.keys())
-    for module in cfg.modules_to_load:
-        for key in keys:
-            if key.startswith(f"{module}") and key in sys.modules:
+        for key in current_modules_state:
+            if key not in modules_state:
                 del sys.modules[key]
+        for key in current_globals_state:
+            if key not in global_state:
+                del globals()[key]
 
-    keys = list(sys.modules.keys())
-    for module in cfg.modules_to_exclude:
-        for key in keys:
-            if key.startswith(f"{module}") and key in sys.modules:
-                del sys.modules[key]
+        keys = list(sys.modules.keys())
+        for module in cfg.modules_to_load:
+            for key in keys:
+                if key.startswith(f"{module}") and key in sys.modules:
+                    del sys.modules[key]
 
+        keys = list(sys.modules.keys())
+        for module in cfg.modules_to_exclude:
+            for key in keys:
+                if key.startswith(f"{module}") and key in sys.modules:
+                    del sys.modules[key]
 
-def run():
-    if sys.platform != "linux":
-        logger.error("Others platforms than linux are not supported")
+    def run(self):
+        if sys.platform != "linux":
+            logger.error("Others platforms than linux are not supported")
 
-    fill_required_function(list(sys.modules.keys()), list(globals().keys()))
-    finder = MyImporter()
-    install(finder)
-    for module in finder.modules_to_load:
-        if module in sys.modules:
-            logger.debug(
-                f"original module {module} was removed from sys.module")
-            sys.modules.pop(module)
-        logger.debug(f"load module {module}")
-        importlib.import_module(module)
+        self.fill_required_function(list(sys.modules.keys()),
+                                    list(globals().keys()))
+        finder = MyImporter()
+        self.install(finder)
+        for module in finder.modules_to_load:
+            if module in sys.modules:
+                logger.debug(
+                    f"original module {module} was removed from sys.module")
+                sys.modules.pop(module)
+            logger.debug(f"load module {module}")
+            importlib.import_module(module)
 
+    def exec_module(self, module_name):
+        visited_files.add(module_name)
+        spec = importlib.util.spec_from_file_location("__main__", module_name)
+        module = importlib.util.module_from_spec(spec)
+        # Pass arguments to program
+        argindex = sys.argv.index(module_name)
+        sys.argv = sys.argv[argindex:]
+        logger.info(f"Exec target module: {module} {sys.argv}", caller=self)
+        spec.loader.exec_module(module)
 
-def exec_module(module_name):
-    visited_files.add(module_name)
-    spec = importlib.util.spec_from_file_location("__main__", module_name)
-    module = importlib.util.module_from_spec(spec)
-    logger.debug(f"Exec target module {spec} {module} {module.__dict__} ")
-    # Pass arguments to program
-    argindex = sys.argv.index(module_name)
-    sys.argv = sys.argv[argindex:]
-    spec.loader.exec_module(module)
+    def initialize_lazy_modules(self):
+        logger.debug('Initialized lazy modules', caller=self)
+        for module, submodule in cache.modules_not_initialized.items():
+            name = getattr(submodule, '__name__')
+            value = get_global_mapping(submodule)
+            setattr(module, name, value)
 
+            for name, module in sys.modules.items():
+                keys = list(module.__dict__)
+                for k in keys:
+                    v = module.__dict__[k]
+                    if new_v := get_global_mapping(v):
+                        module.__dict__[k] = new_v
 
-def initialize_lazy_modules():
-    logger.debug('Initialized lazy modules')
-    for module, submodule in cache.modules_not_initialized.items():
-        name = getattr(submodule, '__name__')
-        value = get_global_mapping(submodule)
-        setattr(module, name, value)
+    def dump_visited(self):
+        with open('visited_function.json', 'w') as fo:
+            json.dump(cache.dumped_functions, fo)
 
-        for name, module in sys.modules.items():
-            keys = list(module.__dict__)
-            for k in keys:
-                v = module.__dict__[k]
-                if new_v := get_global_mapping(v):
-                    module.__dict__[k] = new_v
-
-
-def dump_visited():
-    with open('visited_function.json', 'w') as fo:
-        json.dump(cache.dumped_functions, fo)
-
-
-def main(args):
-
-    if os.path.isfile(args.module):
-        report.set_report(args.report)
-        if not args.dry_run:
-            run()
-        initialize_lazy_modules()
-        exec_module(args.module)
-        if report.report_enable():
-            report.dump_report()
-        dump_visited()
-    else:
-        logger.error(f"File {args.module} not found")
+    def main(self):
+        if os.path.isfile(self.args.module):
+            report.set_report(self.args.report)
+            if not self.args.dry_run:
+                self.run()
+            self.initialize_lazy_modules()
+            self.exec_module(self.args.module)
+            if report.report_enable():
+                report.dump_report()
+            self.dump_visited()
+        else:
+            logger.error(f"File {self.args.module} not found", caller=self)
 
 
 if __name__ == "__main__":
@@ -337,4 +337,5 @@ if __name__ == "__main__":
         description="Pytracer tracing module")
     tracer_init.init_arguments(parser_args)
     args = parser_args.parse_args()
-    main(args)
+    runner = TracerRun(args)
+    runner.main()

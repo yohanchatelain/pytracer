@@ -5,6 +5,7 @@ import os
 import sys
 from abc import abstractmethod
 from enum import IntEnum, auto
+import traceback
 
 import pytracer.utils.color as color
 import pytracer.utils.singleton as singleton
@@ -183,7 +184,7 @@ class LogPrint(Log):
         if error:
             self._print(Level.WARNING, caller, error, ostream=sys.stderr)
 
-    def error(self, msg, caller=None, error=None, raise_error=None):
+    def error(self, msg, caller=None, error=None, raise_error=True):
         self._print(Level.ERROR, caller, msg, ostream=sys.stderr)
         if error:
             self._print(Level.ERROR, caller, error, ostream=sys.stderr)
@@ -191,7 +192,7 @@ class LogPrint(Log):
                 raise error
         sys.exit(1)
 
-    def critical(self, msg, caller=None, error=None, raise_error=None):
+    def critical(self, msg, caller=None, error=None, raise_error=True):
         self._print(Level.CRITICAL, caller, msg, ostream=sys.stderr)
         if error:
             self._print(Level.CRITICAL, caller, error, ostream=sys.stderr)
@@ -249,25 +250,25 @@ class LogLogger(Log):
         if error:
             logging.warning(error)
 
-    def error(self, msg, caller=None, error=None, raise_error=None):
+    def error(self, msg, caller=None, error=None, raise_error=True):
         _msg = self._caller_str(caller) + str(msg)
         logging.error(_msg)
         if error:
             logging.error(error)
-            self.end()
             if raise_error:
                 raise error
+            self.end()
         self.end()
         sys.exit(1)
 
-    def critical(self, msg, caller=None, error=None, raise_error=None):
+    def critical(self, msg, caller=None, error=None, raise_error=True):
         _msg = self._caller_str(caller) + str(msg)
         logging.critical(_msg)
         if error:
             logging.critical(error)
-            self.end()
             if raise_error:
                 raise error
+            self.end()
         self.end()
         sys.exit(2)
 

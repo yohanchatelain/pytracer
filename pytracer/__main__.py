@@ -23,8 +23,8 @@ def clean():
 
 def pytracer_module_main(args):
     if args.pytracer_module == "trace":
-        from pytracer.core.tracer import main
-        main(args)
+        from pytracer.core.tracer import TracerRun
+        TracerRun(args).main()
     elif args.pytracer_module == "parse":
         from pytracer.core.parser import main
         main(args)
