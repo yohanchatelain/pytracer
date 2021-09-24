@@ -247,7 +247,8 @@ class TracerRun:
     def __init__(self, args):
         self.parameters = _init.IOInitializer()
         self.args = args
-        logger.info(f"Trace {self.args.module}", caller=self)
+        self.module = self.args.command[0]
+        logger.info(f"Trace {self.module}", caller=self)
 
     def install(self, loader):
         # insert the path hook ahead of other path hooks
@@ -293,17 +294,16 @@ class TracerRun:
                 logger.debug(
                     f"original module {module} was removed from sys.module")
                 sys.modules.pop(module)
-            logger.debug(f"load module {module}")
+            logger.debug(f"Load module {module}", caller=self)
             importlib.import_module(module)
 
-    def exec_module(self, module_name):
-        visited_files.add(module_name)
-        spec = importlib.util.spec_from_file_location("__main__", module_name)
+    def exec_module(self):
+        visited_files.add(self.module)
+        spec = importlib.util.spec_from_file_location("__main__", self.module)
         module = importlib.util.module_from_spec(spec)
         # Pass arguments to program
-        argindex = sys.argv.index(module_name)
-        sys.argv = sys.argv[argindex:]
-        logger.info(f"Exec target module: {module} {sys.argv}", caller=self)
+        sys.argv = self.args.command
+        logger.info(f"Exec traced command: {self.args.command}", caller=self)
         spec.loader.exec_module(module)
 
     def initialize_lazy_modules(self):
@@ -325,7 +325,7 @@ class TracerRun:
             json.dump(cache.dumped_functions, fo)
 
     def main(self):
-        if os.path.isfile(self.args.module):
+        if os.path.isfile(self.module):
             report.report = report.Report(
                 self.args.report, self.args.report_file)
             register.set_report(report.report.get_filename(),
@@ -333,7 +333,7 @@ class TracerRun:
             if not self.args.dry_run:
                 self.run()
             self.initialize_lazy_modules()
-            self.exec_module(self.args.module)
+            self.exec_module()
             if report.report.report_enable():
                 report.report.dump_report()
             self.dump_visited()

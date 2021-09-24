@@ -1,9 +1,12 @@
 import pytracer.utils.report as report
 
+import argparse
+
 
 def init_arguments(parser):
-    parser.add_argument("--module", required=True,
-                        help="path of the module to trace")
+
+    parser.add_argument("--command", required=True, nargs=argparse.REMAINDER,
+                        help="command to trace")
     parser.add_argument("--dry-run", action="store_true",
                         help="Run the module wihtout tracing it")
     parser.add_argument("--report", choices=report.Report.report_options,
