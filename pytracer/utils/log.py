@@ -11,6 +11,7 @@ import pytracer.utils as ptutils
 import pytracer.utils.color as color
 import pytracer.utils.singleton as singleton
 from pytracer.core.config import config as cfg
+from pytracer.module.info import register
 
 logger_filename = "pytracer.log"
 
@@ -60,14 +61,17 @@ class LogInitializer(metaclass=singleton.Singleton):
         output = cfg.logger.output
         if output:
             if output == "stdout":
-                self.ofilename = "<stdout>"
+                self.filename = "<stdout>"
+                self.filename_path = None
                 self.ostream = sys.stdout
             else:
-                self.ofilename = ptutils.get_filename(output)
-                self.ostream = open(self.ofilename, "w")
+                self.filename = ptutils.get_filename(output)
+                self.filename_path = os.path.abspath(self.filename)
+                self.ostream = open(self.filename, "w")
         else:
-            self.ofilename = ptutils.get_filename(self.ofilename_default)
-            self.ostream = open(self.ofilename, "w")
+            self.filename = ptutils.get_filename(self.ofilename_default)
+            self.filename_path = os.path.abspath(self.filename)
+            self.ostream = open(self.filename, "w")
 
         self.color = cfg.logger.color
         _level = level_from_str(cfg.logger.level)
@@ -75,6 +79,12 @@ class LogInitializer(metaclass=singleton.Singleton):
             self.level = _level
         else:
             self.level = self.level_default
+
+    def get_filename(self):
+        return self.filename
+
+    def get_filename_path(self):
+        return self.filename_path
 
     def get_type(self):
         return self.type
@@ -276,6 +286,8 @@ class LogLogger(Log):
 
 def get_logger():
     loginit = LogInitializer()
+    register.set_pytracer_log(loginit.get_filename(),
+                              loginit.get_filename_path())
     if loginit.get_type() == Type.PRINT:
         return LogPrint()
     if loginit.get_type() == Type.LOGGER:

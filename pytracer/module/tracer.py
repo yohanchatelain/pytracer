@@ -11,15 +11,15 @@ from importlib import invalidate_caches
 from importlib.abc import Loader, MetaPathFinder
 from importlib.machinery import ModuleSpec
 
-import pytracer.core.tracer_init as tracer_init
 import pytracer.core.wrapper.cache as cache
+import pytracer.module.tracer_init as tracer_init
 import pytracer.utils.report as report
 from pytracer.core.config import config as cfg
-from pytracer.core.info import register
 from pytracer.core.wrapper.cache import (add_global_mapping,
                                          get_global_mapping, visited_files)
 from pytracer.core.wrapper.wrapper import (Wrapper, WrapperClass,
                                            WrapperModule, visited_attr)
+from pytracer.module.info import register
 from pytracer.utils import ishashable
 from pytracer.utils.log import get_logger
 
@@ -208,10 +208,13 @@ class MyImporter(MetaPathFinder):
         self.importing_module.remove(fullname)
         return None
 
+    def is_valid_spec(self, fullname, path):
+        return any([finder.find_spec(fullname, path) for finder in sys.meta_path[1:] if hasattr(finder, "find_spec")])
+
     def find_spec(self, fullname, path=None, target=None):
         logger.debug(f"find spec for {fullname} {path} {target}", caller=self)
 
-        if fullname in ("sklearn.utils.collections", "sklearn.utils.enum"):
+        if not self.is_valid_spec(fullname, path):
             return None
 
         if fullname in self.importing_module:

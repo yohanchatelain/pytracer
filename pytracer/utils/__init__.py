@@ -1,6 +1,4 @@
-import threading
 import inspect
-import traceback
 import collections
 from enum import Enum
 import sys

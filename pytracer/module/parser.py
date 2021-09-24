@@ -9,10 +9,12 @@ import pytracer.core.inout as ptinout
 import pytracer.core.inout._init as _init
 import pytracer.core.inout.exporter as ioexporter
 import pytracer.core.inout.reader as ioreader
-import pytracer.core.parser_init as parser_init
+import pytracer.module.parser_init as parser_init
+import pytracer.utils as ptutils
+
 from pytracer.core.config import constant
-from pytracer.core.info import register
 from pytracer.core.stats.stats import print_stats
+from pytracer.module.info import register
 from pytracer.utils.log import get_logger
 from tqdm import tqdm
 
@@ -242,6 +244,18 @@ class CallChain:
         self._stack = []
 
     def _init_filename(self):
+        filename = self.parameters.callgraph
+        self.filename = ptutils.get_filename(
+            filename, constant.extension.pickle)
+        self.filename_path = self._get_filename_path(self.filename)
+
+    def _get_filename_path(self, filename):
+        ptutils.check_extension(filename, constant.extension.pickle)
+        filename, ext = os.path.splitext(filename)
+        ext = ext if ext else constant.extension.pickle
+        return (f"{self.parameters.cache_path}{os.sep}"
+                f"{self.parameters.cache_stats}{os.sep}"
+                f"{filename}{ext}")
 
     def to_call(self, obj):
         module = obj["module"]  # .replace(".", "$")

@@ -190,6 +190,8 @@ class _Config(object, metaclass=Singleton):
                    "io.cache.traces",
                    "io.cache.sources",
                    "io.export.filename",
+                   "io.stats.filename",
+                   "io.stats.callgraph",
                    "numpy",
                    "numpy.ufunc"
                    ]

@@ -1,15 +1,15 @@
 import argparse
-from atexit import register
 import os
 import shutil
 
-import pytracer.core.parser_init as parser_init
-import pytracer.core.tracer_init as tracer_init
-import pytracer.core.info_init as info_init
+import pytracer.module.parser_init as parser_init
+import pytracer.module.tracer_init as tracer_init
+import pytracer.module.info_init as info_init
 import pytracer.gui.index_init as visualize_init
+import pytracer.module.clean_init as clean_init
 from pytracer.core.config import config as cfg
 from pytracer.core.config import constant
-import pytracer.core.info as pytracer_info
+import pytracer.module.info as pytracer_info
 
 
 def clean():
@@ -26,13 +26,13 @@ def clean():
 
 def pytracer_module_main(args):
     if args.pytracer_module == "trace":
-        from pytracer.core.tracer import TracerRun
+        from pytracer.module.tracer import TracerRun
         pytracer_info.register.set_args(args)
         TracerRun(args).main()
         pytracer_info.register.set_trace_size()
         pytracer_info.register.register_trace()
     elif args.pytracer_module == "parse":
-        from pytracer.core.parser import main
+        from pytracer.module.parser import main
         pytracer_info.register.set_args(args)
         main(args)
         pytracer_info.register.set_aggregation_size()
@@ -42,12 +42,12 @@ def pytracer_module_main(args):
         main(args)
     elif args.pytracer_module == "info":
         pytracer_info.PytracerInfoPrinter(args).print()
+    elif args.pytracer_module == "clean":
+        clean()
 
 
 def main():
     parser = argparse.ArgumentParser(description="Pytracer", prog="pytracer")
-    parser.add_argument("--clean", action="store_true",
-                        help="Clean pytracer cache path")
     subparser = parser.add_subparsers(title="pytracer modules",
                                       help="pytracer modules",
                                       dest="pytracer_module")
@@ -56,12 +56,11 @@ def main():
     parser_init.init_module(subparser)
     visualize_init.init_module(subparser)
     info_init.init_module(subparser)
+    clean_init.init_module(subparser)
 
     args, _ = parser.parse_known_args()
 
-    if args.clean:
-        clean()
-    elif args.pytracer_module:
+    if args.pytracer_module:
         pytracer_module_main(args)
     else:
         parser.print_help()

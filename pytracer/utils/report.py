@@ -1,11 +1,12 @@
-from pytracer.utils.singleton import Singleton
-import os
 import csv
+import os
 import sys
 from enum import Enum, auto
-from pytracer.utils.memory import total_size
-from pytracer.utils import get_filename
+
 from pytracer.core.config import constant
+from pytracer.utils import get_filename
+from pytracer.utils.memory import total_size
+from pytracer.utils.singleton import Singleton
 
 
 class Report(metaclass=Singleton):

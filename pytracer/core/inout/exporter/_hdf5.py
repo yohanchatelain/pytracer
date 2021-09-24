@@ -73,16 +73,10 @@ class ExporterHDF5(_exporter.Exporter):
         return self.filename_path
 
     def _init_ostream(self):
-        if filename := self.parameters.export.filename:
-            self.filename = ptutils.get_filename(
-                filename, ext=constant.extension.hdf5)
-            self.filename_path = self._get_filename_path(self.filename)
-        else:
-            self.filename = ptutils.get_filename(
-                constant.export.filename, ext=constant.extension.hdf5)
-            self.filename_path = self._get_filename_path(
-                constant.export.filename)
-
+        filename = self.parameters.export
+        self.filename = ptutils.get_filename(
+            filename, ext=constant.extension.hdf5)
+        self.filename_path = self._get_filename_path(self.filename)
         self.h5file = tables.open_file(self.filename_path, mode="w")
 
     def _get_filename_path(self, filename):
