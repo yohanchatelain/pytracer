@@ -20,7 +20,7 @@ jobs:
       uses: actions/checkout@v2
     - name: Build the Docker image
       run: |
-        docker build . --file Dockerfile.${{ matrix.dockerfile }} --tag ${{ matrix.dockerfile }}:$(date +%s)  
+        docker build . --file docker/Dockerfile.${{ matrix.dockerfile }} --tag ${{ matrix.dockerfile }}:$(date +%s)  
 
   build_fuzzy:
     needs: build_ieee
@@ -38,4 +38,4 @@ jobs:
       uses: actions/checkout@v2
     - name: Build the Docker image
       run: |
-        docker build . --file Dockerfile.${{ matrix.dockerfile }} --tag ${{ matrix.dockerfile }}:$(date +%s)
+        docker build . --file docker/Dockerfile.${{ matrix.dockerfile }} --tag ${{ matrix.dockerfile }}:$(date +%s)
