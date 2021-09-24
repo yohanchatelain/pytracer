@@ -2,7 +2,6 @@ import os
 
 from pytracer.core.config import constant
 
-cache_default = f"{constant.cache.root}"
 directory_default = f"{constant.cache.root}{os.sep}{constant.cache.traces}"
 
 

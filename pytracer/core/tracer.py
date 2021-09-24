@@ -1,26 +1,27 @@
 #!/usr/bin/python3
 
-import json
-from pytracer.utils import ishashable
-import traceback
-
-import pytracer.core.wrapper.cache as cache
 import argparse
+import ast
 import importlib.util
 import inspect
+import json
 import os
 import sys
 from importlib import invalidate_caches
 from importlib.abc import Loader, MetaPathFinder
 from importlib.machinery import ModuleSpec
-import ast
 
-from pytracer.core.config import config as cfg
-from pytracer.utils.log import get_logger
-from pytracer.core.wrapper.wrapper import WrapperClass, WrapperModule, visited_attr, Wrapper
-from pytracer.core.wrapper.cache import add_global_mapping, get_global_mapping, visited_files
 import pytracer.core.tracer_init as tracer_init
+import pytracer.core.wrapper.cache as cache
 import pytracer.utils.report as report
+from pytracer.core.config import config as cfg
+from pytracer.core.info import register
+from pytracer.core.wrapper.cache import (add_global_mapping,
+                                         get_global_mapping, visited_files)
+from pytracer.core.wrapper.wrapper import (Wrapper, WrapperClass,
+                                           WrapperModule, visited_attr)
+from pytracer.utils import ishashable
+from pytracer.utils.log import get_logger
 
 logger = get_logger()
 
@@ -320,13 +321,16 @@ class TracerRun:
 
     def main(self):
         if os.path.isfile(self.args.module):
-            report.set_report(self.args.report)
+            report.report = report.Report(
+                self.args.report, self.args.report_file)
+            register.set_report(report.report.get_filename(),
+                                report.report.get_filename_path())
             if not self.args.dry_run:
                 self.run()
             self.initialize_lazy_modules()
             self.exec_module(self.args.module)
-            if report.report_enable():
-                report.dump_report()
+            if report.report.report_enable():
+                report.report.dump_report()
             self.dump_visited()
         else:
             logger.error(f"File {self.args.module} not found", caller=self)
@@ -337,5 +341,11 @@ if __name__ == "__main__":
         description="Pytracer tracing module")
     tracer_init.init_arguments(parser_args)
     args = parser_args.parse_args()
+
+    report.report = report.Report(args.report, args.report_file)
+    register.set_report(report.report.get_filename(),
+                        report.report.get_filename_path())
+
     runner = TracerRun(args)
     runner.main()
+    register.register_trace()

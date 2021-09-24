@@ -175,7 +175,7 @@ class FilterExclusion(Filter, metaclass=Singleton):
 
 
 def instance_wrapper(function):
-    writer = iowriter.Writer()
+    writer = iowriter.Writer
     _wrapper = iowriter.wrapper_instance
 
     def wrapper(self, *args, **kwargs):
@@ -290,7 +290,7 @@ class Wrapper(metaclass=ABCMeta):
         if hasattr(obj, visited_attr):
             logger.error("Object {obj} already visited", caller=self)
         else:
-            self.writer = iowriter.Writer()
+            self.writer = iowriter.Writer
             self.lazy_dict = {}
             self.included = FilterInclusion()
             self.excluded = FilterExclusion()
@@ -1039,7 +1039,7 @@ class WrapperClass(Wrapper):
 
     def init_attributes(self):
         self.attributes = list(self.real_obj.__dict__.keys())
-        self.writer = iowriter.Writer()
+        self.writer = iowriter.Writer
 
     def get_module(self):
         if hasattr(self, "__module_name__"):

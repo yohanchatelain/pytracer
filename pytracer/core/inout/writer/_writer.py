@@ -8,7 +8,15 @@ from . import _wrapper
 class Writer(metaclass=Singleton):
 
     @abstractmethod
-    def __init__(self, initializer):
+    def __init__(self):
+        pass
+
+    @abstractmethod
+    def get_filename(self):
+        pass
+
+    @abstractmethod
+    def get_filename_path(self):
         pass
 
     @abstractmethod

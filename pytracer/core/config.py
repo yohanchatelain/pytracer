@@ -70,19 +70,48 @@ environment_variables = {
     "config": "PYTRACER_CONFIG"
 }
 
+_text_extension = ".txt"
+_json_extension = ".json"
+_pickle_extension = ".pkl"
+_hdf5_extension = ".h5"
+_csv_extension = ".csv"
+
 
 class _Constant(metaclass=Singleton):
     __attributes = {
         "cache": {"root": ".__pytracercache__",
                   "traces": "traces",
                   "stats": "stats",
-                  'sources': 'sources'},
-        "text_ext": ".txt",
-        "json_ext": ".json",
-        "pickle_ext": ".pkl",
-        "iotypes": ["text", "json", "pickle"],
-        "export": {"dat": "stats.pkl",
-                   "header": "header.pkl"},
+                  'sources': 'sources',
+                  'info': 'info'},
+        "register": {
+            'trace': 'trace',
+            'aggregation': 'aggregation'
+        },
+        "extension": {
+            'text': _text_extension,
+            'json': _json_extension,
+            'pickle': _pickle_extension,
+            'hdf5': _hdf5_extension,
+            "csv": _csv_extension
+        },
+        "report": {
+            "filename": "report",
+            "ext": _csv_extension
+        },
+        "trace": {
+            "filename": "",
+            "ext": _pickle_extension
+        },
+        "callgraph": {
+            "filename": "callgraph",
+            "ext": _pickle_extension
+        },
+        "export": {
+            "filename": "stats",
+            "ext": _hdf5_extension
+        },
+        "iotypes": ["pickle"],
         "env": environment_variables,
     }
 
@@ -160,8 +189,7 @@ class _Config(object, metaclass=Singleton):
                    "io.cache.stats",
                    "io.cache.traces",
                    "io.cache.sources",
-                   "io.export.dat",
-                   "io.export.header",
+                   "io.export.filename",
                    "numpy",
                    "numpy.ufunc"
                    ]

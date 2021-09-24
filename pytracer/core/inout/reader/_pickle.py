@@ -5,8 +5,9 @@ import pytracer.utils as ptutils
 from pytracer.core.config import constant
 from pytracer.utils.log import get_logger
 from pytracer.core.config import config as cfg
+import pytracer.core.inout._init as _init
 
-from . import _init, _reader
+from . import _reader
 
 logger = get_logger()
 
@@ -36,7 +37,7 @@ class ReaderPickle(_reader.Reader):
 
     def __init_generator(self, filename):
         try:
-            ptutils.check_extension(filename, constant.pickle_ext)
+            ptutils.check_extension(filename, constant.extension.pickle)
             logger.debug(f"Opening {filename}", caller=self)
             fi = open(filename, "rb")
             self.unpickler = pickle.Unpickler(fi)

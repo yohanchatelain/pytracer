@@ -1,22 +1,24 @@
 
 import atexit
 import datetime
+import inspect
 import io
 import os
 import pickle
-import traceback
 import shutil
-import inspect
 import threading
+import traceback
 
+import pytracer.core.inout._init as _init
 import pytracer.utils as ptutils
 from pytracer.core.config import config as cfg
 from pytracer.core.config import constant
+from pytracer.core.info import register
+from pytracer.core.wrapper.cache import dumped_functions, visited_files
+from pytracer.utils import get_functions_from_traceback, report
 from pytracer.utils.log import get_logger
-from pytracer.utils import report, get_functions_from_traceback
-from pytracer.core.wrapper.cache import visited_files, dumped_functions
 
-from . import _init, _writer
+from . import _writer
 
 logger = get_logger()
 
@@ -46,10 +48,16 @@ class WriterPickle(_writer.Writer):
         logger.debug("Close writer", caller=self)
         self.ostream.flush()
         self.ostream.close()
-        if os.path.isfile(self.filename):
-            if os.stat(self.filename).st_size == 0:
-                os.remove(self.filename)
+        if os.path.isfile(self.filename_path):
+            if os.stat(self.filename_path).st_size == 0:
+                os.remove(self.filename_path)
         self.copy_sources()
+
+    def get_filename(self):
+        return self.filename
+
+    def get_filename_path(self):
+        return self.filename_path
 
     def copy_sources(self):
         for filename in visited_files:
@@ -60,37 +68,39 @@ class WriterPickle(_writer.Writer):
                 os.makedirs(dstdir, exist_ok=True)
                 shutil.copy(src, dst)
 
-    def _init_ostream(self):
-        if self.parameters.filename:
-            self.filename = self.get_filename_path(
-                self.parameters.filename)
-        else:
-            now = datetime.datetime.now().strftime(self.datefmt)
-            filename = f"{now}{constant.pickle_ext}"
-            filename = ptutils.get_filename(filename)
-            self.filename = self.get_filename_path(filename)
+    def _init_streams(self):
         try:
-            if hasattr(self, "ostream"):
-                self.ostream.close()
-            self.ostream = open(self.filename, "wb")
+            self.ostream = open(self.filename_path, "wb")
             self.pickler = pickle.Pickler(
                 self.ostream, protocol=pickle.HIGHEST_PROTOCOL)
             self.pickler.fast = True
-            self.count_ofile += 1
         except OSError as e:
-            logger.error(f"Can't open pickle file: {self.filename}",
+            logger.error(f"Can't open pickle file: {self.filename_path}",
                          error=e, caller=self, raise_error=False)
         except Exception as e:
             logger.critical("Unexpected error", error=e, caller=self)
 
-    def get_filename_path(self, filename):
-        ptutils.check_extension(filename, constant.pickle_ext)
+    def _init_ostream(self):
+        if filename := self.parameters.filename:
+            self.filename = ptutils.get_filename(
+                filename, constant.extension.pickle)
+            self.filename_path = self._get_filename_path(
+                self.parameters.filename)
+        else:
+            now = datetime.datetime.now().strftime(self.datefmt)
+            self.filename = ptutils.get_filename(
+                now, constant.extension.pickle)
+            self.filename_path = self._get_filename_path(self.filename)
+
+        self._init_streams()
+
+    def _get_filename_path(self, filename):
+        ptutils.check_extension(filename, constant.extension.pickle)
         filename, ext = os.path.splitext(filename)
-        ext = ext if ext else constant.pickle_ext
+        ext = ext if ext else constant.extension.pickle
         return (f"{self.parameters.cache_path}{os.sep}"
                 f"{self.parameters.cache_traces}{os.sep}"
-                f"{filename}{os.extsep}"
-                f"{self.count_ofile}{ext}")
+                f"{filename}{ext}")
 
     def is_looping(self):
 
@@ -156,31 +166,31 @@ class WriterPickle(_writer.Writer):
                     "args": args,
                     "backtrace": backtrace}
 
-        # logger.debug((f"id: {function_id}\n"
-        #               f"time: {time}\n"
-        #               f"module: {module_name}\n"
-        #               f"function: {function_name}\n"
-        #               f"label: {label}\n"
-        #               f"backtrace: {backtrace}\n"), caller=self)
+        logger.debug((f"id: {function_id}\n"
+                      f"time: {time}\n"
+                      f"module: {module_name}\n"
+                      f"function: {function_name}\n"
+                      f"label: {label}\n"
+                      f"backtrace: {backtrace}\n"), caller=self)
 
         if lock.locked():
             return
         lock.acquire()
         try:
             if not self.is_writable(to_write):
-                to_write.pop('args', None)
+                to_write['args'] = {}
 
-            if report.report_enable():
+            if report.report.report_enable():
                 key = (module_name, function_name)
                 value = to_write
-                report.report(key, value)
+                report.report.report(key, value)
 
-            if not report.report_only():
+            if not report.report.report_only():
                 self._write(to_write)
 
         except pickle.PicklingError as e:
             logger.error(
-                f"while writing in Pickle file: {self.filename}",
+                f"while writing in Pickle file: {self.filename_path}",
                 error=e, caller=self)
         except (AttributeError, TypeError) as e:
             logger.warning(

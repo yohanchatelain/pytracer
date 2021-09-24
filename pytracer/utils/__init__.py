@@ -1,3 +1,4 @@
+import threading
 import inspect
 import traceback
 import collections
@@ -76,8 +77,9 @@ def str2bool(v):
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
 
-def get_filename(name):
+def get_filename(name, ext=""):
     i = 0
+    name += f".{os.getpid()}{ext}" if ext else f".{os.getpid()}"
     while os.path.isfile(name):
         name = f"{name}.{i}"
         i += 1

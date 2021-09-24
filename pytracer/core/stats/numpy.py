@@ -4,13 +4,7 @@ import numpy as np
 import scipy.sparse as spr
 
 
-def fxn():
-    warnings.warn("deprecated", DeprecationWarning)
-
-
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore")
-    fxn()
+warnings.simplefilter('ignore')
 
 
 class StatisticNumpy:
@@ -85,37 +79,35 @@ class StatisticNumpy:
     def size(self):
         return self._size
 
+    def _mean_sparse(self):
+        return np.sum(self._data[0])/self._samples
+
+    def _std_sparse(self, _mean):
+        return np.sum([(m - _mean).power(2) / self._samples for m in self._data]).sqrt()
+
     def mean(self):
         _mean = getattr(self, "cached_mean", None)
         if _mean is None:
-            with warnings.catch_warnings():
-                # warnings.simplefilter("ignore")
-                # if spr.issparse(self._data[0]):
-                #     # self._data.reshape(
-                #     #     (self._data.shape[0],) + self._data[0].shape)
-                #     print("DATA", self._data)
-                #     spr.csr_matrix.mean(self._data, axis=0)
-                # else:
-                try:
+            try:
+                if spr.issparse(self._data[0]):
+                    _mean = self._mean_sparse()
+                else:
                     _mean = np.mean(self._data, axis=0, dtype=np.float64)
-                except Exception:
-                    _mean = 0.0
+            except Exception:
+                _mean = np.zeros(self._shape)
         self.cached_mean = _mean
         return _mean
 
     def std(self):
         _std = getattr(self, "cached_std", None)
         if _std is None:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                try:
-                    if spr.issparse(self._data[0]):
-                        spr.csr_matrix.std(
-                            self._data, axis=0, dtype=np.float64)
-                    else:
-                        _std = np.std(self._data, axis=0, dtype=np.float64)
-                except Exception:
-                    _std = 0.0
+            try:
+                if spr.issparse(self._data[0]):
+                    _std = self._std_sparse()
+                else:
+                    _std = np.std(self._data, axis=0, dtype=np.float64)
+            except Exception:
+                _std = np.zeros(self._shape)
         self.cached_std = _std
         return _std
 
@@ -132,20 +124,18 @@ class StatisticNumpy:
         return _sig
 
     def _sig(self, mean, std):
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            if not spr.issparse(mean):
-                masked_std = np.ma.masked_equal(std, 0.0)
-                masked_mean = np.ma.masked_equal(mean, 0.0)
-                sig = np.log2(np.abs(masked_mean/masked_std))
-                if hasattr(sig, "filled"):
-                    if self._type.kind in ('U', 'S'):
-                        sig = sig.filled(8)
-                    else:
-                        sig = sig.filled(self.__max_sig.get(self._type, 0))
+        if not spr.issparse(mean):
+            masked_std = np.ma.masked_equal(std, 0.0)
+            masked_mean = np.ma.masked_equal(mean, 0.0)
+            sig = np.log2(np.abs(masked_mean/masked_std))
+            if hasattr(sig, "filled"):
+                if self._type.kind in ('U', 'S'):
+                    sig = sig.filled(8)
+                else:
+                    sig = sig.filled(self.__max_sig.get(self._type, 0))
 
-            else:
-                sig = np.log2(np.abs(mean/std))
+        else:
+            sig = np.log2(np.abs(mean/std))
         return sig
 
     @staticmethod

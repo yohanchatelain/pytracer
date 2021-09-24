@@ -82,10 +82,10 @@ def get_type(value):
         _type = TypeValue.SKLEARN
     else:
         _type = TypeValue.OTHER
-        if not isinstance(value, (str, np.ndarray, np.dtype, type)):
-            if type(value) not in _type_cache:
-                logger.warning(f"Unknown type: {type(value)} {value}")
-                _type_cache.add(type(value))
+        # if not isinstance(value, (str, np.ndarray, np.dtype, type)):
+        #     if type(value) not in _type_cache:
+        #         logger.warning(f"Unknown type: {type(value)} {value}")
+        #         _type_cache.add(type(value))
     return _type
 
 

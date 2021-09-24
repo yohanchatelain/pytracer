@@ -1,12 +1,9 @@
-import collections
 import atexit
-import io
-import pickle
 import os
-from collections import namedtuple
-import numpy as np
 import warnings
+from collections import namedtuple
 
+import numpy as np
 import pytracer.utils as ptutils
 import tables
 from pytracer.core.config import constant
@@ -14,8 +11,7 @@ from pytracer.utils.log import get_logger
 
 from . import _exporter, _init
 
-
-warnings.simplefilter('ignore', tables.NaturalNameWarning)
+warnings.simplefilter('ignore')
 
 logger = get_logger()
 
@@ -70,63 +66,35 @@ class ExporterHDF5(_exporter.Exporter):
         self._init_ostream()
         atexit.register(self.end)
 
+    def get_filename(self):
+        return self.filename
+
+    def get_filename_path(self):
+        return self.filename_path
+
     def _init_ostream(self):
-        if self.parameters.export.dat:
-            self.filename = self.get_filename_path(
-                self.parameters.export.dat)
+        if filename := self.parameters.export.filename:
+            self.filename = ptutils.get_filename(
+                filename, ext=constant.extension.hdf5)
+            self.filename_path = self._get_filename_path(self.filename)
         else:
-            self.filename = self.get_filename_path(constant.export.dat)
+            self.filename = ptutils.get_filename(
+                constant.export.filename, ext=constant.extension.hdf5)
+            self.filename_path = self._get_filename_path(
+                constant.export.filename)
 
-        if self.parameters.export.header:
-            self.filename_header = self.get_filename_path(
-                self.parameters.export.header)
-        else:
-            self.filename_header = self.get_filename_path(
-                constant.export.header)
+        self.h5file = tables.open_file(self.filename_path, mode="w")
 
-        # Pickler used to test if an object is dumpable
-        if not hasattr(self, "_pickler_test"):
-            self._pickler_test = pickle.Pickler(io.BytesIO())
-
-        self.h5file = tables.open_file("test.h5", mode="w")
-
-        try:
-            if hasattr(self, "ostream"):
-                self.ostream.close()
-            self.ostream = open(self.filename, "wb")
-            self.pickler = pickle.Pickler(
-                self.ostream, protocol=pickle.HIGHEST_PROTOCOL)
-            self.count_ofile += 1
-        except OSError as e:
-            logger.error(f"Can't open Pickle file: {self.filename}",
-                         error=e, caller=self)
-        except Exception as e:
-            logger.critical("Unexpected error", error=e, caller=self)
-
-    def get_filename_path(self, filename):
-        ptutils.check_extension(filename, constant.pickle_ext)
+    def _get_filename_path(self, filename):
+        ptutils.check_extension(filename, constant.extension.hdf5)
         filename, ext = os.path.splitext(filename)
-        ext = ext if ext else constant.pickle_ext
+        ext = ext if ext else constant.extension.hdf5
         return (f"{self.parameters.cache_path}{os.sep}"
                 f"{self.parameters.cache_stats}{os.sep}"
-                f"{filename}{os.extsep}"
-                f"{self.count_ofile}{ext}")
+                f"{filename}{ext}")
 
     def end(self):
-        self._dump_register()
-        self.ostream.flush()
-        self.ostream.close()
         self.h5file.close()
-
-    def _dump_register(self):
-        try:
-            fo = open(self.filename_header, "wb")
-            pickler = pickle.Pickler(fo, protocol=pickle.HIGHEST_PROTOCOL)
-            pickler.dump(_id_to_times)
-            fo.flush()
-            fo.close()
-        except Exception as e:
-            raise e
 
     def backtrace_to_dict(self, backtrace):
         return BacktraceDict(filename=backtrace.filename,
@@ -209,7 +177,7 @@ class ExporterHDF5(_exporter.Exporter):
 
             try:
                 atom_type = tables.Atom.from_dtype(_type)
-            except:
+            except Exception:
                 return
             shape = stats.shape()
             path = tables.path.join_path(function_grp._v_pathname, unique_id)

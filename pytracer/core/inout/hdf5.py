@@ -31,7 +31,7 @@ class Writer(metaclass=Singleton):
             self.filename = self.get_filename_path(self.parameters.filename)
         else:
             now = datetime.now().strftime(self.datefmt)
-            filename = f"{now}{constant.hdf5_ext}"
+            filename = f"{now}{constant.extension.hdf5}"
             self.filename = self.get_filename_path(filename)
 
         self.ostream = h5py.File(self.filename, "w")

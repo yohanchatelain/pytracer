@@ -1,19 +1,20 @@
 import argparse
 import os
 import pickle
+import time
 from enum import Enum, auto
 
 import networkx as nx
 import pytracer.core.inout as ptinout
+import pytracer.core.inout._init as _init
 import pytracer.core.inout.exporter as ioexporter
 import pytracer.core.inout.reader as ioreader
 import pytracer.core.parser_init as parser_init
 from pytracer.core.config import constant
+from pytracer.core.info import register
 from pytracer.core.stats.stats import print_stats
 from pytracer.utils.log import get_logger
 from tqdm import tqdm
-
-import time
 
 logger = get_logger()
 
@@ -58,19 +59,16 @@ class Parser:
     def check_args(self, args):
         if args.directory:
             if not os.path.isdir(args.directory):
-                logger.error(f"{args.directory} is not a directory")
+                logger.error(
+                    f"{args.directory} is not a directory", caller=self)
             self.directory = args.directory
         if args.filename:
             if not os.path.isfile(args.filename):
-                logger.error(f"{args.filename} is not a file")
+                logger.error(f"{args.filename} is not a file", caller=self)
             self.filename = args.filename
 
     def auto_detect_format(self, filename):
-        if filename.endswith(constant.text_ext):
-            return ptinout.IOType.TEXT
-        if filename.endswith(constant.json_ext):
-            return ptinout.IOType.JSON
-        if filename.endswith(constant.pickle_ext):
+        if filename.endswith(constant.extension.pickle):
             return ptinout.IOType.PICKLE
         return None
 
@@ -90,12 +88,18 @@ class Parser:
 
     def _merge(self, values, attr, do_not_check=False):
         attrs = None
-        if isinstance(attr, str):
-            attrs = [value[attr] for value in values]
-        elif callable(attr):
-            attrs = [*map(attr, values)]
-        else:
-            logger.error(f"Unknow type attribute during merging: {attr}")
+        try:
+            if isinstance(attr, str):
+                attrs = [value[attr] for value in values]
+            elif callable(attr):
+                attrs = [*map(attr, values)]
+            else:
+                logger.error(f"Unknow type attribute during merging: {attr}")
+        except KeyError:
+            return [{}]*len(values)
+        except Exception as e:
+            logger.critical(
+                f"Error while merging traces {values} for attribute {attr}", caller=self, error=e)
 
         if not do_not_check and len(set(attrs)) != 1:
             logger.error(
@@ -135,15 +139,19 @@ class Parser:
                 "backtrace": backtrace,
                 "args": stats_args}
 
-    def parse_directory(self):
-
+    def get_traces(self):
         filenames = []
         sizes = set()
-        for file in os.listdir(self.directory):
-            abs_file = os.path.abspath(f"{self.directory}{os.sep}{file}")
-            if os.path.isfile(abs_file):
-                filenames.append(abs_file)
-            sizes.add(os.stat(abs_file).st_size)
+
+        def abspath(file):
+            return f"{self.directory}{os.sep}{file}"
+
+        filenames = [os.path.abspath(abspath(file))
+                     for file in os.listdir(self.directory) if os.path.isfile(abspath(file))]
+        sizes = set([os.stat(file).st_size for file in filenames])
+
+        if filenames == []:
+            logger.error("No traces to analyze", caller=self)
 
         if len(sizes) != 1:
             msg = (f"Traces do not have the same size{os.linesep}"
@@ -152,12 +160,17 @@ class Parser:
                    f"sizes: {sizes}")
             logger.warning(msg, caller=self)
 
-        logger.debug(f"List of files to parse: {filenames}")
+        logger.debug(f"List of files to parse: {filenames}", caller=self)
         logger.debug(f"Filesize: {sizes}", caller=self)
 
-        iotype = self.auto_detect_format(filenames[0])
-        logger.info(f"Auto-detection type: {iotype.name} file")
-        filenames_grouped = Group(iotype, filenames)
+        return filenames
+
+    def parse_traces(self, traces):
+
+        iotype = self.auto_detect_format(traces[0])
+        logger.info(f"Auto-detection type: {iotype.name} file", caller=self)
+        filenames_grouped = Group(iotype, traces)
+
         if self.online:
             for value in tqdm(filenames_grouped, desc="Parsing..."):
                 yield self.merge(value)
@@ -222,9 +235,13 @@ class CallChain:
     _bt_name_index = _bt_lineno_index + 1
 
     def __init__(self):
+        self.parameters = _init.IOInitializer()
+        self._init_filename()
         fo = open("callgraph.pkl", "wb")
         self._pickler = pickle.Pickler(fo, protocol=pickle.HIGHEST_PROTOCOL)
         self._stack = []
+
+    def _init_filename(self):
 
     def to_call(self, obj):
         module = obj["module"]  # .replace(".", "$")
@@ -520,12 +537,16 @@ def main(args):
 
     parser = Parser(args)
 
-    stats_values = parser.parse_directory()
+    traces = parser.get_traces()
+    register.add_traces(traces)
+    stats_values = parser.parse_traces(traces)
 
     # Construct call chain
     callchain = CallChain()
 
     export = ioexporter.Exporter()
+    register.set_aggregation(export.get_filename(), export.get_filename_path())
+
     expectedrows = [10]
 
     if args.online:

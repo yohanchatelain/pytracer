@@ -7,6 +7,7 @@ from abc import abstractmethod
 from enum import IntEnum, auto
 import traceback
 
+import pytracer.utils as ptutils
 import pytracer.utils.color as color
 import pytracer.utils.singleton as singleton
 from pytracer.core.config import config as cfg
@@ -62,10 +63,10 @@ class LogInitializer(metaclass=singleton.Singleton):
                 self.ofilename = "<stdout>"
                 self.ostream = sys.stdout
             else:
-                self.ofilename = output
+                self.ofilename = ptutils.get_filename(output)
                 self.ostream = open(self.ofilename, "w")
         else:
-            self.ofilename = self.ofilename_default
+            self.ofilename = ptutils.get_filename(self.ofilename_default)
             self.ostream = open(self.ofilename, "w")
 
         self.color = cfg.logger.color
