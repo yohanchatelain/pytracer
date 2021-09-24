@@ -31,10 +31,13 @@ class Report(metaclass=Singleton):
             self._init_filename(filename)
         else:
             self._report_filename = None
+            self._report_filename_path = None
+            self._report_ostream = None
         atexit.register(self.end)
 
     def end(self):
-        self._report_ostream.flush()
+        if self._report_ostream:
+            self._report_ostream.flush()
 
     def _init_filename(self, filename):
         if filename == '':

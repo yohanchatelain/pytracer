@@ -116,24 +116,24 @@ def get_stats(values):
         types = [*map(get_type, values[0])]
         _stats = []
         zipv = zip(*values)
-        [(t, v) for t, v in zip(types, zipv)]
+        # [(t, v) for t, v in zip(types, zipv)]
         append = _stats.append
         for ty, v in zip(types, zipv):
             if ty == TypeValue.OTHER:
-                append(StatisticNumpy(v, empty=True))
+                append(get_stat(np.array(v, dtype=np.object)))
             else:
                 append(StatisticNumpy(np.array(v)))
     elif _type == TypeValue.NUMPY:
         try:
             array = np.array(values)
             _stats = StatisticNumpy(array)
-        except:
+        except Exception:
             logger.debug(f"Cannot parse {values}")
             _stats = StatisticNumpy(values, empty=True)
     elif _type == TypeValue.SKLEARN:
         _stats = get_sklearn_stat(values, type(values[0]))
     else:
-        _stats = get_stat(np.array(values))
+        _stats = get_stat(np.array(values, dtype=np.object))
 
     return _stats
 

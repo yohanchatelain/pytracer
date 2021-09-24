@@ -4,7 +4,7 @@ import numpy as np
 import types
 import inspect
 
-builtin_types = (bool, list, str,  dict, type(
+builtin_types = (bool, str,  dict, type(
     None), types.FunctionType, types.ModuleType, types.MethodType,
     types.MappingProxyType, types.BuiltinFunctionType, types.BuiltinMethodType,
     types.AsyncGeneratorType, frozenset, np.dtype, type)
@@ -42,7 +42,7 @@ def get_stat(values):
     for attr in dir(x0):
         try:
             attr_value = getattr(x0, attr, None)
-        except:
+        except Exception:
             continue
         if is_valid_attribute(attr_value):
             if attr_value is not None:
@@ -56,10 +56,10 @@ def get_stat(values):
                             item for sublist in array_list for item in sublist]
                         xarray = np.array(flat_list)
                         empty = False
-                    except:
+                    except Exception:
                         xarray = np.array([])
                         empty = True
-                except:
+                except Exception:
                     xarray = np.array([])
                     empty = True
                 _data[attr] = StatisticNumpy(xarray, empty=empty)

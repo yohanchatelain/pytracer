@@ -11,10 +11,10 @@ import pytracer.core.inout.exporter as ioexporter
 import pytracer.core.inout.reader as ioreader
 import pytracer.module.parser_init as parser_init
 import pytracer.utils as ptutils
-
 from pytracer.core.config import constant
 from pytracer.core.stats.stats import print_stats
 from pytracer.module.info import register
+from pytracer.utils.enum import AutoNumber
 from pytracer.utils.log import get_logger
 from tqdm import tqdm
 
@@ -84,7 +84,11 @@ class Parser:
         for arg_name in args_name[0]:
             arg_value = [arg[arg_name] for arg in args]
             arg_stat = get_stats(arg_value)
-            stats_dict[arg_name] = arg_stat
+            if isinstance(arg_stat, (tuple, list)):
+                for i, arg in enumerate(arg_stat):
+                    stats_dict[f"{arg_name}.{i}"] = arg
+            else:
+                stats_dict[arg_name] = arg_stat
 
         return stats_dict
 
@@ -225,29 +229,38 @@ class CallChain:
     _input_label = "inputs"
     _output_label = "outputs"
 
-    _id_index = 0
-    _name_index = _id_index + 1
-    _label_index = _name_index + 1
-    _bt_index = _label_index + 1
-    _time_index = _bt_index + 1
+    class Index(AutoNumber):
+        id = ()
+        name = ()
+        label = ()
+        backtrace = ()
+        time = ()
 
-    _bt_filename_index = 0
-    _bt_line_index = _bt_filename_index + 1
-    _bt_lineno_index = _bt_line_index + 1
-    _bt_name_index = _bt_lineno_index + 1
+    class BacktraceIndex(AutoNumber):
+        file = ()
+        line = ()
+        lineno = ()
+        name = ()
 
     def __init__(self):
         self.parameters = _init.IOInitializer()
         self._init_filename()
-        fo = open("callgraph.pkl", "wb")
-        self._pickler = pickle.Pickler(fo, protocol=pickle.HIGHEST_PROTOCOL)
+        self._ostream = open(self.get_filename_path(), "wb")
+        self._pickler = pickle.Pickler(
+            self._ostream, protocol=pickle.HIGHEST_PROTOCOL)
         self._stack = []
 
     def _init_filename(self):
         filename = self.parameters.callgraph
         self.filename = ptutils.get_filename(
             filename, constant.extension.pickle)
-        self.filename_path = self._get_filename_path(self.filename)
+        self.filename_path = self._get_filename_path(self.get_filename())
+
+    def get_filename(self):
+        return self.filename
+
+    def get_filename_path(self):
+        return self.filename_path
 
     def _get_filename_path(self, filename):
         ptutils.check_extension(filename, constant.extension.pickle)
@@ -294,42 +307,42 @@ class CallChain:
 
     @classmethod
     def get_id(cls, call):
-        return call[cls._id_index]
+        return call[cls.Index.id.value]
 
     @classmethod
     def get_name(cls, call):
-        return call[cls._name_index]
+        return call[cls.Index.name.value]
 
     @classmethod
     def get_label(cls, call):
-        return call[cls._label_index]
+        return call[cls.Index.label.value]
 
     @classmethod
     def get_bt(cls, call):
-        return call[cls._bt_index]
+        return call[cls.Index.backtrace.value]
 
     @classmethod
     def get_lineno(cls, call):
-        return call[cls._bt_index][cls._bt_lineno_index]
+        return cls.get_bt(call)[cls.BacktraceIndex.lineno.value]
 
     @classmethod
-    def get_filename(cls, call):
-        return call[cls._bt_index][cls._bt_filename_index]
+    def get_file(cls, call):
+        return cls.get_bt(call)[cls.BacktraceIndex.file.value]
 
     @classmethod
     def get_line(cls, call):
-        return call[cls._bt_index][cls._bt_line_index]
+        return cls.get_bt(call)[cls.BacktraceIndex.line.value]
 
     @classmethod
     def get_caller(cls, call):
-        return call[cls._bt_index][cls._bt_name_index]
+        return cls.get_bt(call)[cls.BacktraceIndex.name.value]
 
     @classmethod
     def get_time(cls, call):
-        return call[cls._time_index]
+        return call[cls.Index.time.value]
 
     def is_input_call(self, call):
-        return call[self._label_index] == self._input_label
+        return self.get_label(call) == self._input_label
 
     def print_stack(self, stack, name=None, to_print=False):
         if not to_print:
@@ -481,15 +494,17 @@ class CallChain:
         counter = 1
         call_to_id = {}
         for call in self._stack:
-            key = f"{call[self._id_index]}{call[self._name_index]}{call[self._bt_index]}"
+            key = f"{self.get_id(call)}{self.get_name(call)}{self.get_bt(call)}"
+            # key = f"{call[self._id_index]}{call[self._name_index]}{call[self._bt_index]}"
             if key not in call_to_id:
                 call_to_id[key] = f"{counter}"
                 counter += 1
 
         _str = "" if not as_dict else {}
         for call in self._stack:
-            key = f"{call[self._id_index]}{call[self._name_index]}{call[self._bt_index]}"
-            dir = "<" if call[self._label_index] == self._input_label else ">"
+            key = f"{self.get_id(call)}{self.get_name(call)}{self.get_bt(call)}"
+            # key = f"{call[self._id_index]}{call[self._name_index]}{call[self._bt_index]}"
+            dir = "<" if self.is_input_call(call) else ">"
             if as_dict:
                 _str[call] = f"{call_to_id[key]}{dir}"
             else:
@@ -557,6 +572,8 @@ def main(args):
 
     # Construct call chain
     callchain = CallChain()
+    register.set_callgraph(callchain.get_filename(),
+                           callchain.get_filename_path())
 
     export = ioexporter.Exporter()
     register.set_aggregation(export.get_filename(), export.get_filename_path())

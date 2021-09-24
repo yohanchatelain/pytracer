@@ -1,6 +1,6 @@
 from datetime import datetime
 from networkx.algorithms.shortest_paths.unweighted import predecessor
-from pytracer.core.parser import CallChain, EdgeType
+from pytracer.module.parser import CallChain, EdgeType
 import pytracer.callgraph.layout as layout
 import networkx as nx
 

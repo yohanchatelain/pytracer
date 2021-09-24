@@ -90,6 +90,8 @@ class PytracerInfoAggregationRegister(PytracerInfoRegisterAbstract):
     def _init_default(self):
         self._aggregation_name = None
         self._aggregation_path = None
+        self._callgraph_name = None
+        self._callgraph_path = None
         self._pytracer_args = None
         self._traces = []
 
@@ -107,6 +109,10 @@ class PytracerInfoAggregationRegister(PytracerInfoRegisterAbstract):
     def set_size(self):
         self._aggregation_size = os.stat(self._aggregation_path).st_size
 
+    def set_callgraph(self, name, path):
+        self._callgraph_name = name
+        self._callgraph_path = path
+
     def __str__(self):
 
         _str_fields = OrderedDict(
@@ -116,6 +122,8 @@ class PytracerInfoAggregationRegister(PytracerInfoRegisterAbstract):
             Size=ptutils.get_human_size(self._aggregation_size),
             Args=self._pytracer_args,
             Traces=self._traces,
+            CallgraphName=self._callgraph_name,
+            CallgraphPath=self._callgraph_path,
             PytracerLogName=self._pytracer_log_name,
             PytracerLogPath=self._pytracer_log_path
         )
@@ -162,6 +170,9 @@ class PytracerInfoRegister(metaclass=Singleton):
 
     def set_aggregation_size(self):
         self._aggregation.set_size()
+
+    def set_callgraph(self, name, path):
+        self._aggregation.set_callgraph(name, path)
 
     def _get_trace_registration_filename(self):
         path = self.parameters.cache_info_path
