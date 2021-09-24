@@ -83,7 +83,8 @@ class _Constant(metaclass=Singleton):
                   "traces": "traces",
                   "stats": "stats",
                   'sources': 'sources',
-                  'info': 'info'},
+                  'info': 'info',
+                  'report': 'report'},
         "register": {
             'trace': 'trace',
             'aggregation': 'aggregation'
@@ -100,7 +101,7 @@ class _Constant(metaclass=Singleton):
             "ext": _csv_extension
         },
         "trace": {
-            "filename": "",
+            "filename": '',
             "ext": _pickle_extension
         },
         "callgraph": {
@@ -183,15 +184,18 @@ class _Config(object, metaclass=Singleton):
                    "logger.color",
                    "io",
                    "io.type",
-                   "io.filename",
+                   "io.trace",
                    "io.cache",
                    "io.cache.root",
                    "io.cache.stats",
                    "io.cache.traces",
                    "io.cache.sources",
+                   "io.cache.report",
+                   "io.cache.info",
                    "io.export.filename",
                    "io.stats.filename",
                    "io.stats.callgraph",
+                   "io.report.filename",
                    "numpy",
                    "numpy.ufunc"
                    ]

@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+from pytracer.core.inout import _init
 import argparse
 import ast
 import importlib.util
@@ -244,6 +245,7 @@ class MyImporter(MetaPathFinder):
 class TracerRun:
 
     def __init__(self, args):
+        self.parameters = _init.IOInitializer()
         self.args = args
         logger.info(f"Trace {self.args.module}", caller=self)
 

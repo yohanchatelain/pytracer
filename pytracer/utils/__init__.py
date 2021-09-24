@@ -77,11 +77,12 @@ def str2bool(v):
 
 def get_filename(name, ext=""):
     i = 0
-    name += f".{os.getpid()}{ext}" if ext else f".{os.getpid()}"
-    while os.path.isfile(name):
-        name = f"{name}.{i}"
+    name = f"{name}.{os.getpid()}{ext}" if ext else f"{name}.{os.getpid()}"
+    _name = name
+    while os.path.isfile(_name):
+        _name = f"{name}.{i}"
         i += 1
-    return name
+    return _name
 
 
 def ishashable(_object):

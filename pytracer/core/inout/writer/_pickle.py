@@ -13,8 +13,8 @@ import pytracer.core.inout._init as _init
 import pytracer.utils as ptutils
 from pytracer.core.config import config as cfg
 from pytracer.core.config import constant
-from pytracer.core.wrapper.cache import dumped_functions, visited_files
 from pytracer.module.info import register
+from pytracer.core.wrapper.cache import dumped_functions, visited_files
 from pytracer.utils import get_functions_from_traceback, report
 from pytracer.utils.log import get_logger
 
@@ -81,7 +81,8 @@ class WriterPickle(_writer.Writer):
             logger.critical("Unexpected error", error=e, caller=self)
 
     def _init_ostream(self):
-        filename = self.parameters.trace
+        if not (filename := self.parameters.trace):
+            filename = datetime.datetime.now().strftime(self.datefmt)
         self.filename = ptutils.get_filename(
             filename, constant.extension.pickle)
         self.filename_path = self._get_filename_path(self.filename)

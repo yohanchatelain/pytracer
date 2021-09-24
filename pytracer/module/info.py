@@ -67,9 +67,9 @@ class PytracerInfoTraceRegister(PytracerInfoRegisterAbstract):
             Name=self._trace_name,
             Path=self._trace_path,
             Size=ptutils.get_human_size(self._trace_size),
+            Args=self._pytracer_args,
             ReportName=self._report_name,
             ReportPath=self._report_path,
-            Args=self._pytracer_args,
             PytracerLogName=self._pytracer_log_name,
             PytracerLogPath=self._pytracer_log_path
         )

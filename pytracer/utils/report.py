@@ -1,3 +1,4 @@
+import atexit
 import csv
 import os
 import sys
@@ -7,6 +8,7 @@ from pytracer.core.config import constant
 from pytracer.utils import get_filename
 from pytracer.utils.memory import total_size
 from pytracer.utils.singleton import Singleton
+import pytracer.core.inout._init as _init
 
 
 class Report(metaclass=Singleton):
@@ -20,6 +22,7 @@ class Report(metaclass=Singleton):
     report_options = [x.lower() for x in ReportOption.__members__.keys()]
 
     def __init__(self, option, filename):
+        self.parameters = _init.IOInitializer()
         self.set_report(option)
         if self.report_enable():
             self._report_type = None
@@ -28,19 +31,28 @@ class Report(metaclass=Singleton):
             self._init_filename(filename)
         else:
             self._report_filename = None
+        atexit.register(self.end)
+
+    def end(self):
+        self._report_ostream.flush()
 
     def _init_filename(self, filename):
         if filename == '':
-            filename = constant.report_filename
-        self._report_filename = get_filename(filename)
-        self._report_ostream = open(self._report_filename, 'w')
+            filename = constant.report.filename
+        self._report_filename = get_filename(filename, constant.extension.csv)
+        self._report_filename_path = self._get_filename_path(
+            self._report_filename)
+        self._report_ostream = open(self._report_filename_path, 'w')
+
+    def _get_filename_path(self, filename):
+        return os.path.join(self.parameters.cache_path,
+                            self.parameters.cache_report_path, filename)
 
     def get_filename(self):
         return self._report_filename
 
     def get_filename_path(self):
-        abspath = f"{os.getcwd()}{os.path.sep}{self._report_filename}"
-        return abspath if self._report_filename else None
+        return self._report_filename_path
 
     def set_filename(self, filename):
         self._report_filename = filename
