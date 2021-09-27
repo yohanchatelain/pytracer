@@ -26,7 +26,7 @@ class StatisticNumpy:
         np.dtype("float64"): 53,
         # Warning: float128 in numpy means fp80!
         np.dtype("float128"): 80,
-        np.dtype("object"): 0
+        np.dtype("object"): 53
     }
 
     def __init__(self, values, empty=False):
@@ -134,8 +134,8 @@ class StatisticNumpy:
                 if self._type.kind in ('U', 'S'):
                     sig = sig.filled(8)
                 else:
+                    sig[masked_mean.mask] = 0
                     sig[masked_std.mask] = self.__max_sig.get(self._type, 53)
-                    sig[masked_mean.mask & ~masked_std.mask] = 0
                     sig = sig.data
         else:
             sig = np.log2(np.abs(mean/std))
