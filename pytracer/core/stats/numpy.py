@@ -10,6 +10,9 @@ warnings.simplefilter('ignore')
 class StatisticNumpy:
 
     __max_sig = {
+        int: 64,
+        float: 53,
+        complex: 53,
         np.dtype("bool"): 1,
         np.dtype("uint8"): 8,
         np.dtype("int8"): 8,
@@ -18,14 +21,14 @@ class StatisticNumpy:
         np.dtype("int32"): 32,
         np.dtype("uint32"): 32,
         np.dtype("int64"): 64,
-        int: 64,
-        float: 53,
         np.dtype("uint64"): 64,
         np.dtype("float16"): 11,
         np.dtype("float32"): 24,
         np.dtype("float64"): 53,
-        # Warning: float128 in numpy means fp80!
-        np.dtype("float128"): 80,
+        np.dtype("float128"): np.finfo(np.dtype('float128')).nmant+1,
+        np.dtype("complex64"): 24,
+        np.dtype("complex128"): 53,
+        np.dtype("complex256"): np.finfo(np.dtype('complex256')).nmant+124,
         np.dtype("object"): 53
     }
 
@@ -87,29 +90,37 @@ class StatisticNumpy:
     def _std_sparse(self, _mean):
         return np.sum([(m - _mean).power(2) / self._samples for m in self._data]).sqrt()
 
+    def _mean(self, data):
+        return np.mean(data, axis=0, dtype=np.float64)
+
     def mean(self):
         _mean = getattr(self, "cached_mean", None)
         if _mean is None:
-            try:
-                if spr.issparse(self._data[0]):
-                    _mean = self._mean_sparse()
-                else:
-                    _mean = np.mean(self._data, axis=0, dtype=np.float64)
-            except Exception:
-                _mean = np.zeros(self._shape)
+            if spr.issparse(self._data[0]):
+                _mean = self._mean_sparse()
+            elif np.iscomplexobj(self._data):
+                _mean_real = self._mean(self._data.real)
+                _mean_imag = self._mean(self._data.imag)
+                _mean = _mean_real + 1j * _mean_imag
+            else:
+                _mean = self._mean(self._data)
         self.cached_mean = _mean
         return _mean
+
+    def _std(self, data):
+        return np.std(data, axis=0, dtype=np.float64)
 
     def std(self):
         _std = getattr(self, "cached_std", None)
         if _std is None:
-            try:
-                if spr.issparse(self._data[0]):
-                    _std = self._std_sparse()
-                else:
-                    _std = np.std(self._data, axis=0, dtype=np.float64)
-            except Exception:
-                _std = np.zeros(self._shape)
+            if spr.issparse(self._data[0]):
+                _std = self._std_sparse()
+            elif np.iscomplexobj(self._data):
+                _std_real = self._std(self._data.real)
+                _std_imag = self._std(self._data.imag)
+                _std = _std_real + 1j * _std_imag
+            else:
+                _std = self._std(self._data)
         self.cached_std = _std
         return _std
 
@@ -125,7 +136,7 @@ class StatisticNumpy:
             self.cached_sig = _sig
         return _sig
 
-    def _sig(self, mean, std):
+    def _sig_part(self, mean, std):
         if not spr.issparse(mean):
             masked_std = np.ma.masked_equal(std, 0.0)
             masked_mean = np.ma.masked_equal(mean, 0.0)
@@ -140,6 +151,15 @@ class StatisticNumpy:
         else:
             sig = np.log2(np.abs(mean/std))
         return sig
+
+    def _sig(self, mean, std):
+        if np.iscomplexobj(self._data):
+            _sig_real = self._sig_part(mean.real, std.real)
+            _sig_imag = self._sig_part(mean.imag, std.imag)
+            _sig = _sig_real + 1j * _sig_imag
+        else:
+            _sig = self._sig_part(mean, std)
+        return _sig
 
     @staticmethod
     def hasinstance(obj):

@@ -91,7 +91,6 @@ def frame_args(duration):
 def get_extra_value(extra_value):
     with lock:
         _ndarray = extra_value.read()
-
     ndim = _ndarray.ndim
 
     if ndim == 1:
@@ -123,22 +122,11 @@ def get_heatmap(x, y, z, zmin=None, zmax=None):
     return heatmap
 
 
-# @app.callback(
-#     dash.dependencies.Output("info-data-timeline-heatmap", "figure"),
-#     [dash.dependencies.Input("minmax-heatmap-button", "n_clicks"),
-#      dash.dependencies.State("min-heatmap-input", "value"),
-#      dash.dependencies.State("max-heatmap-input", "value"),
-#      dash.dependencies.State('info-data-timeline-heatmap', 'figure')
-#      ]
-# )
-# def update_heatmap(valid, min_, max_, heatmap):
-#     print(heatmap)
-#     return heatmap
-
-
 @app.callback(
-    dash.dependencies.Output("info-data-timeline-heatmap", "figure"),
-    dash.dependencies.Output("info-timeline", "style"),
+    [dash.dependencies.Output("info-data-timeline-heatmap-real-part", "figure"),
+     dash.dependencies.Output(
+         "info-data-timeline-heatmap-imag-part", "figure"),
+     dash.dependencies.Output("info-timeline", "style")],
     [dash.dependencies.Input("timeline", "hoverData"),
      dash.dependencies.Input("timeline-mode", "value"),
      dash.dependencies.Input('color-heatmap', 'value'),
@@ -146,11 +134,13 @@ def get_heatmap(x, y, z, zmin=None, zmax=None):
      dash.dependencies.Input('minmax-heatmap-button', 'n_clicks'),
      dash.dependencies.State('min-heatmap-input', 'value'),
      dash.dependencies.State('max-heatmap-input', 'value'),
-     dash.dependencies.State('info-data-timeline-heatmap', 'figure'),
+     dash.dependencies.State('info-data-timeline-heatmap-real-part', 'figure'),
+     dash.dependencies.State('info-data-timeline-heatmap-imag-part', 'figure'),
      ],
     prevent_initial_call=True)
-def print_heatmap(hover_data, mode, color, zscale, scale_button, min_scale, max_scale, fig):
-    figure = {}
+def print_heatmap(hover_data, mode, color, zscale, scale_button, min_scale, max_scale, fig_real, fig_imag):
+    figure_real = {}
+    figure_imag = {}
     display = {"display": "flex", "display-direction": "row"}
 
     ctx = dash.callback_context
@@ -174,44 +164,68 @@ def print_heatmap(hover_data, mode, color, zscale, scale_button, min_scale, max_
 
     if extra_value:
         _x, _y, _z = get_extra_value(extra_value)
+        if np.iscomplexobj(_z):
+            _z_real = _z.real
+            _z_imag = _z.imag
+        else:
+            _z_real = _z
+            _z_imag = None
 
         if zscale == 'log':
-            _z = np.log(np.abs(_z))
+            _z_real = np.log(np.abs(_z_real))
+            if _z_imag is not None:
+                _z_imag = np.log(np.abs(_z_imag))
 
         if mode == "sig":
-            figure = get_heatmap(_x, _y, _z, zmin=0, zmax=64)
+            figure_real = get_heatmap(_x, _y, _z_real, zmin=0, zmax=64)
+            figure_imag = get_heatmap(
+                _x, _y, _z_imag, zmin=0, zmax=64) if _z_imag is not None else figure_imag
         else:
-            figure = get_heatmap(_x, _y, _z)
+            figure_real = get_heatmap(_x, _y, _z_real)
+            figure_imag = get_heatmap(
+                _x, _y, _z_imag) if _z_imag is not None else figure_imag
 
         if color:
             colorscale = dict(colorscale=color)
             if mode == "sig":
                 colorscale['cmin'] = 0
                 colorscale['cmax'] = 53
-            figure.update_layout(coloraxis=colorscale)
+            figure_real.update_layout(coloraxis=colorscale)
+            if figure_imag:
+                figure_imag.update_layout(coloraxis=colorscale)
 
     if ctx.triggered:
         if ctx.triggered[0]['prop_id'] == 'color-heatmap.value':
             colorscale = dict(colorscale=color)
-            # if mode == "sig":
-            #     colorscale['cmin'] = 0
-            #     colorscale['cmax'] = 53
-            fig = go.Figure(fig)
-            fig.update_layout(coloraxis=colorscale)
-            figure = fig
+            fig_real = go.Figure(fig_real)
+            fig_imag = go.Figure(fig_imag)
+            fig_real.update_layout(coloraxis=colorscale)
+            if fig_imag:
+                fig_imag.update_layout(coloraxis=colorscale)
+            figure_real = fig_real
+            figure_imag = fig_imag
+
         if ctx.triggered[0]['prop_id'] == 'minmax-heatmap-button.n_clicks':
             colorscale = dict(colorscale=color)
             colorscale['cmin'] = min_scale
             colorscale['cmax'] = max_scale
-            fig = go.Figure(fig)
-            fig.update_layout(coloraxis=colorscale)
-            figure = fig
+            fig_real = go.Figure(fig_real)
+            fig_imag = go.Figure(fig_imag)
+            fig_real.update_layout(coloraxis=colorscale)
+            if fig_imag:
+                fig_imag.update_layout(coloraxis=colorscale)
+            figure_real = fig_real
+            figure_imag = fig_imag
 
-    if figure:
-        figure.update_xaxes(side='top')
-        figure.update_yaxes(autorange='reversed')
+    if figure_real:
+        figure_real.update_xaxes(side='top')
+        figure_real.update_yaxes(autorange='reversed')
 
-    return (figure, display)
+    if figure_imag:
+        figure_imag.update_xaxes(side='top')
+        figure_imag.update_yaxes(autorange='reversed')
+
+    return (figure_real, figure_imag, display)
 
 
 path_cache = {}
@@ -332,11 +346,20 @@ def print_modal_source(on, href, href_description):
 @ app.callback(
     dash.dependencies.Output("info-data-timeline-summary", "children"),
     [dash.dependencies.Input("timeline", "hoverData"),
-     dash.dependencies.Input("info-data-timeline-heatmap", "figure")],
+     dash.dependencies.Input("tabs-heatmap", 'value'),
+     dash.dependencies.Input("info-data-timeline-heatmap-real-part", "figure"),
+     dash.dependencies.Input("info-data-timeline-heatmap-imag-part", "figure")],
     dash.dependencies.State('timeline-mode', 'value'),
     prevent_initial_call=True)
-def print_datahover_summary(hover_data, fig, mode):
+def print_datahover_summary(hover_data, tab, fig_real, fig_imag, mode):
     text = ""
+
+    if tab == 'tab-real-part':
+        fig = fig_real
+    elif tab == 'tab-imag-part':
+        fig = fig_imag
+    else:
+        fig = None
 
     if not fig or not hover_data:
         return text
@@ -535,7 +558,7 @@ def get_colors(module, function):
 
     backtraces_set = set.union(set(backtraces_in), set(backtraces_out))
 
-    _colors = pcolors.qualitative.Alphabet * 10
+    _colors = pcolors.qualitative.Dark24 * 10
     random.shuffle(_colors)
     colors = {bt: _colors[i]
               for i, bt in enumerate(backtraces_set)}
@@ -687,11 +710,20 @@ def update_histo_bin_selected(nb_bins):
 
 @app.callback(
     dash.dependencies.Output("histo_heatmap", "figure"),
-    [dash.dependencies.Input("info-data-timeline-heatmap", "figure"),
+    [dash.dependencies.Input('tabs-heatmap', 'value'),
+     dash.dependencies.Input("info-data-timeline-heatmap-real-part", "figure"),
+     dash.dependencies.Input("info-data-timeline-heatmap-imag-part", "figure"),
      dash.dependencies.Input("histo_bin_selector", "value"),
      dash.dependencies.Input("histo_normalization", "value")],
     dash.dependencies.State("timeline-mode", "value"))
-def update_histo(heatmap, nbins, normalization, mode):
+def update_histo(tabs, heatmap_real, heatmap_imag, nbins, normalization, mode):
+    if tabs == 'tab-real-part':
+        heatmap = heatmap_real
+    elif tabs == 'tab-imag-part':
+        heatmap = heatmap_imag
+    else:
+        heatmap = None
+
     if heatmap == {} or heatmap is None:
         return {}
     x = np.ravel(heatmap['data'][0]['z'])

@@ -123,7 +123,13 @@ timeline_hover_info = html.Div(
 
 timeline_hover_heatmap = html.Div(
     [
-        dcc.Graph(id="info-data-timeline-heatmap"),
+        dcc.Tabs(id='tabs-heatmap', value='tab-parts',
+                 children=[
+                     dcc.Tab(label='Real', value='tab-real-part',
+                             children=[dcc.Graph(id="info-data-timeline-heatmap-real-part")]),
+                     dcc.Tab(label='Imaginary', value='tab-imag-part',
+                             children=[dcc.Graph(id="info-data-timeline-heatmap-imag-part")]),
+                 ]),
         html.Div([
             dcc.Input(id="min-heatmap-input", type="number",
                       debounce=True, placeholder="Min scale"),
