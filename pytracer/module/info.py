@@ -43,6 +43,9 @@ class PytracerInfoTraceRegister(PytracerInfoRegisterAbstract):
         self._pytracer_log_name = None
         self._pytracer_log_path = None
 
+    def get_date(self):
+        return self._registration_date
+
     def set_trace(self, name, path):
         self._trace_name = name
         self._trace_path = path
@@ -94,6 +97,9 @@ class PytracerInfoAggregationRegister(PytracerInfoRegisterAbstract):
         self._callgraph_path = None
         self._pytracer_args = None
         self._traces = []
+
+    def get_date(self):
+        return self._registration_date
 
     def set_aggregation(self, name, path):
         self._aggregation_name = name
@@ -224,7 +230,7 @@ class PytracerInfoPrinter(metaclass=Singleton):
             return []
         traces_path = [os.path.join(
             path, trace) for trace in _traces if trace.startswith(constant.register.trace)]
-        return [self._load_trace_info(trace) for trace in traces_path]
+        return sorted([self._load_trace_info(trace) for trace in traces_path], key=lambda trace: trace.get_date())
 
     def _get_aggregation_info(self):
         path = self.parameters.cache_info_path
@@ -233,7 +239,7 @@ class PytracerInfoPrinter(metaclass=Singleton):
             return []
         aggregations_path = [os.path.join(
             path, aggregation) for aggregation in _aggregations if aggregation.startswith(constant.register.aggregation)]
-        return [self._load_aggregation_info(aggregation) for aggregation in aggregations_path]
+        return sorted([self._load_aggregation_info(aggregation) for aggregation in aggregations_path], key=lambda a: a.get_date())
 
     def print_trace(self, trace):
         print(trace)
