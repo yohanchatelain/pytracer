@@ -18,6 +18,8 @@ class StatisticNumpy:
         np.dtype("int32"): 32,
         np.dtype("uint32"): 32,
         np.dtype("int64"): 64,
+        int: 64,
+        float: 53,
         np.dtype("uint64"): 64,
         np.dtype("float16"): 11,
         np.dtype("float32"): 24,
@@ -132,8 +134,9 @@ class StatisticNumpy:
                 if self._type.kind in ('U', 'S'):
                     sig = sig.filled(8)
                 else:
-                    sig = sig.filled(self.__max_sig.get(self._type, 0))
-
+                    sig[masked_std.mask] = self.__max_sig.get(self._type, 53)
+                    sig[masked_mean.mask & ~masked_std.mask] = 0
+                    sig = sig.data
         else:
             sig = np.log2(np.abs(mean/std))
         return sig
