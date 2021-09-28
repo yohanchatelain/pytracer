@@ -22,6 +22,10 @@ def f(x, y, z):
         return z+sum_
 
 
+def show(name, function):
+    print(f"{name} {function} {hex(id(function))}")
+
+
 def main():
 
     try:
@@ -43,12 +47,12 @@ def main():
     print("args", args)
 
     import pytracer.test.internal.test_hook as hook
-    print("list module of hook")
-    hook.list_module()
+    print("list command of hook")
+    hook.list_command()
 
     print(math.pi)
 
-    print("math.sin", math.sin)
+    show("math.sin", math.sin)
     for i in range(50):
         x = math.sin(i+np.random.uniform(-0.01, 0.01))
         # print(x)
@@ -65,10 +69,10 @@ def main():
     print("NUMPY", np.sin(1))
     mat = np.matrix([[1, 2, 3], [5, 6, 7], [8, 9, 10]])
     print(np.linalg.norm(mat))
-    print(np.random)
+    show("random", np.random)
     print(np.random.uniform(size=10))
-    print(np.minimum)
-    print(np.minimum.accumulate)
+    show("minimum", np.minimum)
+    show("minimum.accumulate", np.minimum.accumulate)
 
     print("Test finished")
 
@@ -78,28 +82,28 @@ def main():
 @pytest.mark.usefixtures("turn_numpy_ufunc_on", "cleandir")
 def test_trace_only_no_arg_ufunc_on(script_runner):
     ret = script_runner.run("pytracer", "trace",
-                            f"--module {__file__}")
+                            f"--command {__file__}")
     assert not ret.success
 
 
 @pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir")
 def test_trace_only_no_arg_ufunc_off(script_runner):
     ret = script_runner.run("pytracer", "trace",
-                            f"--module {__file__}")
+                            f"--command {__file__}")
     assert not ret.success
 
 
 @pytest.mark.usefixtures("turn_numpy_ufunc_on", "cleandir")
 def test_trace_only_ufunc_on(script_runner):
     ret = script_runner.run("pytracer", "trace",
-                            f"--module {__file__} --test2=1")
+                            f"--command {__file__} --test2=1")
     assert ret.success
 
 
 @pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir")
 def test_trace_only_ufunc_off(script_runner):
     ret = script_runner.run("pytracer", "trace",
-                            f"--module {__file__} --test2=1")
+                            f"--command {__file__} --test2=1")
     assert ret.success
 
 
@@ -107,7 +111,7 @@ def test_trace_only_ufunc_off(script_runner):
 def test_trace_parse_ufunc_on(nsamples, script_runner):
     for i in range(nsamples):
         ret = script_runner.run("pytracer", "trace",
-                                f"--module {__file__} --test2=1")
+                                f"--command {__file__} --test2=1")
         assert ret.success
 
 
@@ -115,7 +119,7 @@ def test_trace_parse_ufunc_on(nsamples, script_runner):
 def test_trace_parse(nsamples, script_runner):
     for _ in range(nsamples):
         ret = script_runner.run("pytracer", "trace",
-                                f"--module {__file__} --test2=1")
+                                f"--command {__file__} --test2=1")
         assert ret.success
 
 

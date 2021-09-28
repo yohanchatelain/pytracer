@@ -1,6 +1,6 @@
 # print(__doc__)
 
-# import the necessary modules and libraries
+# import the necessary commands and libraries
 import numpy as np
 from sklearn.tree import DecisionTreeRegressor
 import matplotlib.pyplot as plt

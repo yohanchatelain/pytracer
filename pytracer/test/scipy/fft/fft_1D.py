@@ -1,3 +1,4 @@
+import sys
 from scipy.signal import blackman
 import numpy as np
 from scipy.fft import fft, ifft, fftfreq, fftshift, rfft, irfft
@@ -6,7 +7,7 @@ x = np.array([1.0, 2.0, 1.0, -1.0, 1.5])
 y = fft(x)
 print(y)
 yinv = ifft(y)
-print(yinv)
+print('yinv', yinv)
 
 # Number of sample points
 N = 600
@@ -21,7 +22,7 @@ xf = fftfreq(N, T)[:N//2]
 print(xf)
 
 freq = fftfreq(8, 0.125)
-print(freq)
+print('freq', freq)
 
 x = np.arange(8)
 y = fftshift(x)
@@ -37,7 +38,9 @@ yf = fft(y)
 xf = fftfreq(N, T)
 xf = fftshift(xf)
 yplot = fftshift(yf)
-print(yplot)
+print('yplot', yplot)
+
+sys.exit(1)
 
 x = np.array([1.0, 2.0, 1.0, -1.0, 1.5, 1.0])
 fft(x)

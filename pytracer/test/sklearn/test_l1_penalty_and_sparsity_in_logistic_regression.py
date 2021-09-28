@@ -78,14 +78,14 @@ def l1_penalty_and_sparsity_in_logistic_regression():
 @pytest.mark.usefixtures("turn_numpy_ufunc_on", "cleandir")
 def test_trace_only_ufunc_on(script_runner):
     ret = script_runner.run("pytracer", "trace",
-                            f"--module {__file__}")
+                            f"--command {__file__}")
     assert ret.success
 
 
 @pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir")
 def test_trace_only_ufunc_off(script_runner):
     ret = script_runner.run("pytracer", "trace",
-                            f"--module {__file__}")
+                            f"--command {__file__}")
     assert ret.success
 
 
@@ -93,7 +93,7 @@ def test_trace_only_ufunc_off(script_runner):
 def test_trace_parse(nsamples, script_runner):
     for _ in range(nsamples):
         ret = script_runner.run("pytracer", "trace",
-                                f"--module {__file__}")
+                                f"--command {__file__}")
         assert ret.success
 
 
