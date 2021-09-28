@@ -1,4 +1,3 @@
-
 from dash_core_components.Input import Input
 from dash_html_components.Label import Label
 import dash_ace
@@ -117,13 +116,29 @@ yformat_selector = html.Div([
 
 
 timeline_hover_info = html.Div(
-    dcc.Markdown(id="info-data-timeline-summary"),
-    className="mini_container"
+    [
+        html.Div(
+            dcc.Markdown(id="info-data-timeline-summary")
+        ),
+        html.Div(
+            dcc.RadioItems(
+                id='heatmap-formats',
+                options=[
+                    {'label': 'Heatmap', "value": "heatmap"},
+                    {'label': 'Graph', "value": "graph"}
+                ],
+                value='heatmap',
+                labelStyle={"display": 'column'},
+                className='dcc_control',
+            )
+        )
+    ],
+    className="pretty_container"
 )
 
 timeline_hover_heatmap = html.Div(
     [
-        dcc.Tabs(id='tabs-heatmap', value='tab-parts',
+        dcc.Tabs(id='tabs-heatmap', value='tab-real-part',
                  children=[
                      dcc.Tab(label='Real', value='tab-real-part',
                              children=[dcc.Graph(id="info-data-timeline-heatmap-real-part")]),

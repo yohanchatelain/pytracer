@@ -88,7 +88,7 @@ def frame_args(duration):
     }
 
 
-def get_extra_value(extra_value):
+def extra_value_to_heatmap(extra_value):
     with lock:
         _ndarray = extra_value.read()
     ndim = _ndarray.ndim
@@ -111,7 +111,15 @@ def get_extra_value(extra_value):
     return _x, _y, _ndarray
 
 
+def extra_value_to_graph(extra_value):
+    with lock:
+        _ndarray = extra_value.read()
+    return _ndarray
+
+
 def get_heatmap(x, y, z, zmin=None, zmax=None):
+    if z is None:
+        return go.Figure()
     heatmap = go.Figure(data=go.Heatmap(x=x,
                                         y=y,
                                         z=z,
@@ -120,6 +128,118 @@ def get_heatmap(x, y, z, zmin=None, zmax=None):
                                         coloraxis='coloraxis'))
     heatmap.update_layout(width=700, height=700)
     return heatmap
+
+
+def read_extra_value(x, info, mode):
+    try:
+        with lock:
+            extra_value = pgc.data.get_extra_value(info['module'],
+                                                   info['function'],
+                                                   info['label'],
+                                                   info['arg'],
+                                                   x,
+                                                   mode)
+
+    except KeyError:
+        extra_value = None
+    return extra_value
+
+
+def get_graph_complex_1D(z):
+    z_real = go.Scatter(y=z.real, name=r'$ \Re $')
+    z_imag = go.Scatter(y=z.imag, name=r'$ \Im $')
+    return go.Figure(data=[z_real, z_imag])
+
+
+def get_graph_complex(z):
+    if z.ndim == 1:
+        return get_graph_complex_1D(z)
+    else:
+        return go.Figure()
+
+
+def get_graph_real_1D(z):
+    return go.Figure(data=[go.Scatter(y=z)])
+
+
+def get_graph_real(z):
+    if z.ndim == 1:
+        return get_graph_real_1D(z)
+    else:
+        return go.Figure()
+
+
+def get_graph_figure(figure_real, extra_value):
+    z = extra_value_to_graph(extra_value)
+
+    if np.iscomplexobj(z):
+        return get_graph_complex(z)
+    else:
+        return get_graph_real(z)
+
+
+def get_heatmap_figure(figure_real, figure_imag, extra_value, zscale, mode, min_scale, max_scale, color):
+    _x, _y, _z = extra_value_to_heatmap(extra_value)
+
+    if np.iscomplexobj(_z):
+        _z_real = _z.real
+        _z_imag = _z.imag
+    else:
+        _z_real = _z
+        _z_imag = None
+
+    if zscale == 'log':
+        _z_real = np.log(np.abs(_z_real))
+        if _z_imag is not None:
+            _z_imag = np.log(np.abs(_z_imag))
+
+    if mode == "sig":
+        figure_real = get_heatmap(
+            _x, _y, _z_real, zmin=min_scale, zmax=max_scale)
+        figure_imag = get_heatmap(
+            _x, _y, _z_imag, zmin=min_scale, zmax=max_scale)
+    else:
+        figure_real = get_heatmap(_x, _y, _z_real)
+        figure_imag = get_heatmap(_x, _y, _z_imag)
+
+    colorscale = dict(colorscale=color)
+    if mode == "sig":
+        colorscale['cmin'] = min_scale
+        colorscale['cmax'] = max_scale
+
+    figure_real.update_layout(coloraxis=colorscale)
+    figure_imag.update_layout(coloraxis=colorscale)
+
+    figure_real.update_xaxes(side='top')
+    figure_real.update_yaxes(autorange='reversed')
+
+    figure_imag.update_xaxes(side='top')
+    figure_imag.update_yaxes(autorange='reversed')
+
+    return (figure_real, figure_imag)
+
+
+def handle_color_heatmap_trigger(figure, color):
+    (figure_real, figure_imag) = figure
+    colorscale = dict(colorscale=color)
+    figure_real = go.Figure(figure_real)
+    figure_imag = go.Figure(figure_imag)
+    figure_real.update_layout(coloraxis=colorscale)
+    figure_imag.update_layout(coloraxis=colorscale)
+    return (figure_real, figure_imag)
+
+
+def handle_scale_heatmap_trigger(figure, color, scale):
+    figure_real, figure_imag = figure
+    min_scale, max_scale = scale
+    colorscale = dict(colorscale=color)
+    colorscale['cmin'] = min_scale
+    colorscale['cmax'] = max_scale
+    figure_real = go.Figure(figure_real)
+    figure_imag = go.Figure(figure_imag)
+    figure_real.update_layout(coloraxis=colorscale)
+    figure_imag.update_layout(coloraxis=colorscale)
+    return (figure_real, figure_imag)
 
 
 @app.callback(
@@ -131,6 +251,7 @@ def get_heatmap(x, y, z, zmin=None, zmax=None):
      dash.dependencies.Input("timeline-mode", "value"),
      dash.dependencies.Input('color-heatmap', 'value'),
      dash.dependencies.Input('z-scale', 'value'),
+     dash.dependencies.Input('heatmap-formats', 'value'),
      dash.dependencies.Input('minmax-heatmap-button', 'n_clicks'),
      dash.dependencies.State('min-heatmap-input', 'value'),
      dash.dependencies.State('max-heatmap-input', 'value'),
@@ -138,93 +259,50 @@ def get_heatmap(x, y, z, zmin=None, zmax=None):
      dash.dependencies.State('info-data-timeline-heatmap-imag-part', 'figure'),
      ],
     prevent_initial_call=True)
-def print_heatmap(hover_data, mode, color, zscale, scale_button, min_scale, max_scale, fig_real, fig_imag):
-    figure_real = {}
-    figure_imag = {}
+def print_heatmap(hover_data, mode, color, zscale, heatmap_format, scale_button, min_scale=0, max_scale=53, fig_real={}, fig_imag={}):
+    figure_real = go.Figure()
+    figure_imag = go.Figure()
+
+    print('print heatmap')
+
     display = {"display": "flex", "display-direction": "row"}
 
     ctx = dash.callback_context
+
+    if ctx.triggered:
+        print(f'ctx triggered {ctx.triggered[0]["prop_id"]}')
+
+        figure = (figure_real, figure_imag)
+        scale = (min_scale, max_scale)
+
+        if ctx.triggered[0]['prop_id'] == 'color-heatmap.value':
+            return handle_color_heatmap_trigger(figure, color) + (display,)
+
+        if ctx.triggered[0]['prop_id'] == 'minmax-heatmap-button.n_clicks':
+            return handle_scale_heatmap_trigger(figure, color, scale) + (display,)
 
     extra_value = None
     if hover_data:
         x = hover_data['points'][0]['x']
         info = hover_data['points'][0]['customdata']
-
-        try:
-            with lock:
-                extra_value = pgc.data.get_extra_value(info['module'],
-                                                       info['function'],
-                                                       info['label'],
-                                                       info['arg'],
-                                                       x,
-                                                       mode)
-
-        except KeyError:
-            extra_value = None
+        extra_value = read_extra_value(x, info, mode)
 
     if extra_value:
-        _x, _y, _z = get_extra_value(extra_value)
-        if np.iscomplexobj(_z):
-            _z_real = _z.real
-            _z_imag = _z.imag
+
+        if heatmap_format == 'heatmap':
+            (figure_real, figure_imag) = get_heatmap_figure(figure_real,
+                                                            figure_imag,
+                                                            extra_value,
+                                                            zscale, mode,
+                                                            min_scale,
+                                                            max_scale, color)
+
+        elif heatmap_format == "graph":
+            figure_real = get_graph_figure(figure_real, extra_value)
         else:
-            _z_real = _z
-            _z_imag = None
+            raise ValueError(f'Unkwown format {heatmap_format}')
 
-        if zscale == 'log':
-            _z_real = np.log(np.abs(_z_real))
-            if _z_imag is not None:
-                _z_imag = np.log(np.abs(_z_imag))
-
-        if mode == "sig":
-            figure_real = get_heatmap(_x, _y, _z_real, zmin=0, zmax=64)
-            figure_imag = get_heatmap(
-                _x, _y, _z_imag, zmin=0, zmax=64) if _z_imag is not None else figure_imag
-        else:
-            figure_real = get_heatmap(_x, _y, _z_real)
-            figure_imag = get_heatmap(
-                _x, _y, _z_imag) if _z_imag is not None else figure_imag
-
-        if color:
-            colorscale = dict(colorscale=color)
-            if mode == "sig":
-                colorscale['cmin'] = 0
-                colorscale['cmax'] = 53
-            figure_real.update_layout(coloraxis=colorscale)
-            if figure_imag:
-                figure_imag.update_layout(coloraxis=colorscale)
-
-    if ctx.triggered:
-        if ctx.triggered[0]['prop_id'] == 'color-heatmap.value':
-            colorscale = dict(colorscale=color)
-            fig_real = go.Figure(fig_real)
-            fig_imag = go.Figure(fig_imag)
-            fig_real.update_layout(coloraxis=colorscale)
-            if fig_imag:
-                fig_imag.update_layout(coloraxis=colorscale)
-            figure_real = fig_real
-            figure_imag = fig_imag
-
-        if ctx.triggered[0]['prop_id'] == 'minmax-heatmap-button.n_clicks':
-            colorscale = dict(colorscale=color)
-            colorscale['cmin'] = min_scale
-            colorscale['cmax'] = max_scale
-            fig_real = go.Figure(fig_real)
-            fig_imag = go.Figure(fig_imag)
-            fig_real.update_layout(coloraxis=colorscale)
-            if fig_imag:
-                fig_imag.update_layout(coloraxis=colorscale)
-            figure_real = fig_real
-            figure_imag = fig_imag
-
-    if figure_real:
-        figure_real.update_xaxes(side='top')
-        figure_real.update_yaxes(autorange='reversed')
-
-    if figure_imag:
-        figure_imag.update_xaxes(side='top')
-        figure_imag.update_yaxes(autorange='reversed')
-
+    print(figure_real)
     return (figure_real, figure_imag, display)
 
 
@@ -361,6 +439,9 @@ def print_datahover_summary(hover_data, tab, fig_real, fig_imag, mode):
     else:
         fig = None
 
+    # print(f'hover_data {hover_data}')
+    # print(f'figure {fig}')
+
     if not fig or not hover_data:
         return text
 
@@ -368,7 +449,13 @@ def print_datahover_summary(hover_data, tab, fig_real, fig_imag, mode):
         x = hover_data['points'][0]['x']
         info = hover_data['points'][0]['customdata']
 
-    _ndarray = np.array(fig['data'][0]['z'])
+    if 'data' in fig and len(fig['data']) > 0 and 'z' in fig['data'][0]:
+        _ndarray = np.array(fig['data'][0]['z'])
+    else:
+        return text
+
+    print('data', _ndarray)
+
     _min = np.min(_ndarray)
     _max = np.max(_ndarray)
 
@@ -379,14 +466,14 @@ def print_datahover_summary(hover_data, tab, fig_real, fig_imag, mode):
         norm_fro = np.linalg.norm(_ndarray)
         norm_inf = np.linalg.norm(_ndarray, ord=np.inf)
         cond = 1/norm_fro
-        text = (f"Function={info['function']}{os.linesep*2}"
-                f"Arg={info['arg']}{os.linesep*2}"
-                f"shape={_size}{os.linesep}{os.linesep}"
-                f"Frobenius norm={norm_fro:.2}{os.linesep}{os.linesep}"
-                f"Inf norm={norm_inf:.2}{os.linesep}{os.linesep}"
-                f"Cond={cond:.2e}{os.linesep}{os.linesep}"
-                f"Min={_min:.2e}{os.linesep}{os.linesep}"
-                f"Max={_max:.2e}{os.linesep}{os.linesep}"
+        text = (f"Function={info['function'].strip()}",
+                f"Arg     ={info['arg'].strip()}",
+                f"Shape   ={_size}",
+                f"Fro norm={norm_fro:.2}",
+                f"Inf norm={norm_inf:.2}",
+                f"Cond    ={cond:.2e}",
+                f"Min     ={_min:.2e}",
+                f"Max     ={_max:.2e}"
                 )
 
     elif ndim == 2:
@@ -395,29 +482,28 @@ def print_datahover_summary(hover_data, tab, fig_real, fig_imag, mode):
         norm_inf = np.linalg.norm(_ndarray, ord=np.inf)
         norm_2 = np.linalg.norm(_ndarray, ord=2)
         cond = np.linalg.cond(_ndarray)
-        text = (f"Function={info['function']}{os.linesep*2}"
-                f"Arg={info['arg']}{os.linesep*2}",
-                f"shape={_row}x{_col}{os.linesep}{os.linesep}"
-                f"Frobenius norm={norm_fro:.2}{os.linesep}{os.linesep}"
-                f"Inf norm={norm_inf:.2}{os.linesep}{os.linesep}"
-                f"2-norm={norm_2:.2}{os.linesep}{os.linesep}"
-                f"Cond={cond:.2e}{os.linesep}{os.linesep}"
-                f"Min={_min:.2e}{os.linesep}{os.linesep}"
-                f"Max={_max:.2e}{os.linesep}{os.linesep}"
+        text = (f"Function={info['function'].strip()}",
+                f"Arg     ={info['arg'].strip()}",
+                f"Shape   ={_row}x{_col}",
+                f"Fro norm={norm_fro:.2}",
+                f"Inf norm={norm_inf:.2}",
+                f"2-norm  ={norm_2:.2}",
+                f"Cond    ={cond:.2e}",
+                f"Min     ={_min:.2e}",
+                f"Max     ={_max:.2e}"
                 )
 
     elif ndim > 2:
         shape = "x".join(map(str, _ndarray.shape))
         norm_fro = np.linalg.norm(_ndarray)
-        text = (f"Function={info['function']}{os.linesep*2}"
-                f"Arg={info['arg']}{os.linesep*2}"
-                f"shape={shape}{os.linesep}{os.linesep}"
-                f"Frobenius norm={norm_fro:.2}{os.linesep}{os.linesep}"
-                f"Min={_min:.2e}{os.linesep}{os.linesep}"
-                f"Max={_max:.2e}{os.linesep}{os.linesep}"
+        text = (f"Function={info['function'].strip()}",
+                f"Arg     ={info['arg'].strip()}",
+                f"Shape   ={shape}",
+                f"Fro norm={norm_fro:.2}",
+                f"Min     ={_min:.2e}",
+                f"Max     ={_max:.2e}"
                 )
-
-    return text
+    return os.linesep.join(map(lambda x: f"- {x.replace(' ', ' &nbsp;')}", text))
 
 
 @ app.callback(
@@ -697,6 +783,7 @@ def update_timeline(selected_rows, data, mode, xscale, yscale,
     e = time.perf_counter()
     print("update_timeline", e-b)
     # print(fig.data)
+    print(fig)
     return fig
 
 
@@ -726,7 +813,12 @@ def update_histo(tabs, heatmap_real, heatmap_imag, nbins, normalization, mode):
 
     if heatmap == {} or heatmap is None:
         return {}
-    x = np.ravel(heatmap['data'][0]['z'])
+
+    if 'data' in heatmap and len(heatmap['data']) > 0 and 'z' in heatmap['data'][0]:
+        x = np.ravel(heatmap['data'][0]['z'])
+    else:
+        return go.Figure()
+
     fig = get_histo(x, nbins, normalization)
 
     mode_str = {"sig": "Significant digits",
