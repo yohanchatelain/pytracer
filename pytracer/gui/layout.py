@@ -1,5 +1,3 @@
-from dash_core_components.Input import Input
-from dash_html_components.Label import Label
 import dash_ace
 import dash_core_components as dcc
 import dash_html_components as html
@@ -31,13 +29,13 @@ info_table = html.Div(
             fixed_columns={"headers": True, "data": 0},
             style_table={
                 "overflowY": "auto"
-            }, css=[{"selector": ".row", "rule": "margin: 0", "rule": "width: auto", "rule": "max-width: 36vh"}]),
+            }, css=[{"selector": ".row", "rule": "margin: 0", "rule": "width: 100%"}]),
         html.Div(id="data-choosen", className="mini_container",
-                 style={'width': 'auto', 'max-width': '33vh'},
+                 style={'width': 'auto', 'max-width': '100%'},
                  children=dcc.Markdown(id="data-choosen-txt"))
     ],
     style={"display": "flex", "flex-direction": "column",
-           "justify-content": "start", "align-items": "flex-start", "width": '36vh'},
+           "justify-content": "start", "align-items": "flex-start"},
     className="pretty_container"
 )
 
@@ -133,6 +131,7 @@ timeline_hover_info = html.Div(
             )
         )
     ],
+    style={'max-width': '100%'},
     className="pretty_container"
 )
 
@@ -150,7 +149,9 @@ timeline_hover_heatmap = html.Div(
                       debounce=True, placeholder="Min scale"),
             dcc.Input(id="max-heatmap-input", type="number",
                       debounce=True, placeholder="Max scale"),
-            html.Button("Apply", id="minmax-heatmap-button", n_clicks=0)
+            html.Button("Apply", id="minmax-heatmap-button", n_clicks=0),
+            html.Button("Dump", id="dump-heatmap-button", n_clicks=0),
+            dcc.Download(id='download-heatmap')
         ], className="pretty_container"),
 
     ],
@@ -158,54 +159,63 @@ timeline_hover_heatmap = html.Div(
 )
 
 
-heatmap_colors_selector = html.Div([
-    html.Div([
-        html.Label(["Color map style",
-                    dcc.Dropdown(
-                        id='color-heatmap-style',
-                        options=[
-                            {"label": 'sequential', 'value': 'sequential'},
-                            {'label': 'diverging', 'value': 'diverging'}
-                        ]
-                    )], className='mini_container'),
-        html.Label(["Color map selection",
-                    dcc.Dropdown(
-                        id='color-heatmap',
-                        options=[]
-                    )], className='mini_container'),
-        html.Div([
-            html.P("Z-scale:",
-                   className="control_label"),
-            dcc.RadioItems(
-                id="z-scale",
-                options=[
-                    {"label": "linear", "value": "linear"},
-                    {"label": "log", "value": "log"},
-                ],
-                value="linear",
-                labelStyle={"display": "inline-block"},
-                className="dcc_control",
-            )], className="mini_container"),
-        html.Div([
-            html.P("Histogram normalization", className="control_label"),
-            dcc.RadioItems(id='histo_normalization',
-                           options=[
-                               {"label": "none", "value": ""},
-                               {"label": "density", "value": "density"},
-                               {"label": "percentage", "value": "percent"},
-                               {"label": "probability density",
-                                   "value": "probability density"},
-                           ],
-                           value="",
-                           labelStyle={"display": "column"},
-                           className='dcc-control')
-        ], className="mini_container"),
+color_map_style_selector = html.Div(
+    [
+        html.P("Color map style", className='control_label'),
+        dcc.Dropdown(id='color-heatmap-style', options=[
+            {"label": 'sequential', 'value': 'sequential'},
+            {'label': 'diverging', 'value': 'diverging'}
+        ])
+    ], className="mini_container")
+
+color_map_selection_selector = html.Div(
+    [
+        html.P("Color map selection", className='control_label'),
+        dcc.Dropdown(id='color-heatmap', options=[])
+    ], className="mini_container")
+
+zscale_selector = html.Div(
+    [
+        html.P("Z-scale:", className="control_label"),
+        dcc.RadioItems(
+            id="z-scale",
+            options=[
+                {"label": "linear", "value": "linear"},
+                {"label": "log", "value": "log"},
+            ],
+            value="linear",
+            labelStyle={"display": "column"},
+            className="dcc_control"
+        )
+    ], className="mini_container")
+
+histogram_normalization_selector = html.Div(
+    [
+        html.P("Histogram normalization", className="control_label"),
+        dcc.RadioItems(id='histo_normalization',
+                       options=[
+                           {"label": "none", "value": ""},
+                           {"label": "density", "value": "density"},
+                           {"label": "percentage", "value": "percent"},
+                           {"label": "probability density",
+                            "value": "probability density"},
+                       ],
+                       value="",
+                       labelStyle={"display": "column"},
+                       className='dcc-control')
+    ], className="mini_container")
+
+heatmap_colors_selector = html.Div(
+    [
+        color_map_style_selector,
+        color_map_selection_selector,
+        zscale_selector,
+        histogram_normalization_selector
         # html.Button('Animation', id='animate-heatmap', n_clicks=0)],
     ],
-        className="mini_container",
-        style={"display": "flex", "display-direction": "row", 'width': 'auto'})
-]
-)
+    className="mini_container",
+    style={"display": "flex", "display-direction": "row", 'width': 'auto'})
+
 
 histo_heatmap = html.Div(
     dcc.Graph(id="histo_heatmap"),
@@ -268,39 +278,49 @@ modal = html.Div(
     # className="pretty_container ten columns",
     style={"display": "flex", "height": 400})
 
-timeline_graph = html.Div([
-    html.Div([
+source_link = html.Div(
+    [
+        dcc.Link(id="source-link", href=""),
+        dcc.Markdown(id="source",
+                     style={"overflowY": "auto",
+                            "height": "200"}),
+    ], className="mini_container",
+    style={'width': "auto"}
+)
+
+dump_timeline = html.Div(
+    [
+        html.Button('Dump timeline', id='dump-timeline', n_clicks=0),
+        dcc.Download(id='download-timeline')
+    ], className='mini_container', style={'width': 'auto'})
+
+show_source = html.Div(
+    [
+        daq.BooleanSwitch(label="Show source",
+                          id="source-button", on=False)
+    ], className="mini_container",
+    style={'width': "auto"})
+
+timeline = html.Div(
+    [
         dcc.Graph(id="timeline",
                   config={'responsive': False,
                           'autosizable': True,
                           'showLink': True})
     ],
-        id="timeline_div",
-        className="pretty_container"),
+    id="timeline_div",  className="pretty_container")
+
+timeline_graph = html.Div([
+    timeline,
     html.Div(
         [
-            html.Div(
-                [
-                    dcc.Link(id="source-link", href=""),
-                    dcc.Markdown(id="source",
-                                 style={"overflowY": "auto",
-                                        "height": "200"}),
-                ], className="mini_container",
-                style={'width': "auto"}
-            ),
-            html.Div([
-                html.Button('Dump timeline', id='dump-timeline', n_clicks=0),
-                dcc.Download(id='download-timeline')
-            ], className='mini_container', style={'width': 'auto'}),
-            html.Div(
-                [
-                    daq.BooleanSwitch(label="Show source",
-                                      id="source-button", on=False)
-                ], className="mini_container",
-                style={'width': "auto"}),
+            source_link,
+            dump_timeline,
+            show_source
         ], className="mini_container",
         style={"display": "flex", "flex-direction": "row"},
     ),
+    modal,
     timeline_hover,
 ])
 
@@ -333,7 +353,7 @@ header_link = html.Div(
     [
         html.A(
             html.Button("Learn More", id="learn-more-button"),
-            href="https://github.com/yohanchatelain",
+            href="https://github.com/yohanchatelain/pytracer",
         )
     ],
     className="one-third column",
@@ -367,6 +387,8 @@ def get_gantt(callgraph):
     time = list(range(max_time+1))
     date = [*map(pcc.convert_time_to_date, time)]
     fig = px.timeline(gantt, y="Task", x_start='Start', x_end='Finish')
+    fig.update_layout(paper_bgcolor='hsla(0,0%,0%,0%)',
+                      plot_bgcolor='hsla(0,0%,0%,0%)')
     fig.update_xaxes(tickformat=f'%s', overwrite=True)
     fig.update_yaxes(tickwidth=1, ticklen=1)
     return dcc.Graph(id='gantt', figure=fig)

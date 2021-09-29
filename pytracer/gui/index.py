@@ -16,7 +16,6 @@ def init_layout(app, args):
     app.layout = html.Div([
         html.Div(id="output-clientsid"),
         header,
-        modal,
         html.Div(
             [
                 sidebar,

@@ -426,10 +426,12 @@ def print_modal_source(on, href, href_description):
     [dash.dependencies.Input("timeline", "hoverData"),
      dash.dependencies.Input("tabs-heatmap", 'value'),
      dash.dependencies.Input("info-data-timeline-heatmap-real-part", "figure"),
-     dash.dependencies.Input("info-data-timeline-heatmap-imag-part", "figure")],
+     dash.dependencies.Input("info-data-timeline-heatmap-imag-part", "figure"),
+     dash.dependencies.Input("heatmap-formats", "value")
+     ],
     dash.dependencies.State('timeline-mode', 'value'),
     prevent_initial_call=True)
-def print_datahover_summary(hover_data, tab, fig_real, fig_imag, mode):
+def print_datahover_summary(hover_data, tab, fig_real, fig_imag, heatmap_format, mode):
     text = ""
 
     if tab == 'tab-real-part':
@@ -442,19 +444,20 @@ def print_datahover_summary(hover_data, tab, fig_real, fig_imag, mode):
     # print(f'hover_data {hover_data}')
     # print(f'figure {fig}')
 
-    if not fig or not hover_data:
+    if not fig or not hover_data or fig['data'] == []:
         return text
 
     if hover_data:
-        x = hover_data['points'][0]['x']
         info = hover_data['points'][0]['customdata']
 
-    if 'data' in fig and len(fig['data']) > 0 and 'z' in fig['data'][0]:
-        _ndarray = np.array(fig['data'][0]['z'])
+        if heatmap_format == 'heatmap':
+            _ndarray = np.array(fig['data'][0]['z'])
+        elif heatmap_format == 'graph':
+            text = (f"Function={info['function'].strip()}",
+                    f"Arg     ={info['arg'].strip()}")
+            return os.linesep.join(map(lambda x: f"- {x.replace(' ', ' &nbsp;')}", text))
     else:
         return text
-
-    print('data', _ndarray)
 
     _min = np.min(_ndarray)
     _max = np.max(_ndarray)
@@ -562,6 +565,8 @@ def get_scatter_timeline(module, function, label, backtrace, arg, mode, marker_s
                            mode="markers",
                            marker_symbol=marker_symbol,
                            marker_color=marker_color,
+                           marker_size=10,
+                           marker_opacity=0.5,
                            meta={'module': module, 'function': function})
     return scatter
 
@@ -674,6 +679,27 @@ def dump_timeline(n_clicks, figure):
 
 
 @ app.callback(
+    dash.dependencies.Output("download-heatmap", "data"),
+    dash.dependencies.Input("dump-heatmap-button", "n_clicks"),
+    dash.dependencies.State('tabs-heatmap', 'value'),
+    dash.dependencies.State("info-data-timeline-heatmap-real-part", "figure"),
+    dash.dependencies.State("info-data-timeline-heatmap-real-part", "figure"),
+    prevent_initial_call=True
+)
+def dump_heatmap_real(n_clicks, tab, figure_real, figure_imag):
+    if tab == "tab-real-part":
+        data = json.dumps(figure_real, ensure_ascii=False, indent=2)
+        name = 'heatmap-real.json'
+    elif tab == 'tab-imag-part':
+        data = json.dumps(figure_imag, ensure_ascii=False, indent=2)
+        name = 'heatmap-imag.json'
+    else:
+        raise Exception(f'Unknown tab {tab}')
+
+    return dict(content=data, filename=name)
+
+
+@ app.callback(
     dash.dependencies.Output("current-selected-rows", "data"),
     dash.dependencies.Output("previous-selected-rows", "data"),
     dash.dependencies.Input("info-table", "selected_rows"),
@@ -715,7 +741,14 @@ def update_timeline(selected_rows, data, mode, xscale, yscale,
                 fig.update_yaxes(tickformat=value)
             return fig
 
-    new_fig = go.Figure(layout={'height': 800})
+    new_fig = go.Figure(
+        layout={'height': 800,
+                # 'paper_bgcolor': 'hsla(0,0%,0%,0%)',
+                # 'plot_bgcolor': 'hsla(0,0%,0%,0%)',
+                # 'xaxis': {'gridcolor': 'grey'},
+                # 'axis': {'gridcolor': 'grey'}
+                }
+    )
 
     if curr_fig is None:
         fig = new_fig
@@ -783,7 +816,6 @@ def update_timeline(selected_rows, data, mode, xscale, yscale,
     e = time.perf_counter()
     print("update_timeline", e-b)
     # print(fig.data)
-    print(fig)
     return fig
 
 
