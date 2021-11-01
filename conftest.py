@@ -4,7 +4,7 @@ import json
 import tempfile
 
 from pytracer.utils import getenv
-from pytracer.core.config import constant, PytracerConfigError
+from pytracer.core.config import constant
 
 
 def get_config():
@@ -56,7 +56,7 @@ def turn_numpy_ufunc_off():
 def cleandir(script_runner, tmp_path):
     os.chdir(tmp_path)
     yield
-    ret = script_runner.run("pytracer", "--clean")
+    ret = script_runner.run("pytracer", "clean")
     assert ret.success
     os.chdir("..")
 
@@ -64,7 +64,7 @@ def cleandir(script_runner, tmp_path):
 @pytest.fixture
 def parse(script_runner):
     yield
-    ret = script_runner.run("pytracer", "parse", "--online")
+    ret = script_runner.run("pytracer", "parse")
     assert ret.success
 
 
