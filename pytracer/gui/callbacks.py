@@ -114,6 +114,9 @@ def extra_value_to_heatmap(extra_value):
 def extra_value_to_graph(extra_value):
     with lock:
         _ndarray = extra_value.read()
+        if _ndarray.ndim == 2:
+            if _ndarray.shape[0] == 1 or _ndarray.shape[1] == 1:
+                return _ndarray.ravel()
     return _ndarray
 
 
@@ -158,13 +161,37 @@ def get_graph_complex(z):
         return go.Figure()
 
 
+def get_scatter_complex_1D(z):
+    z_real = go.Scatter(y=z.real, name=r'$ \Re $', mode='markers')
+    z_imag = go.Scatter(y=z.imag, name=r'$ \Im $', mode='markers')
+    return go.Figure(data=[z_real, z_imag])
+
+
+def get_scatter_complex(z):
+    if z.ndim == 1:
+        return get_scatter_complex_1D(z)
+    else:
+        return go.Figure()
+
+
 def get_graph_real_1D(z):
     return go.Figure(data=[go.Scatter(y=z)])
+
+
+def get_scatter_real_1D(z):
+    return go.Figure(data=[go.Scatter(y=z, mode='markers')])
 
 
 def get_graph_real(z):
     if z.ndim == 1:
         return get_graph_real_1D(z)
+    else:
+        return go.Figure()
+
+
+def get_scatter_real(z):
+    if z.ndim == 1:
+        return get_scatter_real_1D(z)
     else:
         return go.Figure()
 
@@ -178,6 +205,15 @@ def get_graph_figure(figure_real, extra_value):
         return get_graph_real(z)
 
 
+def get_scatter_figure(figure_real, extra_value):
+    z = extra_value_to_graph(extra_value)
+
+    if np.iscomplexobj(z):
+        return get_scatter_complex(z)
+    else:
+        return get_scatter_real(z)
+
+
 def get_heatmap_figure(figure_real, figure_imag, extra_value, zscale, mode, min_scale, max_scale, color):
     _x, _y, _z = extra_value_to_heatmap(extra_value)
 
@@ -188,10 +224,20 @@ def get_heatmap_figure(figure_real, figure_imag, extra_value, zscale, mode, min_
         _z_real = _z
         _z_imag = None
 
-    if zscale == 'log':
-        _z_real = np.log(np.abs(_z_real))
+    if zscale == 'log2':
+        _z_real = np.log2(np.abs(_z_real))
         if _z_imag is not None:
-            _z_imag = np.log(np.abs(_z_imag))
+            _z_imag = np.log2(np.abs(_z_imag))
+
+    if zscale == 'log10':
+        _z_real = np.log10(np.abs(_z_real))
+        if _z_imag is not None:
+            _z_imag = np.log10(np.abs(_z_imag))
+
+    # if zscale == 'log':
+    #     _z_real = np.log(np.abs(_z_real))
+    #     if _z_imag is not None:
+    #         _z_imag = np.log(np.abs(_z_imag))
 
     if mode == "sig":
         figure_real = get_heatmap(
@@ -263,16 +309,16 @@ def print_heatmap(hover_data, mode, color, zscale, heatmap_format, scale_button,
     figure_real = go.Figure()
     figure_imag = go.Figure()
 
-    print('print heatmap')
+    # print('print heatmap')
 
     display = {"display": "flex", "display-direction": "row"}
 
     ctx = dash.callback_context
 
     if ctx.triggered:
-        print(f'ctx triggered {ctx.triggered[0]["prop_id"]}')
+        # print(f'ctx triggered {ctx.triggered[0]["prop_id"]}')
 
-        figure = (figure_real, figure_imag)
+        figure = (fig_real, fig_imag)
         scale = (min_scale, max_scale)
 
         if ctx.triggered[0]['prop_id'] == 'color-heatmap.value':
@@ -299,10 +345,12 @@ def print_heatmap(hover_data, mode, color, zscale, heatmap_format, scale_button,
 
         elif heatmap_format == "graph":
             figure_real = get_graph_figure(figure_real, extra_value)
+        elif heatmap_format == "scatter":
+            figure_real = get_scatter_figure(figure_real, extra_value)
         else:
             raise ValueError(f'Unkwown format {heatmap_format}')
 
-    print(figure_real)
+    # print(figure_real)
     return (figure_real, figure_imag, display)
 
 
@@ -459,12 +507,36 @@ def print_datahover_summary(hover_data, tab, fig_real, fig_imag, heatmap_format,
     else:
         return text
 
-    _min = np.min(_ndarray)
-    _max = np.max(_ndarray)
+    try:
+        _min = np.min(_ndarray)
+        _max = np.max(_ndarray)
+        _is_nan = False
+    except Exception:
+        _is_nan = True
+        _min = np.nan
+        _max = np.nan
+        _size = _ndarray.shape
+        norm_fro = np.nan
+        norm_inf = np.nan
+        cond = np.nan
+        text = (f"Function={info['function'].strip()}",
+                f"Arg     ={info['arg'].strip()}",
+                f"Shape   ={_size}",
+                f"Fro norm={norm_fro:.2}",
+                f"Inf norm={norm_inf:.2}",
+                f"Cond    ={cond:.2e}",
+                f"Min     ={_min:.2e}",
+                f"Max     ={_max:.2e}"
+                )
+    # _min = np.min(_ndarray)
+    # _max = np.max(_ndarray)
 
     ndim = _ndarray.ndim
 
-    if ndim == 1:
+    if _is_nan:
+        pass
+    elif ndim == 1:
+        # if ndim == 1:
         (_size,) = _ndarray.shape
         norm_fro = np.linalg.norm(_ndarray)
         norm_inf = np.linalg.norm(_ndarray, ord=np.inf)
@@ -518,7 +590,25 @@ def open_modal_source(on):
     return style_on if on else style_off
 
 
+def is_object(y):
+    try:
+        if y == []:
+            return True
+        if not np.can_cast(y[0], np.number):
+            return True
+        if np.isnan(y[0]):
+            return True
+        if 'nan' in y or b'nan' in y:
+            return True
+        if 'None' in y or b'None' in y:
+            return True
+    except Exception as e:
+        return True
+    return False
+
 # @cache.memoize(timeout=TIMEOUT)
+
+
 def get_scatter_timeline(module, function, label, backtrace, arg, mode, marker_symbol,
                          marker_color, customdata=None):
 
@@ -534,32 +624,53 @@ def get_scatter_timeline(module, function, label, backtrace, arg, mode, marker_s
 
     x = pgc.data.filter(module, function, get_x, "time", arg, label)
     y = pgc.data.filter(module, function, get_x, mode, arg, label)
+    dtype = pgc.data.filter(module, function, get_x, 'dtype', arg, label)
+    dtype = dtype[0].decode('utf-8') if dtype != [] else ''
     (filename, line, lineno, name) = backtrace
+
+    decoded_arg = arg.decode('utf-8')
 
     info = {'module': module,
             'function': function,
             'label': label,
-            'arg': arg.decode('utf-8'),
+            'arg': decoded_arg,
             'filename': filename.decode('utf-8'),
             'lineno': lineno,
-            'name': name.decode('utf-8')}
+            'name': name.decode('utf-8'),
+            'dtype': dtype
+            }
 
-    customdata = []
-    hovertext = []
-    customdata_append = customdata.append
-    hovertext_append = hovertext.append
-    for i in x:
-        info['time'] = i
-        customdata_append(info)
-        hovertext_append(f"{function}{os.linesep}{arg.decode('utf-8')}")
+    _is_object = is_object(y)
+    y = [1] * len(y) if _is_object else y
+    _str = pgc.data.filter(module, function, get_x, 'info',
+                           arg, label) if _is_object else None
+    marker_symbol = 'star' if _is_object else marker_symbol
+    # y = [1] * len(y) if _is_object else None
 
-    scatter = go.Scattergl(name=f"{function} - {arg.decode('utf-8')} - {lineno}",
+    customdata = [{**info, 'time': i} for i in x]
+    _hovertext = '<br>'.join([function, decoded_arg, dtype]) + os.linesep
+    hovertext = [_hovertext] * len(x)
+
+    hovertemplate = ('<b>X</b>: %{x}',
+                     '<b>Y</b>: %{y:7e}',
+                     '<b>%{text}</b>')
+
+    if _is_object and _str != []:
+        description = f"<b>{_str[0].decode('utf-8')}</b>"
+        hovertemplate += (description,)
+
+    hovertemplate = '<br>'.join(hovertemplate)
+
+    name = f"{function} - {decoded_arg} - {lineno}"
+
+    scatter = go.Scattergl(name=name,
                            #    legendgroup=f"group{backtrace}",
                            x=x,
                            y=y,
-                           hovertemplate='<b>X</b>: %{x}' +
-                           '<br><b>Y</b>: %{y:.7e}<br>' +
-                           '<b>%{text}</b>',
+                           hovertemplate=hovertemplate,
+                           #    '<b>X</b>: %{x}' +
+                           #    '<br><b>Y</b>: %{y:.7e}<br>' +
+                           #    '<b>%{text}</b>',
                            text=hovertext,
                            customdata=customdata,
                            mode="markers",
@@ -743,6 +854,7 @@ def update_timeline(selected_rows, data, mode, xscale, yscale,
 
     new_fig = go.Figure(
         layout={'height': 800,
+                'modebar': {'orientation': 'v'}
                 # 'paper_bgcolor': 'hsla(0,0%,0%,0%)',
                 # 'plot_bgcolor': 'hsla(0,0%,0%,0%)',
                 # 'xaxis': {'gridcolor': 'grey'},

@@ -17,5 +17,7 @@ def init_module(subparser):
     parser_parser.add_argument("--batch-size", default=5, type=int,
                                help=(f"Number of elements to process per batch. "
                                      f"Increasing this number requires more memory RAM"))
+    parser_parser.add_argument('--method', default='cnh', choices=['cnh', 'general'],
+                               help='Method used to compute the significant digits: Centered Normal Hypothesis (CNH) or General (see significantdigits package)')
     parser_parser.add_argument(
         "--online", action="store_true", default=False, help="Do not bufferized parsing")

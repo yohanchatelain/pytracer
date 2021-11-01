@@ -8,6 +8,8 @@ import pytracer.utils as ptutils
 import tables
 from pytracer.core.config import constant
 from pytracer.utils.log import get_logger
+import scipy.sparse as spr
+from time import perf_counter
 
 from . import _exporter, _init
 
@@ -31,6 +33,8 @@ class ExportDescription(tables.IsDescription):
     mean = tables.Float64Col()
     std = tables.Float64Col()
     sig = tables.Float64Col()
+    info = tables.StringCol(256)
+    dtype = tables.StringCol(256)
 
     class BacktraceDescription(tables.IsDescription):
         filename = tables.StringCol(1024)
@@ -118,6 +122,60 @@ class ExporterHDF5(_exporter.Exporter):
             logger.error(
                 f"Cannot registered object {obj}", error=e, caller=self)
 
+    def _get_sparse_representation_shape(self, sparse_array):
+        csr = sparse_array.tocsr()
+        data_size = csr.data.size
+        indices_size = csr.indices.size
+        indptr_size = csr.indptr.size
+        _sizes = [1, data_size, 1, indices_size, 1, indptr_size]
+        return (sum(_sizes),)
+
+    def _get_sparse_representation(self, sparse_array):
+        csr = sparse_array.tocsr()
+        data_size = csr.data.size
+        indices_size = csr.indices.size
+        indptr_size = csr.indptr.size
+        _sizes = [1, data_size, 1, indices_size, 1, indptr_size]
+        _size = sum(_sizes)
+        _size_i = 0
+        _index_start = 0
+        _index_end = _sizes[_size_i]
+
+        pytracer_type = np.dtype([('Pytracer', csr.dtype)])
+        _sparse = np.empty(_size, pytracer_type)
+
+        _sparse[_index_start:_index_end] = data_size
+        _size_i += 1
+        _index_start_ = _index_start
+        _index_start = _index_end
+        _index_end += _sizes[_size_i] + _index_start_
+
+        _sparse[_index_start: _index_end] = csr.data
+        _size_i += 1
+        _index_start = _index_end
+        _index_end += _sizes[_size_i]
+
+        _sparse[_index_start: _index_end] = indices_size
+        _size_i += 1
+        _index_start = _index_end
+        _index_end += _sizes[_size_i]
+
+        _sparse[_index_start: _index_end] = csr.indices
+        _size_i += 1
+        _index_start = _index_end
+        _index_end += _sizes[_size_i]
+
+        _sparse[_index_start: _index_end] = indptr_size
+        _size_i += 1
+        _index_start = _index_end
+        _index_end += _sizes[_size_i]
+
+        _sparse[_index_start: _index_end] = csr.indptr
+
+        # _sparse[_index_start: _index_end] = 'Pytracer_sparse_representation'
+
+        return _sparse
+
     def export_arg(self, *args, **kwargs):
 
         row = kwargs["row"]
@@ -142,10 +200,12 @@ class ExporterHDF5(_exporter.Exporter):
             mean = raw_mean
             std = raw_std
             sig = raw_sig
+            info = str(stats.values()[0])
         else:
             mean = np.mean(raw_mean, dtype=np.float64)
             std = np.mean(raw_std, dtype=np.float64)
             sig = np.mean(raw_sig, dtype=np.float64)
+            info = None
 
         row["id"] = function_id
         row["label"] = label
@@ -158,6 +218,9 @@ class ExporterHDF5(_exporter.Exporter):
         row["BacktraceDescription/line"] = backtrace.line
         row["BacktraceDescription/lineno"] = backtrace.lineno
         row["BacktraceDescription/name"] = backtrace.name
+        row['dtype'] = stats.dtype()
+        if info:
+            row['info'] = info
         row.append()
 
         # We create array to keep the object
@@ -184,17 +247,35 @@ class ExporterHDF5(_exporter.Exporter):
             mean_array = self.h5file.create_carray(
                 group, "mean",
                 atom=atom_type, shape=shape, filters=filters)
-            mean_array[:] = raw_mean
+            if spr.issparse(raw_mean):
+                start = perf_counter()
+                mean_array[:] = self._get_sparse_representation(raw_mean)
+                end = perf_counter()
+                print(f'mean {end-start}')
+            else:
+                mean_array[:] = raw_mean
 
             std_array = self.h5file.create_carray(
                 group, "std",
                 atom=atom_type, shape=shape, filters=filters)
-            std_array[:] = raw_std
+            if spr.issparse(raw_std):
+                start = perf_counter()
+                std_array[:] = self._get_sparse_representation(raw_std)
+                end = perf_counter()
+                print(f'std {end-start}')
+            else:
+                std_array[:] = raw_std
 
             sig_array = self.h5file.create_carray(
                 group, "sig",
                 atom=atom_type, shape=shape, filters=filters)
-            sig_array[:] = raw_sig
+            if spr.issparse(raw_sig):
+                start = perf_counter()
+                sig_array[:] = self._get_sparse_representation(raw_sig)
+                end = perf_counter()
+                print(f'sig {end-start}')
+            else:
+                sig_array[:] = raw_sig
 
     def export(self, obj, expectedrows):
         module = obj["module"]  # .replace(".", "$")
@@ -208,6 +289,11 @@ class ExporterHDF5(_exporter.Exporter):
 
         assert(module)
         assert(function)
+
+        try:
+            tables.path.check_attribute_name(function)
+        except ValueError:
+            function = 'safename_{function}'
 
         if module_grp_name in self.h5file:
             module_grp = self.h5file.get_node(module_grp_name)

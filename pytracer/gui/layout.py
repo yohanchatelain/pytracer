@@ -22,7 +22,7 @@ info_table = html.Div(
             columns=[{"id": "module", "name": "module"},
                      {"id": "function", "name": "function"}],
             data=None,
-            selected_rows=[0],
+            selected_rows=[],
             sort_action="native",
             cell_selectable=False,
             row_selectable="multi",
@@ -123,7 +123,8 @@ timeline_hover_info = html.Div(
                 id='heatmap-formats',
                 options=[
                     {'label': 'Heatmap', "value": "heatmap"},
-                    {'label': 'Graph', "value": "graph"}
+                    {'label': 'Graph', "value": "graph"},
+                    {'label': 'Scatter', "value": "scatter"}
                 ],
                 value='heatmap',
                 labelStyle={"display": 'column'},
@@ -181,7 +182,8 @@ zscale_selector = html.Div(
             id="z-scale",
             options=[
                 {"label": "linear", "value": "linear"},
-                {"label": "log", "value": "log"},
+                {"label": "log2", "value": "log2"},
+                {"label": "log10", "value": "log10"}
             ],
             value="linear",
             labelStyle={"display": "column"},

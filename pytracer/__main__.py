@@ -10,6 +10,8 @@ import pytracer.module.clean_init as clean_init
 from pytracer.core.config import config as cfg
 from pytracer.core.config import constant
 import pytracer.module.info as pytracer_info
+import pytracer.builtins
+import pytracer.cache
 
 
 def clean():
@@ -27,18 +29,22 @@ def clean():
 def pytracer_module_main(args):
     if args.pytracer_module == "trace":
         from pytracer.module.tracer import TracerRun
+        pytracer.builtins.overload_builtins()
         pytracer_info.register.set_args(args)
+        pytracer.cache.set_module_args(args)
         TracerRun(args).main()
         pytracer_info.register.set_trace_size()
         pytracer_info.register.register_trace()
     elif args.pytracer_module == "parse":
         from pytracer.module.parser import main
         pytracer_info.register.set_args(args)
+        pytracer.cache.set_module_args(args)
         main(args)
         pytracer_info.register.set_aggregation_size()
         pytracer_info.register.register_aggregation()
     elif args.pytracer_module == "visualize":
         from pytracer.gui.index import main
+        pytracer.cache.set_module_args(args)
         main(args)
     elif args.pytracer_module == "info":
         pytracer_info.PytracerInfoPrinter(args).print()

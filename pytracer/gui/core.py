@@ -52,7 +52,7 @@ class Data:
 
     __cache = {}
     __labels = {"inputs", "outputs"}
-    __modes = ("mean", "std", "sig")
+    __modes = ("mean", "std", "sig", 'info')
 
     def __init__(self, filename, directory):
         if os.path.isfile(filename):
@@ -154,7 +154,11 @@ class Data:
                     break
 
         key = (module, function, searchnodename)
-        Data.__cache[key] = extra_value
+        try:
+            Data.__cache[key] = extra_value
+        except UnboundLocalError:
+            print(f'Inexisting {key}')
+            return
 
         return extra_value
 

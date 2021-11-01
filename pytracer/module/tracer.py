@@ -11,13 +11,15 @@ import sys
 from importlib import invalidate_caches
 from importlib.abc import Loader, MetaPathFinder
 from importlib.machinery import ModuleSpec
-
-import pytracer.core.wrapper.cache as cache
+import pytracer.cache as cache
+# import pytracer.core.wrapper.cache as cache
 import pytracer.module.tracer_init as tracer_init
 import pytracer.utils.report as report
 from pytracer.core.config import config as cfg
-from pytracer.core.wrapper.cache import (add_global_mapping,
-                                         get_global_mapping, visited_files)
+from pytracer.cache import (add_global_mapping,
+                            get_global_mapping, visited_files)
+# from pytracer.core.wrapper.cache import (add_global_mapping,
+#                                          get_global_mapping, visited_files)
 from pytracer.core.wrapper.wrapper import (Wrapper, WrapperClass,
                                            WrapperModule, visited_attr)
 from pytracer.module.info import register
@@ -111,7 +113,7 @@ class Myloader(Loader):
             # cache.visited_spec[spec.name] = True
             real_module = importlib.import_module(spec.name)
             self.get_globals(spec, real_module)
-            Wrapper.m2wm[real_module] = None
+            # Wrapper.m2wm[real_module] = None
 
             if cache.has_global_mapping(real_module):
                 logger.error(
@@ -129,9 +131,9 @@ class Myloader(Loader):
 
             cache.orispec_to_wrappedmodule[cache.hash_spec(
                 spec)] = wrapped_module
-            wrp.assert_lazy_modules_loaded()
-            wrp.assert_lazy_attributes_are_initialized()
-            Wrapper.m2wm[real_module] = wrapped_module
+            # wrp.assert_lazy_modules_loaded()
+            # wrp.assert_lazy_attributes_are_initialized()
+            # Wrapper.m2wm[real_module] = wrapped_module
             add_global_mapping(real_module, wrapped_module)
             logger.debug(f"create Wrapped module {wrapped_module.__spec__}")
             logger.debug(f"Wrapped module {hex(id(wrapped_module))}")
@@ -333,12 +335,22 @@ class TracerRun:
             if not self.args.dry_run:
                 self.run()
             self.initialize_lazy_modules()
-            self.exec_module()
+            try:
+                self.exec_module()
+            except Exception as e:
+                if (error := cache.cached_error) is not None:
+                    msg, err = error
+                    logger.error(f"{msg}Unexpected error while writing",
+                                 error=err, caller=self, raise_error=True)
+                else:
+                    logger.error(
+                        f"Unexpected error {e}", error=e, caller=self,
+                        raise_error=True)
             if report.report.report_enable():
                 report.report.dump_report()
             self.dump_visited()
         else:
-            logger.error(f"File {self.args.module} not found", caller=self)
+            logger.error(f"File {self.args.command} not found", caller=self)
 
 
 if __name__ == "__main__":

@@ -74,11 +74,18 @@ class Parser:
             return ptinout.IOType.PICKLE
         return None
 
-    def merge_dict(self, args):
+    # def merge_dict(self, args):
+    #     from pytracer.core.stats.stats import get_stats
+    #     args_name = [arg.keys() for arg in args]
+    #     for arg_name in args_name:
+    #         assert (all([d == arg_name for d in args_name]))
+    def merge_dict(self, args, info):
         from pytracer.core.stats.stats import get_stats
         args_name = [arg.keys() for arg in args]
         for arg_name in args_name:
-            assert (all([d == arg_name for d in args_name]))
+            if not (all([d == arg_name for d in args_name])):
+                logger.error(
+                    f'Divergence found {args_name} in {info}', caller=self)
 
         stats_dict = {}
         for arg_name in args_name[0]:
@@ -126,7 +133,9 @@ class Parser:
         # Args may be different
         args = self._merge(values, "args", do_not_check=True)
 
-        stats_args = self.merge_dict(args)
+        info = (function_id, times, modules, functions, labels, backtraces)
+        stats_args = self.merge_dict(args, info)
+        # stats_args = self.merge_dict(args)
 
         # We can pick any of the list since
         # we ensure that they are equal
@@ -152,6 +161,8 @@ class Parser:
         def abspath(file):
             return f"{self.directory}{os.sep}{file}"
 
+        ls = os.listdir(os.path.abspath(self.directory))
+        filenames = []
         filenames = [os.path.abspath(abspath(file))
                      for file in os.listdir(self.directory) if os.path.isfile(abspath(file))]
         sizes = set([os.stat(file).st_size for file in filenames])
@@ -213,8 +224,8 @@ def parse_stat_value(stats_value, info_dict, counter):
                   f"function: {function},"
                   f"{label}"))
     # if isinstance(args, dict):
-    for arg, stat in args.items():
-        print_stats(arg, stat)
+    # for arg, stat in args.items():
+    #     print_stats(arg, stat)
 
 
 class EdgeType(Enum):

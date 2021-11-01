@@ -1,4 +1,5 @@
 from enum import IntEnum, auto
+from inspect import _empty
 from types import FunctionType
 
 from pytracer.utils.log import get_logger
@@ -15,6 +16,7 @@ class TypeValue(IntEnum):
     TUPLE = auto()
     FUNCTION = auto()
     SKLEARN = auto()
+    STRING = auto()
     OTHER = auto()
 
     def is_scalar(self):
@@ -62,16 +64,16 @@ def get_type(value):
         _type = TypeValue.INT
     elif isinstance(value, float):
         _type = TypeValue.FLOAT
-    elif StatisticNumpy.hasinstance(value):
+    elif StatisticNumpy.hasinstance(value) or isinstance(value, np.ndarray):
         _type = TypeValue.NUMPY
     elif isinstance(value, list):
         try:
-            array = np.array(value, dtype=np.object)
+            array = np.array(value, dtype=np.float64)
             if StatisticNumpy.hasinstance(array):
                 _type = TypeValue.LIST
             else:
                 _type = TypeValue.OTHER
-        except ValueError:
+        except (ValueError, TypeError) as e:
             array = tuple(value)
             _type = TypeValue.TUPLE
     elif isinstance(value, tuple):
@@ -110,13 +112,17 @@ def get_stats(values):
         array = np.array(values, dtype=np.float64)
         _stats = StatisticNumpy(array)
     elif _type == TypeValue.LIST:
-        array = np.array(values)
+        try:
+            array = np.concatenate(values)
+        except ValueError as e:
+            logger.error(
+                f'Array length mismatch between samples {values}', error=e)
         _stats = StatisticNumpy(array)
     elif _type == TypeValue.TUPLE:
         types = [*map(get_type, values[0])]
         _stats = []
         zipv = zip(*values)
-        # [(t, v) for t, v in zip(types, zipv)]
+        [(t, v) for t, v in zip(types, zipv)]
         append = _stats.append
         for ty, v in zip(types, zipv):
             if ty == TypeValue.OTHER:
@@ -130,8 +136,10 @@ def get_stats(values):
         except Exception:
             logger.debug(f"Cannot parse {values}")
             _stats = StatisticNumpy(values, empty=True)
-    elif _type == TypeValue.SKLEARN:
-        _stats = get_sklearn_stat(values, type(values[0]))
+    elif _type == TypeValue.STRING:
+        _stats = StatisticNumpy(values, empty=True, dtype=type(values[0]))
+    # elif _type == TypeValue.SKLEARN:
+    #     _stats = get_sklearn_stat(values, type(values[0]))
     else:
         _stats = get_stat(np.array(values, dtype=np.object))
 

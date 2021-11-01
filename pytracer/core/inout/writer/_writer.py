@@ -36,7 +36,7 @@ class Writer(metaclass=Singleton):
         pass
 
 
-Writer.wrapper_function = _wrapper.wrapper_function
-Writer.wrapper_class = _wrapper.wrapper_class
-Writer.wrapper_instance = _wrapper.wrapper_instance
-Writer.wrapper_ufunc = _wrapper.wrapper_ufunc
+# Writer.wrapper_function = _wrapper.wrapper_function
+# Writer.wrapper_class = _wrapper.wrapper_class
+# Writer.wrapper_instance = _wrapper.wrapper_instance
+# Writer.wrapper_ufunc = _wrapper.wrapper_ufunc
