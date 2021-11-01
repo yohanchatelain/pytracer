@@ -375,7 +375,7 @@ def get_function_wrapper(name, module, function):
     #         f"Instance {name} of {repr(instance)} cannot be wrapped", error=e)
     #     x = None
 
-    return x
+    # return x
 
 
 class Wrapper(metaclass=ABCMeta):
