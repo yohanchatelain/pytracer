@@ -1,7 +1,9 @@
 from scipy.optimize import root
 from scipy.sparse import spdiags, kron
 from scipy.sparse.linalg import spilu, LinearOperator
-from numpy import cosh, zeros_like, mgrid, zeros, eye
+from numpy import cosh, zeros_like, mgrid, zeros, eye, set_printoptions
+
+set_printoptions(precision=17)
 
 # parameters
 nx, ny = 75, 75

@@ -108,7 +108,6 @@ def get_functions_from_traceback():
             return True
 
     def to_return(stack):
-        print(stack.function)
         if stack.function not in stack.frame.f_globals:
             return False
         function = stack.frame.f_globals[stack.function]

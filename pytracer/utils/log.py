@@ -1,5 +1,6 @@
 import atexit
 import datetime
+import inspect
 import logging
 import os
 import sys
@@ -155,14 +156,22 @@ class LogPrint(Log):
     def flush(self):
         self.parameters.ostream.flush()
 
-    def _print(self, level, caller, msg, ostream=None):
+    def _get_caller(self):
+        return inspect.currentframe().f_back.f_back.f_back.f_code.co_name
+
+    def _print(self, level, caller=None, msg='', ostream=None, show_caller=None):
         if self.parameters.level > level:
             return
 
-        if caller:
+        if show_caller:
+            function_caller = '.' + self._get_caller()
+        else:
+            function_caller = ''
+
+        if caller is not None:
             scaller = getattr(caller, "__class__", "")
             scaller = getattr(scaller, "__name__", "")
-            scaller = f"[{scaller}]" if scaller else scaller
+            scaller = f"[{scaller}{function_caller}]" if scaller else scaller
         else:
             scaller = ""
 
@@ -184,8 +193,9 @@ class LogPrint(Log):
             ostream.write(to_print)
         self.parameters.ostream.write(to_print)
 
-    def debug(self, msg, caller=None):
-        self._print(Level.DEBUG, caller, msg)
+    def debug(self, msg, caller=None, ostream=sys.stderr, show_caller=True):
+        self._print(Level.DEBUG, caller, msg,
+                    ostream=sys.stderr, show_caller=show_caller)
 
     def info(self, msg, caller=None):
         self._print(Level.INFO, caller, msg)

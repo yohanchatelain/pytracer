@@ -130,16 +130,15 @@ def get_heatmap(x, y, z, zmin=None, zmax=None):
     return heatmap
 
 
-def read_extra_value(x, info, mode):
+def read_extra_value(time, info, mode):
     try:
         with lock:
             extra_value = pgc.data.get_extra_value(info['module'],
                                                    info['function'],
                                                    info['label'],
                                                    info['arg'],
-                                                   x,
+                                                   time,
                                                    mode)
-
     except KeyError:
         extra_value = None
     return extra_value
@@ -270,9 +269,8 @@ def print_heatmap(hover_data, mode, color, zscale, heatmap_format, scale_button,
     ctx = dash.callback_context
 
     if ctx.triggered:
-        print(f'ctx triggered {ctx.triggered[0]["prop_id"]}')
 
-        figure = (figure_real, figure_imag)
+        figure = (fig_real, fig_imag)
         scale = (min_scale, max_scale)
 
         if ctx.triggered[0]['prop_id'] == 'color-heatmap.value':
@@ -303,6 +301,7 @@ def print_heatmap(hover_data, mode, color, zscale, heatmap_format, scale_button,
             raise ValueError(f'Unkwown format {heatmap_format}')
 
     print(figure_real)
+    figure_real.update_layout(modebar={'orientation': 'v'})
     return (figure_real, figure_imag, display)
 
 
@@ -535,6 +534,9 @@ def get_scatter_timeline(module, function, label, backtrace, arg, mode, marker_s
     x = pgc.data.filter(module, function, get_x, "time", arg, label)
     y = pgc.data.filter(module, function, get_x, mode, arg, label)
     (filename, line, lineno, name) = backtrace
+
+    if (np.all(np.isnan(y))):
+
 
     info = {'module': module,
             'function': function,

@@ -5,6 +5,7 @@
         "sklearn"
     ],
     "modules_to_exclude": [
+        "dict",
         "numpy.compat",
         "numpy.compat._inspect",
         "numpy.core._dtype",
@@ -60,7 +61,13 @@
         "numpy.core.shape_base",
         "numpy.lib._datasource",
         "numpy.lib._iotools",
-        "joblib"
+        "joblib",
+        "numpy.random.bit_generator",
+        "numpy.core._exceptions",
+        "numpy.random",
+        "scipy._lib._uarray",
+        "sklearn.utils._pprint",
+        "sklearn.model_selection._validation"
     ],
     "include_file": "",
     "exclude_file": [

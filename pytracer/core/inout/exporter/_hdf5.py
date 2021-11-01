@@ -209,6 +209,11 @@ class ExporterHDF5(_exporter.Exporter):
         assert(module)
         assert(function)
 
+        try:
+            tables.path.check_attribute_name(function)
+        except ValueError:
+            function = f'TSF_{function}'
+
         if module_grp_name in self.h5file:
             module_grp = self.h5file.get_node(module_grp_name)
         else:

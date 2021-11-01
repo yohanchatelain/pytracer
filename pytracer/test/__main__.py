@@ -1,9 +1,7 @@
 import argparse
-import importlib
 import os
-import sys
 import subprocess
-from sys import prefix
+import sys
 
 from pytracer.core.config import constant
 from pytracer.utils import color, get_human_size
@@ -120,7 +118,7 @@ def run_file(args, file):
         stdout = open(f"{file}.stdout", "w")
         stderr = open(f"{file}.stderr", "w")
         try:
-            subprocess.run(["python3", "-m", "pytracer", "--clean"])
+            subprocess.run(["python3", "-m", "pytracer", "clean"])
             ret = subprocess.run(["python3", generic_test, file],
                                  check=True,
                                  stdout=stdout,

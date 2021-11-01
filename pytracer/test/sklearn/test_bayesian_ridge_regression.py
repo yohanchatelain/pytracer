@@ -30,9 +30,11 @@ def bayesian_ridge_regression():
     # Fit the Bayesian Ridge Regression and an OLS for comparison
     clf = BayesianRidge(compute_score=True)
     clf.fit(X, y)
+    print(clf.coef_)
 
     ols = LinearRegression()
     ols.fit(X, y)
+    print(ols.coef_)
 
     # #############################################################################
     # Plot true weights, estimated weights, histogram of the weights, and

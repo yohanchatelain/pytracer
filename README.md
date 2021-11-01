@@ -108,7 +108,7 @@ You must open the address in a browser to see the trace.
 ## Complete example
 
 ```bash
-  pytracer --clean # if run before
+  pytracer --clean # if executed before
   pytracer trace --module ./pytracer/test/sklearn/test_basic_tests
   pytracer parse
   pytracer visualize --filename test.h5 --callgraph callgraph.pkl

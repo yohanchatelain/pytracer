@@ -1,3 +1,5 @@
+# https://scikit-learn.org/stable/auto_examples/covariance/plot_mahalanobis_distances.html#sphx-glr-auto-examples-covariance-plot-mahalanobis-distances-py
+
 import pytest
 from sklearn import covariance
 from sklearn.covariance import EmpiricalCovariance, MinCovDet

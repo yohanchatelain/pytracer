@@ -2,7 +2,6 @@
 
 from pytracer.core.inout import _init
 import argparse
-import ast
 import importlib.util
 import inspect
 import json
@@ -12,22 +11,21 @@ from importlib import invalidate_caches
 from importlib.abc import Loader, MetaPathFinder
 from importlib.machinery import ModuleSpec
 
-import pytracer.core.wrapper.cache as cache
+import pytracer.cache as cache
 import pytracer.module.tracer_init as tracer_init
 import pytracer.utils.report as report
 from pytracer.core.config import config as cfg
-from pytracer.core.wrapper.cache import (add_global_mapping,
-                                         get_global_mapping, visited_files)
-from pytracer.core.wrapper.wrapper import (Wrapper, WrapperClass,
+from pytracer.cache import (add_global_mapping,
+                            get_global_mapping, visited_files)
+from pytracer.core.wrapper.wrapper import (Wrapper,
                                            WrapperModule, visited_attr)
 from pytracer.module.info import register
-from pytracer.utils import ishashable
 from pytracer.utils.log import get_logger
 
 logger = get_logger()
 
 
-class Myloader(Loader):
+class PytracerLoader(Loader):
 
     def __init__(self, fullname, path=None):
         self.to_initialize = list()
@@ -99,6 +97,7 @@ class Myloader(Loader):
             if inspect.ismodule(sym_obj_wrp):
                 self.sanitize_check(sym_obj_rl, sym_obj_wrp, indent+" ")
 
+    # TODO: Check aliases empty
     def get_globals(self, spec, module):
         for alias, value in globals().items():
             if value == module:
@@ -113,7 +112,7 @@ class Myloader(Loader):
             self.get_globals(spec, real_module)
             Wrapper.m2wm[real_module] = None
 
-            if cache.has_global_mapping(real_module):
+            if cache.get_global_mapping(real_module):
                 logger.error(
                     f"Module {real_module} has been created already", caller=self)
             else:
@@ -129,8 +128,6 @@ class Myloader(Loader):
 
             cache.orispec_to_wrappedmodule[cache.hash_spec(
                 spec)] = wrapped_module
-            wrp.assert_lazy_modules_loaded()
-            wrp.assert_lazy_attributes_are_initialized()
             Wrapper.m2wm[real_module] = wrapped_module
             add_global_mapping(real_module, wrapped_module)
             logger.debug(f"create Wrapped module {wrapped_module.__spec__}")
@@ -162,7 +159,7 @@ class Myloader(Loader):
             globals()[alias] = module
 
 
-class MyImporter(MetaPathFinder):
+class PytracerImporter(MetaPathFinder):
 
     modules_to_load = []
 
@@ -181,28 +178,6 @@ class MyImporter(MetaPathFinder):
                 except KeyError:
                     pass
                 self.modules_to_load.append(module_name)
-
-    def is_internal_import(self, stack):
-        if stack.code_context is None:
-            return False
-        try:
-            m = ast.parse(inspect.cleandoc(stack.code_context[0]))
-        except SyntaxError:
-            # We don't have an import stmt so we can discard it
-            return False
-        return isinstance(m.body[0], (ast.Import, ast.ImportFrom))
-
-    def need_real_module(self):
-        for stack in inspect.stack():
-            # if self.is_internal_import(stack):
-            #     return False
-            if "/pytracer/core" in stack.filename:
-                if stack.filename.endswith(__file__):
-                    if stack.function == "create_module":
-                        return True
-                if stack.filename.endswith("_wrapper.py"):
-                    return True
-        return False
 
     def return_original_spec(self, fullname):
         logger.debug(f"Need the original module {fullname}", caller=self)
@@ -236,7 +211,8 @@ class MyImporter(MetaPathFinder):
                 f"{fullname} is not in to_include modules", caller=self)
             return self.return_original_spec(fullname)
 
-        spec = ModuleSpec(fullname, Myloader(fullname), origin="Pytracer")
+        spec = ModuleSpec(fullname, PytracerLoader(
+            fullname), origin="Pytracer")
 
         logger.debug(f"{fullname} spec found", caller=self)
         return spec
@@ -287,7 +263,7 @@ class TracerRun:
 
         self.fill_required_function(list(sys.modules.keys()),
                                     list(globals().keys()))
-        finder = MyImporter()
+        finder = PytracerImporter()
         self.install(finder)
         for module in finder.modules_to_load:
             if module in sys.modules:
@@ -338,7 +314,7 @@ class TracerRun:
                 report.report.dump_report()
             self.dump_visited()
         else:
-            logger.error(f"File {self.args.module} not found", caller=self)
+            logger.error(f"File {self.args.command} not found", caller=self)
 
 
 if __name__ == "__main__":

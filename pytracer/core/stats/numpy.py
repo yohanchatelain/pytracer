@@ -46,6 +46,7 @@ class StatisticNumpy:
             self._size = 1
             self._ndim = 0
             self._shape = ()
+            self._type = np.object_
         else:
             if isinstance(values, list):
                 raise Exception
@@ -55,6 +56,11 @@ class StatisticNumpy:
             self._ndim = self._data.ndim - 1
             self._shape = self._data.shape[1:]
             self._type = self._data.dtype
+
+        if not (np.issubdtype(self._type, np.number) or np.issubdtype(self._type, np.bool_)):
+            self.cached_mean = np.nan
+            self.cached_std = np.nan
+            self.cached_sig = np.nan
 
     def _preprocess_values(self, values):
         x0 = values[0]

@@ -1,4 +1,6 @@
 
+import types
+from contextlib import contextmanager
 import atexit
 import datetime
 import inspect
@@ -9,20 +11,24 @@ import shutil
 import threading
 import traceback
 
+import pytracer
 import pytracer.core.inout._init as _init
+import pytracer.core.inout.binding as binding
 import pytracer.utils as ptutils
+from pytracer.cache import dumped_functions, visited_files
 from pytracer.core.config import config as cfg
 from pytracer.core.config import constant
-from pytracer.module.info import register
-from pytracer.core.wrapper.cache import dumped_functions, visited_files
 from pytracer.utils import get_functions_from_traceback, report
 from pytracer.utils.log import get_logger
+from pytracer.utils.singleton import Counter
 
 from . import _writer
 
 logger = get_logger()
 
 lock = threading.Lock()
+
+elements = Counter()
 
 
 def increment_visit(module, function):
@@ -32,12 +38,51 @@ def increment_visit(module, function):
         dumped_functions[key] = 1
 
 
+class PytracerPickler(pickle.Pickler):
+
+    def reducer_override(self, obj):
+        if hasattr(obj, 'generic_wrapper'):
+            d = (types.FunctionType, obj.__name__, {
+                 k: v for k, v in obj.__dict__.items() if k != 'generic_wrapper'})
+            return d
+        else:
+            return NotImplemented
+
+    def dumps(self, obj):
+        return pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+class PytracerPickleTrace(dict):
+
+    def __str__(self):
+        d = {k: self[k] for k in self if k != 'args'}
+        return str(d)
+
+    def __repr__(self):
+        d = {k: self[k] for k in self if k != 'args'}
+        return repr(d)
+
+
+@contextmanager
+def safe_dump(self, pickler):
+    if self.is_dumping:
+        return
+    self.is_dumping = True
+    try:
+        yield pickler
+    except Exception as e:
+        logger.warning(f'Pickle object cannot be saved', caller=self, error=e)
+    finally:
+        self.is_dumping = False
+
+
 class WriterPickle(_writer.Writer):
 
     elements = 0
     count_ofile = 0
 
     def __init__(self):
+        self.is_dumping = False
         self.parameters = _init.IOInitializer()
         self.datefmt = "%y%m%d%H%M%S"
         self._init_ostream()
@@ -104,22 +149,12 @@ class WriterPickle(_writer.Writer):
         return sum(map(aux, inspect.stack())) >= 2
 
     def is_writable(self, obj):
-        if self.is_looping():
-            return False
-        try:
-            pickle.dump(obj, io.BytesIO())
-            return True
-        except Exception as e:
-            try:
-                obj["args"] = {}
-            except (AttributeError, KeyError, TypeError):
-                pass
-            logger.warning(
-                f"Object is not writable: {obj}", caller=self, error=e)
-            return False
+        with safe_dump(self, pickle.dumps) as dump:
+            return dump(obj)
 
     def _write(self, to_write):
-        self.pickler.dump(to_write)
+        with safe_dump(self, self.pickler.dump) as dump:
+            dump(to_write)
 
     def critical_writing_error(self, e):
         possible_functions = get_functions_from_traceback()
@@ -127,7 +162,7 @@ class WriterPickle(_writer.Writer):
         msg += "\n".join([f"\t{f}" for f in possible_functions])
         msg += "\nTry again, excluding them\n"
         logger.critical(f"{msg}Unexpected error while writing",
-                        error=e, caller=self)
+                        error=e, caller=self, raise_error=True)
 
     def clean_args(self, args):
 
@@ -139,7 +174,7 @@ class WriterPickle(_writer.Writer):
 
         return args
 
-    def write(self, **kwargs):
+    def dump(self, **kwargs):
         function = kwargs["function"]
         time = kwargs["time"]
         module_name = kwargs["module_name"]
@@ -153,13 +188,13 @@ class WriterPickle(_writer.Writer):
         args = self.clean_args(args)
 
         function_id = id(function)
-        to_write = {"id": function_id,
-                    "time": time,
-                    "module": module_name,
-                    "function": function_name,
-                    "label": label,
-                    "args": args,
-                    "backtrace": backtrace}
+        to_write = PytracerPickleTrace(id=function_id,
+                                       time=time,
+                                       module=module_name,
+                                       function=function_name,
+                                       label=label,
+                                       args=args,
+                                       backtrace=backtrace)
 
         logger.debug((f"id: {function_id}\n"
                       f"time: {time}\n"
@@ -168,9 +203,9 @@ class WriterPickle(_writer.Writer):
                       f"label: {label}\n"
                       f"backtrace: {backtrace}\n"), caller=self)
 
-        if lock.locked():
-            return
-        lock.acquire()
+        # if lock.locked():
+        #     return
+        # lock.acquire()
         try:
             if not self.is_writable(to_write):
                 to_write['args'] = {}
@@ -184,26 +219,25 @@ class WriterPickle(_writer.Writer):
                 self._write(to_write)
 
         except pickle.PicklingError as e:
-            logger.error(
+            logger.warning(
                 f"while writing in Pickle file: {self.filename_path}",
                 error=e, caller=self)
-        except (AttributeError, TypeError) as e:
+        except Exception as e:
             logger.warning(
-                f"Unable to pickle object: {args} {function_name}", caller=self, error=e)
-            if report.report_enable():
+                f"Unable to pickle object for {function_name}", caller=self, error=e)
+            if report.report.report_enable():
                 key = (module_name, function_name)
                 value = to_write
-                report.report(key, value)
-            if not report.report_only():
+                report.report.report(key, value)
+            if not report.report.report_only():
                 to_write['args'] = {}
                 self._write(to_write)
-        except Exception as e:
-            logger.debug(f"Writing pickle object: {to_write}", caller=self)
-            self.critical_writing_error(e)
-        lock.release()
+
+            # self.critical_writing_error(e)
+        # lock.release()
 
     def inputs(self, **kwargs):
-        self.write(**kwargs, label="inputs")
+        self.dump(**kwargs, label="inputs")
 
     def module_name(self, obj):
         module = getattr(obj, "__module__", "")
@@ -215,28 +249,138 @@ class WriterPickle(_writer.Writer):
         function = kwargs.pop("instance")
         function_name = getattr(function, "__name__", "")
         module_name = self.module_name(function)
-        self.write(**kwargs,
-                   function=function,
-                   function_name=function_name,
-                   module_name=module_name,
-                   label="inputs")
+        self.dump(**kwargs,
+                  function=function,
+                  function_name=function_name,
+                  module_name=module_name,
+                  label="inputs")
 
     def outputs(self, **kwargs):
-        self.write(**kwargs, label="outputs")
+        self.dump(**kwargs, label="outputs")
 
     def outputs_instance(self, **kwargs):
         function = kwargs.pop("instance")
         function_name = getattr(function, "__name__", "")
         module_name = self.module_name(function)
-        self.write(**kwargs,
-                   function=function,
-                   function_name=function_name,
-                   module_name=module_name,
-                   label="outputs")
+        self.dump(**kwargs,
+                  function=function,
+                  function_name=function_name,
+                  module_name=module_name,
+                  label="outputs")
 
     def backtrace(self):
         if cfg.io.backtrace:
+
             stack = traceback.extract_stack(limit=4)[0]
             visited_files.add(stack.filename)
             return stack
         return None
+
+    def write(self, function, module, name, *args, **kwargs):
+
+        bind = binding.Binding(function, *args, **kwargs)
+        stack = self.backtrace()
+
+        time = elements()
+
+        self.inputs(time=time,
+                    module_name=module,
+                    function_name=name,
+                    function=function,
+                    args=bind.arguments,
+                    backtrace=stack)
+
+        try:
+            if name == 'add_docstring':
+                outputs = None
+            else:
+                outputs = function(*bind.args, **bind.kwargs)
+        except Exception as e:
+            outputs = None
+            error = e
+        else:
+            error = None
+
+        _outputs = binding.format_output(outputs)
+
+        self.outputs(time=time,
+                     module_name=module,
+                     function_name=name,
+                     function=function,
+                     args=_outputs,
+                     backtrace=stack)
+
+        return outputs, error
+
+    def write_instance(self, instance, module, function, *args, **kwargs):
+
+        bind = binding.Binding(function, *args, **kwargs)
+        stack = self.backtrace()
+
+        time = elements()
+
+        self.inputs(time=time,
+                    module_name=module,
+                    function_name=function,
+                    function=function,
+                    args=bind.arguments,
+                    backtrace=stack)
+
+        try:
+            if function == 'add_docstring':
+                outputs = None
+            else:
+                outputs = instance.__call__(*args, **kwargs)
+        except Exception as e:
+            outputs = None
+            error = e
+        else:
+            error = None
+
+        _outputs = binding.format_output(outputs)
+
+        self.outputs(time=time,
+                     module_name=module,
+                     function_name=function,
+                     function=function,
+                     args=_outputs,
+                     backtrace=stack)
+
+        return outputs, error
+
+    def write_method(self, instance, method, function, module, *args, **kwargs):
+
+        bind = binding.Binding(function, *args, **kwargs)
+        stack = self.backtrace()
+
+        time = elements()
+
+        self.inputs(time=time,
+                    module_name=module,
+                    function_name=function,
+                    function=function,
+                    args=bind.arguments,
+                    backtrace=stack)
+
+        try:
+            if function == 'add_docstring':
+                outputs = None
+            else:
+                outputs = object.__getattribute__(
+                    instance, function)(*args, **kwargs)
+        except Exception as e:
+            outputs = None
+            error = e
+        else:
+            error = None
+
+        _outputs = binding.format_output(outputs)
+
+        self.outputs(time=time,
+                     module_name=module,
+                     function_name=function,
+                     function=function,
+                     args=_outputs,
+                     backtrace=stack)
+
+        return outputs, error

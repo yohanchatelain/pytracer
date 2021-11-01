@@ -19,24 +19,24 @@ def comparing_various_online_solvers():
     heldout = [0.95, 0.90, 0.75, 0.50, 0.01]
     rounds = 20
     X, y = datasets.load_digits(return_X_y=True)
-
+    rng = np.random.RandomState(420000)
+    print(X.shape)
     classifiers = [
-        ("SGD", SGDClassifier(max_iter=100)),
-        ("ASGD", SGDClassifier(average=True)),
+        ("SGD", SGDClassifier(max_iter=100, random_state=rng)),
+        ("ASGD", SGDClassifier(average=True, random_state=rng)),
         ("Perceptron", Perceptron()),
         ("Passive-Aggressive I", PassiveAggressiveClassifier(loss='hinge',
-                                                             C=1.0, tol=1e-4)),
+                                                             C=1.0, tol=1e-4, random_state=rng)),
         ("Passive-Aggressive II", PassiveAggressiveClassifier(loss='squared_hinge',
-                                                              C=1.0, tol=1e-4)),
+                                                              C=1.0, tol=1e-4, random_state=rng)),
         ("SAG", LogisticRegression(
-            solver='sag', tol=1e-1, C=1.e4 / X.shape[0]))
+            solver='sag', tol=1e-1, C=1.e4 / X.shape[0], random_state=rng))
     ]
 
     xx = 1. - np.array(heldout)
 
     for name, clf in classifiers:
         print("training %s" % name)
-        rng = np.random.RandomState(42)
         yy = []
         for i in heldout:
             yy_ = []
@@ -46,13 +46,14 @@ def comparing_various_online_solvers():
                 clf.fit(X_train, y_train)
                 y_pred = clf.predict(X_test)
                 yy_.append(1 - np.mean(y_pred == y_test))
+            print(np.mean(yy_), np.std(yy_))
             yy.append(np.mean(yy_))
         plt.plot(xx, yy, label=name)
 
-    # plt.legend(loc="upper right")
-    # plt.xlabel("Proportion train")
-    # plt.ylabel("Test Error Rate")
-    # plt.show()
+    plt.legend(loc="upper right")
+    plt.xlabel("Proportion train")
+    plt.ylabel("Test Error Rate")
+    plt.show()
 
 
 @pytest.mark.xfail

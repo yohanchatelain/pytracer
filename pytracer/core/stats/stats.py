@@ -116,7 +116,7 @@ def get_stats(values):
         types = [*map(get_type, values[0])]
         _stats = []
         zipv = zip(*values)
-        # [(t, v) for t, v in zip(types, zipv)]
+        [(t, v) for t, v in zip(types, zipv)]
         append = _stats.append
         for ty, v in zip(types, zipv):
             if ty == TypeValue.OTHER:

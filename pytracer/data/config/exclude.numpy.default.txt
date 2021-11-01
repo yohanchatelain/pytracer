@@ -154,3 +154,6 @@ numpy void
 numpy vstack
 numpy zeros
 numpy zeros_like
+numpy errstate
+numpy* os_fspath
+numpy* poly1d

@@ -1,3 +1,5 @@
+# https://scikit-learn.org/stable/auto_examples/linear_model/plot_ransac.html#sphx-glr-auto-examples-linear-model-plot-ransac-py
+
 import pytest
 import numpy as np
 from matplotlib import pyplot as plt

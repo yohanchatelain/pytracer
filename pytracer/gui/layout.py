@@ -22,7 +22,7 @@ info_table = html.Div(
             columns=[{"id": "module", "name": "module"},
                      {"id": "function", "name": "function"}],
             data=None,
-            selected_rows=[0],
+            selected_rows=[],
             sort_action="native",
             cell_selectable=False,
             row_selectable="multi",

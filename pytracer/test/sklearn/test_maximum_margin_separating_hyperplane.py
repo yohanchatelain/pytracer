@@ -9,6 +9,8 @@ def maximum_margin_separating_hyperplane():
     from sklearn.linear_model import SGDClassifier
     from sklearn.datasets import make_blobs
 
+    # rng = np.random.RandomState(0)
+
     # we create 50 separable points
     X, Y = make_blobs(n_samples=50, centers=2,
                       random_state=0, cluster_std=0.60)
@@ -29,12 +31,15 @@ def maximum_margin_separating_hyperplane():
         x2 = X2[i, j]
         p = clf.decision_function([[x1, x2]])
         Z[i, j] = p[0]
-    levels = [-1.0, 0.0, 1.0]
-    linestyles = ['dashed', 'solid', 'dashed']
-    colors = 'k'
-    plt.contour(X1, X2, Z, levels, colors=colors, linestyles=linestyles)
-    plt.scatter(X[:, 0], X[:, 1], c=Y, cmap=plt.cm.Paired,
-                edgecolor='black', s=20)
+    # levels = [-1.0, 0.0, 1.0]
+    # linestyles = ['dashed', 'solid', 'dashed']
+    # colors = 'k'
+    # plt.contour(X1, X2, Z, levels, colors=colors, linestyles=linestyles)
+    # plt.scatter(X[:, 0], X[:, 1], c=Y, cmap=plt.cm.Paired,
+    #             edgecolor='black', s=20)
+
+    # plt.axis('tight')
+    # plt.show()
 
 
 @pytest.mark.xfail

@@ -1,7 +1,7 @@
-import pytracer.core.wrapper.cache as cache
 import inspect
 
-import pytracer.core.wrapper.cache as wrapper_cache
+import pytracer.cache as cache
+import pytracer.cache as wrapper_cache
 from pytracer.utils.log import get_logger
 from pytracer.utils.singleton import Counter
 
@@ -18,7 +18,7 @@ class Binding:
         try:
             sig = inspect.signature(function)
             self._bind_initializer(sig, *args, **kwargs)
-        except ValueError:
+        except (ValueError, TypeError):
             self._default_initializer(*args, **kwargs)
 
     def _bind_initializer(self, sig, *args, **kwargs):

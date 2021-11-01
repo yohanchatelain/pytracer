@@ -7,3 +7,14 @@ __pycache__
 cache-directory
 *.error
 log
+pytracer.log.*
+*.json
+*.pkl
+*.png
+*~
+*.pdf
+pytracer_pkg.egg-info/
+*.cover
+build/
+dist/
+*.h5

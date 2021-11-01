@@ -1,10 +1,11 @@
-# scikit-learn.org/stable/auto_examples/decomposition/plot_faces_decomposition.html#sphx-glr-auto-examples-decomposition-plot-faces-decomposition-py
+# https://scikit-learn.org/stable/auto_examples/applications/plot_face_recognition.html#sphx-glr-auto-examples-applications-plot-face-recognition-py
 
 import pytest
 from time import time
 import logging
 import matplotlib.pyplot as plt
 
+import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import GridSearchCV
 from sklearn.datasets import fetch_lfw_people
@@ -34,7 +35,8 @@ def face_recognition():
     # positions info is ignored by this model)
     X = lfw_people.data
     n_features = X.shape[1]
-
+    X = X.astype(np.float64)
+    print(X.dtype)
     # the label to predict is the id of the person
     y = lfw_people.target
     target_names = lfw_people.target_names
@@ -56,7 +58,7 @@ def face_recognition():
     # Compute a PCA (eigenfaces) on the face dataset (treated as unlabeled
     # dataset): unsupervised feature extraction / dimensionality reduction
     n_components = 150
-
+    print(X_train.shape[1], X_test.shape[1])
     print("Extracting the top %d eigenfaces from %d faces"
           % (n_components, X_train.shape[0]))
     t0 = time()
