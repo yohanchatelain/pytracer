@@ -1,4 +1,4 @@
-    from scipy.interpolate import interp1d
+from scipy.interpolate import interp1d
 import numpy as np
 
 x = np.linspace(0, 10, num=11, endpoint=True)

@@ -204,38 +204,38 @@ def wrapper_class(self, info, *args, **kwargs):
 #     return inputs_type
 
 
-def get_ufunc_output_type(args_type, sig_types):
+# def get_ufunc_output_type(args_type, sig_types):
 
-    inputs_sym = "".join([arg_type.char for arg_type in args_type])
-    for sig_type in sig_types:
-        if sig_type.startswith(inputs_sym):
-            return sig_type[sig_type.find("->")+2:]
+#     inputs_sym = "".join([arg_type.char for arg_type in args_type])
+#     for sig_type in sig_types:
+#         if sig_type.startswith(inputs_sym):
+#             return sig_type[sig_type.find("->")+2:]
 
-    # The inputs types are not in the signatures of the function
-    # We need to find a safe casting
-    for sig_type in sig_types:
-        return_pos = sig_type.find("->")
-        input_type = sig_type[:return_pos]
-        output_type = sig_type[return_pos+2:]
+#     # The inputs types are not in the signatures of the function
+#     # We need to find a safe casting
+#     for sig_type in sig_types:
+#         return_pos = sig_type.find("->")
+#         input_type = sig_type[:return_pos]
+#         output_type = sig_type[return_pos+2:]
 
-        casted_inputs_type = ""
-        for i, ity in enumerate(input_type):
-            casted_inputs_type = ""
-            if cache.hidden.can_cast(inputs_sym[i], ity):
-                casted_inputs_type += ity
-            else:
-                casted_inputs_type = ""
-                break
+#         casted_inputs_type = ""
+#         for i, ity in enumerate(input_type):
+#             casted_inputs_type = ""
+#             if cache.hidden.can_cast(inputs_sym[i], ity):
+#                 casted_inputs_type += ity
+#             else:
+#                 casted_inputs_type = ""
+#                 break
 
-        if casted_inputs_type != "":
-            logger.debug(
-                f"Find casting rule {casted_inputs_type} for {inputs_sym}")
-            return output_type
+#         if casted_inputs_type != "":
+#             logger.debug(
+#                 f"Find casting rule {casted_inputs_type} for {inputs_sym}")
+#             return output_type
 
-    logger.error(
-        f"Cannot find suitable casting rule for {args_type} {sig_types}")
+#     logger.error(
+#         f"Cannot find suitable casting rule for {args_type} {sig_types}")
 
-    return None
+#     return None
 
 # Special wrapper used for numpy ufunc functions
 # Ufunc are base types

@@ -93,7 +93,8 @@ class Myloader(Loader):
                 try:
                     setattr(wrapped_module, sym, obj)
                 except:
-                    logger.error(warn, caller=self)
+                    pass
+                    # logger.error(warn, caller=self)
                 if sym == "__warningregistry__":
                     continue
             sym_obj_wrp = getattr(wrapped_module, sym)
