@@ -1,12 +1,26 @@
+import numpy as np
 import pytest
-
-import scipy.integrate as integrate
-import scipy.special as special
+from scipy import linalg
 
 
 def main():
-    result = integrate.quad(lambda x: special.jv(2.5, x), 0, 4.5)
-    print(result)
+    A = np.array([[1, 2], [3, 4]])
+    print(A)
+
+    b = np.array([[5], [6]])
+    print(b)
+
+    x = linalg.inv(A).dot(b)  # slow
+    print(x)
+
+    x = A.dot(linalg.inv(A).dot(b)) - b  # check
+    print(x)
+
+    x = np.linalg.solve(A, b)  # fast
+    print(x)
+
+    x = A.dot(np.linalg.solve(A, b)) - b  # check
+    print(x)
 
 
 @pytest.mark.usefixtures("cleandir")

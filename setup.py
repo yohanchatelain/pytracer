@@ -3,7 +3,7 @@ import setuptools
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
-included_packages = ("pytracer*")
+included_packages = ("pytracer*", "significantdigits")
 
 setuptools.setup(
     name="pytracer-pkg",

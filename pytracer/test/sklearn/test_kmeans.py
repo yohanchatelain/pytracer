@@ -1,9 +1,11 @@
-import pytest
-from sklearn import datasets
-from sklearn.cluster import KMeans
-from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 import numpy as np
+import pytest
+from mpl_toolkits.mplot3d import Axes3D
+
+from sklearn import datasets
+from sklearn.cluster import KMeans
+
 print(__doc__)
 
 
@@ -73,26 +75,18 @@ def kmeans():
     # ax.dist = 12
 
 
-@pytest.mark.xfail
-@pytest.mark.usefixtures("turn_numpy_ufunc_on", "cleandir")
-def test_trace_only_ufunc_on(script_runner):
+@pytest.mark.usefixtures("cleandir")
+def test_trace_only(script_runner):
     ret = script_runner.run("pytracer", "trace",
-                            f"--command {__file__}")
+                            f"--command {__file__} --test2=1")
     assert ret.success
 
 
-@pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir")
-def test_trace_only_ufunc_off(script_runner):
-    ret = script_runner.run("pytracer", "trace",
-                            f"--command {__file__}")
-    assert ret.success
-
-
-@pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir", "parse")
+@pytest.mark.usefixtures("cleandir", "parse")
 def test_trace_parse(nsamples, script_runner):
     for _ in range(nsamples):
         ret = script_runner.run("pytracer", "trace",
-                                f"--command {__file__}")
+                                f"--command {__file__} --test2=1")
         assert ret.success
 
 

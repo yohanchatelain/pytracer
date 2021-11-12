@@ -1,7 +1,8 @@
+import pytest
+from numpy import cosh, eye, mgrid, zeros, zeros_like
 from scipy.optimize import root
-from scipy.sparse import spdiags, kron
-from scipy.sparse.linalg import spilu, LinearOperator
-from numpy import cosh, zeros_like, mgrid, zeros, eye
+from scipy.sparse import kron, spdiags
+from scipy.sparse.linalg import LinearOperator, spilu
 
 # parameters
 nx, ny = 75, 75
@@ -84,5 +85,20 @@ def main():
     print(sol)
 
 
-if __name__ == "__main__":
+@pytest.mark.usefixtures("cleandir")
+def test_trace_only(script_runner):
+    ret = script_runner.run("pytracer", "trace",
+                            f"--command {__file__} --test2=1")
+    assert ret.success
+
+
+@pytest.mark.usefixtures("cleandir", "parse")
+def test_trace_parse(nsamples, script_runner):
+    for _ in range(nsamples):
+        ret = script_runner.run("pytracer", "trace",
+                                f"--command {__file__} --test2=1")
+        assert ret.success
+
+
+if '__main__' == __name__:
     main()

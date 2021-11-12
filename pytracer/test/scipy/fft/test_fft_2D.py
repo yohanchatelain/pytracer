@@ -1,12 +1,27 @@
+import numpy as np
 import pytest
-
-import scipy.integrate as integrate
-import scipy.special as special
+from scipy.fft import ifftn
 
 
 def main():
-    result = integrate.quad(lambda x: special.jv(2.5, x), 0, 4.5)
-    print(result)
+    N = 30
+    xf = np.zeros((N, N))
+    xf[0, 5] = 1
+    xf[0, N-5] = 1
+    Z = ifftn(xf)
+    print(Z)
+
+    xf = np.zeros((N, N))
+    xf[5, 0] = 1
+    xf[N-5, 0] = 1
+    Z = ifftn(xf)
+    print(Z)
+
+    xf = np.zeros((N, N))
+    xf[5, 10] = 1
+    xf[N-5, N-10] = 1
+    Z = ifftn(xf)
+    print(Z)
 
 
 @pytest.mark.usefixtures("cleandir")

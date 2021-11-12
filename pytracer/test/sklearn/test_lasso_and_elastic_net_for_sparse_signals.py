@@ -1,5 +1,6 @@
-import pytest
 import numpy as np
+import pytest
+
 from sklearn import linear_model
 
 # https://scikit-learn.org/stable/auto_examples/linear_model/plot_lasso_and_elasticnet.html#lasso-and-elastic-net-for-sparse-signals
@@ -52,26 +53,18 @@ def lasso_and_elastic_net_for_sparse_signals():
     print("r^2 on test data : %f" % r2_score_enet)
 
 
-@pytest.mark.xfail
-@pytest.mark.usefixtures("turn_numpy_ufunc_on", "cleandir")
-def test_trace_only_ufunc_on(script_runner):
+@pytest.mark.usefixtures("cleandir")
+def test_trace_only(script_runner):
     ret = script_runner.run("pytracer", "trace",
-                            f"--command {__file__}")
+                            f"--command {__file__} --test2=1")
     assert ret.success
 
 
-@pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir")
-def test_trace_only_ufunc_off(script_runner):
-    ret = script_runner.run("pytracer", "trace",
-                            f"--command {__file__}")
-    assert ret.success
-
-
-@pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir", "parse")
+@pytest.mark.usefixtures("cleandir", "parse")
 def test_trace_parse(nsamples, script_runner):
     for _ in range(nsamples):
         ret = script_runner.run("pytracer", "trace",
-                                f"--command {__file__}")
+                                f"--command {__file__} --test2=1")
         assert ret.success
 
 

@@ -4,10 +4,11 @@ import pytest
 
 
 def maximum_margin_separating_hyperplane():
-    import numpy as np
     import matplotlib.pyplot as plt
-    from sklearn.linear_model import SGDClassifier
+    import numpy as np
+
     from sklearn.datasets import make_blobs
+    from sklearn.linear_model import SGDClassifier
 
     # we create 50 separable points
     X, Y = make_blobs(n_samples=50, centers=2,
@@ -37,26 +38,18 @@ def maximum_margin_separating_hyperplane():
                 edgecolor='black', s=20)
 
 
-@pytest.mark.xfail
-@pytest.mark.usefixtures("turn_numpy_ufunc_on", "cleandir")
-def test_trace_only_ufunc_on(script_runner):
+@pytest.mark.usefixtures("cleandir")
+def test_trace_only(script_runner):
     ret = script_runner.run("pytracer", "trace",
-                            f"--command {__file__}")
+                            f"--command {__file__} --test2=1")
     assert ret.success
 
 
-@pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir")
-def test_trace_only_ufunc_off(script_runner):
-    ret = script_runner.run("pytracer", "trace",
-                            f"--command {__file__}")
-    assert ret.success
-
-
-@pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir", "parse")
+@pytest.mark.usefixtures("cleandir", "parse")
 def test_trace_parse(nsamples, script_runner):
     for _ in range(nsamples):
         ret = script_runner.run("pytracer", "trace",
-                                f"--command {__file__}")
+                                f"--command {__file__} --test2=1")
         assert ret.success
 
 

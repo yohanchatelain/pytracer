@@ -1,12 +1,24 @@
+import numpy as np
 import pytest
-
-import scipy.integrate as integrate
-import scipy.special as special
+from scipy.fft import dct, idct
 
 
 def main():
-    result = integrate.quad(lambda x: special.jv(2.5, x), 0, 4.5)
-    print(result)
+    N = 100
+    t = np.linspace(0, 20, N, endpoint=False)
+    x = np.exp(-t/3)*np.cos(2*t)
+    y = dct(x, norm='ortho')
+    window = np.zeros(N)
+    window[:20] = 1
+    yr = idct(y*window, norm='ortho')
+    s = np.sum(np.abs(x-yr)**2) / np.sum(np.abs(x)**2)
+    print(s)
+
+    window = np.zeros(N)
+    window[:15] = 1
+    yr = idct(y*window, norm='ortho')
+    s = np.sum(np.abs(x-yr)**2) / np.sum(np.abs(x)**2)
+    print(s)
 
 
 @pytest.mark.usefixtures("cleandir")
