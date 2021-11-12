@@ -69,7 +69,6 @@
         "exclude.scipy.default.txt",
         "exclude.sklearn.default.txt"
     ],
-    "filter_alias": true,
     "logger": {
         "format": "print",
         "output": "pytracer.log",
