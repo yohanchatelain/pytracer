@@ -1,10 +1,6 @@
 import os
-import pytest
-import json
-import tempfile
 
-from pytracer.utils import getenv
-from pytracer.core.config import constant
+import pytest
 
 
 @pytest.fixture
@@ -12,7 +8,7 @@ def cleandir(script_runner, tmp_path):
     os.chdir(tmp_path)
     yield
     ret = script_runner.run("pytracer", "clean")
-    assert ret.success
+    assert(ret.success)
     os.chdir("..")
 
 
@@ -20,7 +16,7 @@ def cleandir(script_runner, tmp_path):
 def parse(script_runner):
     yield
     ret = script_runner.run("pytracer", "parse")
-    assert ret.success
+    assert(ret.success)
 
 
 def pytest_addoption(parser):

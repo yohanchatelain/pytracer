@@ -70,12 +70,13 @@ class StatisticNumpy:
             self._ndim = self._data.ndim - 1
             self._shape = self._data.shape[1:]
             self._type = self._data.dtype
+
         if np.issubdtype(self._type, np.str) or isinstance(self._type, str):
             self.cached_mean = np.nan
             self.cached_std = np.nan
             self.cached_sig = np.nan
-
-        elif not (np.issubdtype(self._type, np.number) or np.issubdtype(self._type, np.bool_)):
+        elif not (np.issubdtype(self._type, np.number) or
+                  np.issubdtype(self._type, np.bool_)):
             self.cached_mean = np.nan
             self.cached_std = np.nan
             self.cached_sig = np.nan
@@ -92,8 +93,7 @@ class StatisticNumpy:
         if isinstance(values, list):
             try:
                 return np.array(values)
-            except Exception as e:
-                # print("NUMPY.STATISTIC_NUMPY.PREPROCESS_VALUE", e, values)
+            except Exception:
                 return values
 
         else:
@@ -194,16 +194,6 @@ class StatisticNumpy:
         if not spr.issparse(mean):
             method = method_str_to_enum[module_args['method']]
             sig = significant_digits(self._data, reference=mean, method=method)
-            # masked_std = np.ma.masked_equal(std, 0.0)
-            # masked_mean = np.ma.masked_equal(mean, 0.0)
-            # sig = np.log2(np.abs(masked_mean/masked_std))
-            # if hasattr(sig, "filled"):
-            #     if self._type.kind in ('U', 'S'):
-            #         sig = sig.filled(8)
-            # else:
-            #     sig[masked_mean.mask] = 0
-            #     sig[masked_std.mask] = self.__max_sig.get(self._type, 53)
-            #     sig = sig.data
         else:
             sig = mean.copy()
             sig.data = np.log2(np.abs(mean.data/self.cached_std_sparse.data))
@@ -229,4 +219,5 @@ class StatisticNumpy:
         if getattr(obj, "size", -1) == 0:
             return False
 
-        return np.issubdtype(obj.dtype, np.number) or np.issubdtype(obj.dtype, np.bool_)
+        return np.issubdtype(obj.dtype, np.number) or\
+            np.issubdtype(obj.dtype, np.bool_)

@@ -32,6 +32,7 @@ _reverse_global_mapping = set()
 
 globals_to_update = {}
 
+
 def get_global_mapping(_object):
     _id = id(_object)
     return _global_mapping.get(_id, None)

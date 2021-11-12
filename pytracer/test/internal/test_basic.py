@@ -1,9 +1,10 @@
 #!/usr/bin/python3
 
-import pytest
-import math
-import numpy as np
 import argparse
+import math
+
+import numpy as np
+import pytest
 
 
 def f(x, y, z):
@@ -83,16 +84,14 @@ def main():
 def test_trace_only_no_arg(script_runner):
     ret = script_runner.run("pytracer", "trace",
                             f"--command {__file__}")
-    assert not ret.success
+    assert(not ret.success)
 
-
-import pytest
 
 @pytest.mark.usefixtures("cleandir")
 def test_trace_only(script_runner):
     ret = script_runner.run("pytracer", "trace",
                             f"--command {__file__} --test2=1")
-    assert ret.success
+    assert(ret.success)
 
 
 @pytest.mark.usefixtures("cleandir", "parse")
@@ -100,7 +99,7 @@ def test_trace_parse(nsamples, script_runner):
     for _ in range(nsamples):
         ret = script_runner.run("pytracer", "trace",
                                 f"--command {__file__} --test2=1")
-        assert ret.success
+        assert(ret.success)
 
 
 if '__main__' == __name__:

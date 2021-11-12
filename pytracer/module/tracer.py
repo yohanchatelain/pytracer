@@ -18,12 +18,8 @@ import pytracer.utils.report as report
 from pytracer.core.config import config as cfg
 from pytracer.cache import (add_global_mapping,
                             get_global_mapping, visited_files)
-# from pytracer.core.wrapper.cache import (add_global_mapping,
-#                                          get_global_mapping, visited_files)
-from pytracer.core.wrapper.wrapper import (Wrapper, WrapperClass,
-                                           WrapperModule, visited_attr)
+from pytracer.core.wrapper.wrapper import (WrapperModule, visited_attr)
 from pytracer.module.info import register
-from pytracer.utils import ishashable
 from pytracer.utils.log import get_logger
 
 logger = get_logger()
@@ -92,9 +88,8 @@ class Myloader(Loader):
             if not hasattr(wrapped_module, sym):
                 try:
                     setattr(wrapped_module, sym, obj)
-                except:
+                except Exception:
                     pass
-                    # logger.error(warn, caller=self)
                 if sym == "__warningregistry__":
                     continue
             sym_obj_wrp = getattr(wrapped_module, sym)
@@ -115,8 +110,8 @@ class Myloader(Loader):
             self.get_globals(spec, real_module)
 
             if cache.has_global_mapping(real_module):
-                logger.error(
-                    f"Module {real_module} has been created already", caller=self)
+                logger.error(f"Module {real_module} has been created already",
+                             caller=self)
             else:
                 cache.add_global_mapping(real_module, None)
             cache.required_modules[real_module] = []
@@ -156,7 +151,9 @@ class Myloader(Loader):
         sys.modules[module.__name__] = module
         globals()[module.__name__] = module
 
-        for alias in self.spec_to_aliases.get(cache.hash_spec(module.__spec__), []):
+        aliases = self.spec_to_aliases.get(
+            cache.hash_spec(module.__spec__), [])
+        for alias in aliases:
             globals()[alias] = module
 
 
@@ -196,9 +193,10 @@ class MyImporter(MetaPathFinder):
         return None
 
     def is_valid_spec(self, fullname, path):
-        meta_path = [
-            meta_path for meta_path in sys.meta_path if not isinstance(meta_path, MyImporter)]
-        return any([finder.find_spec(fullname, path) for finder in meta_path if hasattr(finder, "find_spec")])
+        meta_path = [meta_path for meta_path in sys.meta_path
+                     if not isinstance(meta_path, MyImporter)]
+        return any([finder.find_spec(fullname, path) for finder in meta_path
+                    if hasattr(finder, "find_spec")])
 
     def find_spec(self, fullname, path=None, target=None):
         logger.debug(f"find spec for {fullname} {path} {target}", caller=self)

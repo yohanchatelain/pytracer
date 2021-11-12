@@ -12,9 +12,7 @@ CMD ["pytracer trace --module "]
 #FROM builder 
 
 RUN cd /opt/build/pytracer && \
-    pytest --script-launch-mode=subprocess --nsamples=3 -m "not slow" -v -k "trace_only and ufunc_off" || cat pytracer.log
-RUN cd /opt/build/pytracer && \
-    pytest --script-launch-mode=subprocess --nsamples=3 -m "not slow" -v -k "trace_only and ufunc_on" || cat pytracer.log
+    pytest --script-launch-mode=subprocess --nsamples=3 -m "not slow" -v -k "trace_only" || cat pytracer.log
 RUN cd /opt/build/pytracer && \
     pytest --script-launch-mode=subprocess --nsamples=3 -m "not slow" -v -k "trace_parse" || cat pytracer.log
 

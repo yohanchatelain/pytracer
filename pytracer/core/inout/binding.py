@@ -26,10 +26,11 @@ class Binding:
 
 def format_output(outputs):
     if isinstance(outputs, dict):
-        _dict = {k: copy.deepcopy(v) for k, v in outputs.items() if not k.startswith('__')
-                 and not k.endswith('__') and not callable(v)}
+        _dict = {k: copy.deepcopy(v) for k, v in outputs.items()
+                 if not k.startswith('__')
+                 and not k.endswith('__')
+                 and not callable(v)}
         _outputs = _dict
-        # _outputs = copy.deepcopy(outputs)
     elif isinstance(outputs, tuple):
         _outputs = {f"Ret{i}": o for i, o in enumerate(outputs)}
     else:

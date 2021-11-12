@@ -5,11 +5,10 @@ from collections import namedtuple
 
 import numpy as np
 import pytracer.utils as ptutils
+import scipy.sparse as spr
 import tables
 from pytracer.core.config import constant
 from pytracer.utils.log import get_logger
-import scipy.sparse as spr
-from time import perf_counter
 
 from . import _exporter, _init
 
@@ -248,10 +247,7 @@ class ExporterHDF5(_exporter.Exporter):
                 group, "mean",
                 atom=atom_type, shape=shape, filters=filters)
             if spr.issparse(raw_mean):
-                start = perf_counter()
                 mean_array[:] = self._get_sparse_representation(raw_mean)
-                end = perf_counter()
-                print(f'mean {end-start}')
             else:
                 mean_array[:] = raw_mean
 
@@ -259,10 +255,7 @@ class ExporterHDF5(_exporter.Exporter):
                 group, "std",
                 atom=atom_type, shape=shape, filters=filters)
             if spr.issparse(raw_std):
-                start = perf_counter()
                 std_array[:] = self._get_sparse_representation(raw_std)
-                end = perf_counter()
-                print(f'std {end-start}')
             else:
                 std_array[:] = raw_std
 
@@ -270,10 +263,7 @@ class ExporterHDF5(_exporter.Exporter):
                 group, "sig",
                 atom=atom_type, shape=shape, filters=filters)
             if spr.issparse(raw_sig):
-                start = perf_counter()
                 sig_array[:] = self._get_sparse_representation(raw_sig)
-                end = perf_counter()
-                print(f'sig {end-start}')
             else:
                 sig_array[:] = raw_sig
 
@@ -287,8 +277,10 @@ class ExporterHDF5(_exporter.Exporter):
         time = obj["time"]
         module_grp_name = f"/{module}"
 
-        assert(module)
-        assert(function)
+        if module is None:
+            logger.error('Exported value has no module', caller=self)
+        if function is None:
+            logger.error('Exported value has no function', caller=self)
 
         try:
             tables.path.check_attribute_name(function)
@@ -305,8 +297,10 @@ class ExporterHDF5(_exporter.Exporter):
             table = function_grp["values"]
         else:
             function_grp = self.h5file.create_group(module_grp, function)
-            table = self.h5file.create_table(
-                function_grp, "values", description=ExportDescription, expectedrows=expectedrows[0])
+            table = self.h5file.create_table(function_grp,
+                                             "values",
+                                             description=ExportDescription,
+                                             expectedrows=expectedrows[0])
         expectedrows[0] = table.nrows + 1000
         row = table.row
         for name, stats in args.items():

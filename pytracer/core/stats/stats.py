@@ -1,5 +1,4 @@
 from enum import IntEnum, auto
-from inspect import _empty
 from types import FunctionType
 
 from pytracer.utils.log import get_logger
@@ -50,12 +49,8 @@ class TypeValue(IntEnum):
         return not self.is_function() and not self.is_other()
 
 
-_type_cache = set()
-
-
 def get_type(value):
     from pytracer.core.stats.numpy import StatisticNumpy
-    from pytracer.core.stats.sklearn import is_sklearn_value
     import numpy as np
     _type = None
     if isinstance(value, bool):
@@ -73,33 +68,27 @@ def get_type(value):
                 _type = TypeValue.LIST
             else:
                 _type = TypeValue.OTHER
-        except (ValueError, TypeError) as e:
+        except (ValueError, TypeError):
             array = tuple(value)
             _type = TypeValue.TUPLE
     elif isinstance(value, tuple):
         _type = TypeValue.TUPLE
     elif isinstance(value, FunctionType):
         _type = TypeValue.FUNCTION
-    elif is_sklearn_value(value):
-        _type = TypeValue.SKLEARN
     else:
         _type = TypeValue.OTHER
-        # if not isinstance(value, (str, np.ndarray, np.dtype, type)):
-        #     if type(value) not in _type_cache:
-        #         logger.warning(f"Unknown type: {type(value)} {value}")
-        #         _type_cache.add(type(value))
     return _type
 
 
 def check_type(values):
     types = [*map(type, values)]
     # Ensure that values have all the same type
-    assert(len(set(types)) == 1)
+    if len(set(types)) != 1:
+        logger.error('Parsed values do not have the same type: {set(types)}')
 
 
 def get_stats(values):
     from pytracer.core.stats.numpy import StatisticNumpy
-    from pytracer.core.stats.sklearn import get_sklearn_stat
     from pytracer.core.stats.generic import get_stat
     import numpy as np
     check_type(values)
@@ -138,8 +127,6 @@ def get_stats(values):
             _stats = StatisticNumpy(values, empty=True)
     elif _type == TypeValue.STRING:
         _stats = StatisticNumpy(values, empty=True, dtype=type(values[0]))
-    # elif _type == TypeValue.SKLEARN:
-    #     _stats = get_sklearn_stat(values, type(values[0]))
     else:
         _stats = get_stat(np.array(values, dtype=np.object))
 
