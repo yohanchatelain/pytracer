@@ -17,8 +17,7 @@ jobs:
       matrix:
         python-version: [3.8]
         python-test: [ 
-          '"trace_only and ufunc_off"',
-          '"trace_only and ufunc_on"',
+          '"trace_only"',
           '"trace_parse"'
         ]
         python-long: [

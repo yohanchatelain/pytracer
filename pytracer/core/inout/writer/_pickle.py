@@ -1,8 +1,6 @@
 
 import atexit
-import collections
 import datetime
-import inspect
 import io
 import os
 import pickle
@@ -10,7 +8,6 @@ import shutil
 import threading
 import traceback
 import types
-from collections import deque
 from contextlib import contextmanager
 
 import pytracer.cache as cache
@@ -45,7 +42,8 @@ class PytracerPickler(pickle.Pickler):
     def reducer_override(self, obj):
         if hasattr(obj, 'generic_wrapper'):
             d = (types.FunctionType, obj.__name__, {
-                 k: v for k, v in obj.__dict__.items() if k != 'generic_wrapper'})
+                 k: v for k, v in obj.__dict__.items()
+                 if k != 'generic_wrapper'})
             return d
         else:
             return NotImplemented
@@ -73,7 +71,7 @@ def safe_dump(self, pickler):
     try:
         yield pickler
     except Exception as e:
-        logger.warning(f'Pickle object cannot be saved', caller=self, error=e)
+        logger.warning('Pickle object cannot be saved', caller=self, error=e)
     finally:
         self.is_dumping = False
 
@@ -110,7 +108,8 @@ class WriterPickle(_writer.Writer):
         for filename in visited_files:
             src = filename
             if os.path.isfile(src):
-                dst = f"{self.parameters.cache_sources_path}{os.path.sep}{filename}"
+                path = self.parameters.cache_sources_path
+                dst = os.path.join([path, filename])
                 dstdir = os.path.dirname(dst)
                 os.makedirs(dstdir, exist_ok=True)
                 shutil.copy(src, dst)
@@ -146,26 +145,6 @@ class WriterPickle(_writer.Writer):
                 f"{self.parameters.cache_traces}{os.sep}"
                 f"{filename}{ext}")
 
-    # def is_looping(self):
-
-    #     def aux(stack):
-    #         return '/pytracer/core' in stack.filename and stack.function == 'write'
-    #     return sum(map(aux, inspect.stack())) >= 2
-
-    # def is_writable(self, obj):
-    #     if self.is_looping():
-    #         return False
-    #     try:
-    #         pickle.dump(obj, io.BytesIO())
-    #         return True
-    #     except Exception as e:
-    #         try:
-    #             obj["args"] = {}
-    #         except (AttributeError, KeyError, TypeError):
-    #             pass
-    #         logger.warning(
-    #             f"Object is not writable: {obj}", caller=self, error=e)
-    #         return False
     def is_writable(self, obj):
         if self.is_dumping:
             return False
@@ -204,9 +183,6 @@ class WriterPickle(_writer.Writer):
         cache.cached_error = (msg, e)
         raise e
 
-        # logger.critical(f"{msg}Unexpected error while writing",
-        #                 error=e, caller=self)
-
     def clean_args(self, args):
         keys = list(args.keys())
         for name in keys:
@@ -222,20 +198,8 @@ class WriterPickle(_writer.Writer):
         if module_name in ('posix', 'posixpath'):
             return
 
-    # def clean_args(self, args):
-
-    #     keys = list(args.keys())
-
-    #     for name in keys:
-    #         if name == 'self' or not self.is_writable(args[name]):
-    #             args.pop(name)
-
-    #     return args
-
-    # def write(self, **kwargs):
         function = kwargs["function"]
         time = kwargs["time"]
-        # module_name = kwargs["module_name"]
         function_name = kwargs["function_name"]
         label = kwargs["label"]
         args = kwargs["args"]
@@ -246,13 +210,6 @@ class WriterPickle(_writer.Writer):
         self.clean_args(args)
 
         function_id = id(function)
-        # to_write = {"id": function_id,
-        #             "time": time,
-        #             "module": module_name,
-        #             "function": function_name,
-        #             "label": label,
-        #             "args": args,
-        #             "backtrace": backtrace}
 
         to_write = PytracerPickleTrace(id=function_id,
                                        time=time,
@@ -269,9 +226,6 @@ class WriterPickle(_writer.Writer):
                       f"label: {label}\n"
                       f"backtrace: {backtrace}\n"), caller=self)
 
-        # if lock.locked():
-        #     return
-        # lock.acquire()
         try:
             if not self.is_writable(to_write):
                 to_write['args'] = {}
@@ -285,8 +239,8 @@ class WriterPickle(_writer.Writer):
                 self._write(to_write)
 
         except Exception as e:
-            logger.warning(
-                f"Unable to pickle object for {function_name}", caller=self, error=e)
+            logger.warning(f"Unable to pickle object for {function_name}",
+                           caller=self, error=e)
             if report.report.report_enable():
                 key = (module_name, function_name)
                 value = to_write
@@ -295,28 +249,8 @@ class WriterPickle(_writer.Writer):
                 to_write['args'] = {}
                 self._write(to_write)
 
-        # except pickle.PicklingError as e:
-        #     logger.error(
-        #         f"while writing in Pickle file: {self.filename_path}",
-        #         error=e, caller=self)
-        # except (AttributeError, TypeError) as e:
-        #     logger.warning(
-        #         f"Unable to pickle object: {args} {function_name}", caller=self, error=e)
-        #     if report.report_enable():
-        #         key = (module_name, function_name)
-        #         value = to_write
-        #         report.report(key, value)
-        #     if not report.report_only():
-        #         to_write['args'] = {}
-        #         self._write(to_write)
-        # except Exception as e:
-        #     logger.debug(f"Writing pickle object: {to_write}", caller=self)
-        #     self.critical_writing_error(e)
-        # lock.release()
-
     def inputs(self, **kwargs):
         self.dump(**kwargs, label="inputs")
-        # self.write(**kwargs, label="inputs")
 
     def module_name(self, obj):
         module = getattr(obj, "__module__", "")
@@ -334,16 +268,8 @@ class WriterPickle(_writer.Writer):
                   module_name=module_name,
                   label="inputs")
 
-        # self.write(**kwargs,
-        #            function=function,
-        #            function_name=function_name,
-        #            module_name=module_name,
-        #            label="inputs")
-
     def outputs(self, **kwargs):
         self.dump(**kwargs, label="outputs")
-
-        # self.write(**kwargs, label="outputs")
 
     def outputs_instance(self, **kwargs):
         function = kwargs.pop("instance")
@@ -354,11 +280,6 @@ class WriterPickle(_writer.Writer):
                   function_name=function_name,
                   module_name=module_name,
                   label="outputs")
-        # self.write(**kwargs,
-        #            function=function,
-        #            function_name=function_name,
-        #            module_name=module_name,
-        #            label="outputs")
 
     def backtrace(self):
         if cfg.io.backtrace:

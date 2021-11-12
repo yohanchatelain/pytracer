@@ -12,7 +12,6 @@ from importlib import invalidate_caches
 from importlib.abc import Loader, MetaPathFinder
 from importlib.machinery import ModuleSpec
 import pytracer.cache as cache
-# import pytracer.core.wrapper.cache as cache
 import pytracer.module.tracer_init as tracer_init
 import pytracer.utils.report as report
 from pytracer.core.config import config as cfg
@@ -25,7 +24,7 @@ from pytracer.utils.log import get_logger
 logger = get_logger()
 
 
-class Myloader(Loader):
+class PytracerLoader(Loader):
 
     def __init__(self, fullname, path=None):
         self.to_initialize = list()
@@ -134,10 +133,10 @@ class Myloader(Loader):
             return wrapped_module
         except ImportError as e:
             logger.warning(f"ImportError encountered for {spec}", caller=self,
-                           error=e)
+                           error=e, raise_error=True)
         except Exception as e:
             logger.critical("Unknown exception", error=e,
-                            caller=self, raise_error=True)
+                            caller=self)
 
     def exec_module(self, module):
         logger.debug(f"exec module {module}", caller=self)
@@ -157,7 +156,7 @@ class Myloader(Loader):
             globals()[alias] = module
 
 
-class MyImporter(MetaPathFinder):
+class PytracerImporter(MetaPathFinder):
 
     modules_to_load = []
 
@@ -194,7 +193,7 @@ class MyImporter(MetaPathFinder):
 
     def is_valid_spec(self, fullname, path):
         meta_path = [meta_path for meta_path in sys.meta_path
-                     if not isinstance(meta_path, MyImporter)]
+                     if not isinstance(meta_path, PytracerImporter)]
         return any([finder.find_spec(fullname, path) for finder in meta_path
                     if hasattr(finder, "find_spec")])
 
@@ -222,7 +221,7 @@ class MyImporter(MetaPathFinder):
                 f"{fullname} is not in to_include modules", caller=self)
             return self.return_original_spec(fullname)
 
-        spec = ModuleSpec(name=fullname, loader=Myloader(fullname))
+        spec = ModuleSpec(name=fullname, loader=PytracerLoader(fullname))
 
         logger.debug(f"{fullname} spec found", caller=self)
         return spec
@@ -273,7 +272,7 @@ class TracerRun:
 
         self.fill_required_function(list(sys.modules.keys()),
                                     list(globals().keys()))
-        finder = MyImporter()
+        finder = PytracerImporter()
         self.install(finder)
         for module in finder.modules_to_load:
             if module in sys.modules:

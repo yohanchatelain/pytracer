@@ -1,13 +1,12 @@
-import pickle
 import importlib
+import pickle
 
+import pytracer.core.inout._init as _init
+import pytracer.core.inout.reader._reader as _reader
 import pytracer.utils as ptutils
+from pytracer.core.config import config as cfg
 from pytracer.core.config import constant
 from pytracer.utils.log import get_logger
-from pytracer.core.config import config as cfg
-import pytracer.core.inout._init as _init
-
-from . import _reader
 
 logger = get_logger()
 

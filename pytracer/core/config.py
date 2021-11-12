@@ -214,13 +214,19 @@ class _Config(object, metaclass=Singleton):
     def __setitem__(self, key, value):
         return NotImplementedError
 
-    def __getattr__(self, name):
+    def __hasattr__(self, name):
+        return getattr(_Config._data, name)
+
+    def __getattr__(self, name, default=None):
         if name in self._attributes:
             try:
                 return getattr(_Config._data, name)
             except KeyError:
                 raise DictAtKeyError(name)
-        raise KeyError(self.key_error(name))
+        elif default is not None:
+            return default
+        else:
+            object.__getattribute__(self, name)
 
     def key_error(self, name):
         msg = f"Configuration: Unknown parameter {name}"

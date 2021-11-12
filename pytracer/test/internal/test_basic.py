@@ -1,5 +1,7 @@
 #!/usr/bin/python3
 
+import sys
+from pytracer.__main__ import main as pytracer_main
 import argparse
 import math
 
