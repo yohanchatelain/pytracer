@@ -111,10 +111,8 @@ class Myloader(Loader):
     def create_module(self, spec):
         try:
             logger.debug(f"create module for spec {spec}")
-            # cache.visited_spec[spec.name] = True
             real_module = importlib.import_module(spec.name)
             self.get_globals(spec, real_module)
-            # Wrapper.m2wm[real_module] = None
 
             if cache.has_global_mapping(real_module):
                 logger.error(
@@ -132,9 +130,6 @@ class Myloader(Loader):
 
             cache.orispec_to_wrappedmodule[cache.hash_spec(
                 spec)] = wrapped_module
-            # wrp.assert_lazy_modules_loaded()
-            # wrp.assert_lazy_attributes_are_initialized()
-            # Wrapper.m2wm[real_module] = wrapped_module
             add_global_mapping(real_module, wrapped_module)
             logger.debug(f"create Wrapped module {wrapped_module.__spec__}")
             logger.debug(f"Wrapped module {hex(id(wrapped_module))}")
@@ -195,25 +190,15 @@ class MyImporter(MetaPathFinder):
             return False
         return isinstance(m.body[0], (ast.Import, ast.ImportFrom))
 
-    def need_real_module(self):
-        for stack in inspect.stack():
-            # if self.is_internal_import(stack):
-            #     return False
-            if "/pytracer/core" in stack.filename:
-                if stack.filename.endswith(__file__):
-                    if stack.function == "create_module":
-                        return True
-                if stack.filename.endswith("_wrapper.py"):
-                    return True
-        return False
-
     def return_original_spec(self, fullname):
         logger.debug(f"Need the original module {fullname}", caller=self)
         self.importing_module.remove(fullname)
         return None
 
     def is_valid_spec(self, fullname, path):
-        return any([finder.find_spec(fullname, path) for finder in sys.meta_path[1:] if hasattr(finder, "find_spec")])
+        meta_path = [
+            meta_path for meta_path in sys.meta_path if not isinstance(meta_path, MyImporter)]
+        return any([finder.find_spec(fullname, path) for finder in meta_path if hasattr(finder, "find_spec")])
 
     def find_spec(self, fullname, path=None, target=None):
         logger.debug(f"find spec for {fullname} {path} {target}", caller=self)
@@ -239,7 +224,7 @@ class MyImporter(MetaPathFinder):
                 f"{fullname} is not in to_include modules", caller=self)
             return self.return_original_spec(fullname)
 
-        spec = ModuleSpec(fullname, Myloader(fullname), origin="Pytracer")
+        spec = ModuleSpec(name=fullname, loader=Myloader(fullname))
 
         logger.debug(f"{fullname} spec found", caller=self)
         return spec

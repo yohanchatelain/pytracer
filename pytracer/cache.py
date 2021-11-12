@@ -60,11 +60,15 @@ _map_type = {}
 
 def add_type(_object, _object_type):
     _id = id(_object)
-    _map_type[_id] = _object_type
+    _hash = _object.__sizeof__
+    _map_type[(_id, _hash)] = _object_type
 
 
 def get_type(_object):
-    return _map_type.get(id(_object), None)
+    _id = id(_object)
+    _hash = _object.__sizeof__
+    key = (_id, _hash)
+    return _map_type.get(key, None)
 
 
 module_to_not_update = set(['builtins'])
@@ -77,3 +81,43 @@ def set_module_args(args):
 
 
 cached_error = None
+
+
+_attribute_counter = dict()
+
+
+def increment_visit(module):
+    if module in _attribute_counter:
+        _attribute_counter[module]['visited'] += 1
+    else:
+        _attribute_counter[module] = dict(visited=1, included=dict(
+            function=0, classe=0, basic=0), excluded=dict(function=0, classe=0, basic=0))
+
+
+def increment_include(module, _type):
+    _attribute_counter[module]['included'][_type] += 1
+
+
+def increment_exclude(module, _type):
+    _attribute_counter[module]['excluded'][_type] += 1
+
+
+def print_stats():
+    visited = 0
+    included = dict(function=0, classe=0, basic=0)
+    excluded = dict(function=0, classe=0, basic=0)
+    modes = dict(visited=visited, included=included, excluded=excluded)
+    for module, stats in _attribute_counter.items():
+        print(f'{module.__name__}')
+        for mode, values in stats.items():
+            if isinstance(values, dict):
+                for _type, stat in values.items():
+                    modes[mode][_type] += stat
+                    print(f'{mode} {_type}:{stat}')
+            else:
+                modes[mode] += values
+                print(f'{mode}:{values}')
+
+    modes['included']['all'] = sum(modes['included'].values())
+    modes['excluded']['all'] = sum(modes['excluded'].values())
+    print(f'Total {modes}')

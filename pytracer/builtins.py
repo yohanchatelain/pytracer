@@ -1,8 +1,8 @@
-import pytracer.cache
 import builtins
-import types
 import inspect
+import types
 
+import pytracer.cache
 
 _builtins_type = builtins.type
 _builtins_isinstance = builtins.isinstance
@@ -22,22 +22,29 @@ _inspect_isclass = inspect.isclass
 def _type(_object):
 
     if _original_type := pytracer.cache.get_type(_object):
-        return _original_type
+        _ty = _original_type
     else:
-        return _builtins_type(_object)
+        _ty = _builtins_type(_object)
+    return _ty
 
 
-def _custom_type(*args):
+def _custom_type(*args, **kwargs):
     if len(args) == 1:
-        return _type(*args)
+        _ty = _type(*args)
+        if _ty == _Type:
+            return _builtins_type
+        else:
+            return _ty
     else:
-        return _builtins_type(*args)
+        return _builtins_type(*args, **kwargs)
 
 
 class _Type(type):
 
     def __new__(cls, *args, **kwargs):
-        return _custom_type(*args)
+        if len(args) == 3 and cls.__name__ != '_Type':
+            return _builtins_type.__new__(cls, *args, **kwargs)
+        return _custom_type(*args, **kwargs)
 
 
 def original_type(_type):
@@ -59,54 +66,44 @@ def _isInstance(obj, class_or_tuple, /):
 
 def _issubclass(clss, classinfo):
     t = _builtins_issubclass(clss, classinfo)
-    print(f'issubclass {clss} of {classinfo} {t}')
     return t
 
 
 class _Dict(dict):
 
     def __getitem__(self, item):
-        print(f'get item {item}')
         return super().__getitem__(item)
 
     def __setitem__(self, key, value):
-        print(f'set item {key} to {value}')
         super().__setitem__(key, value)
 
 
 class _Super(super):
 
     def __new__(cls, *args, **kwargs):
-        print(f"new super on {getattr(cls, '__name__',None)}")
         return _builtins_super(_builtins_type).__new__(cls, *args, **kwargs)
 
     def __call__(self, *args, **kwargs):
-        print(f'call super {args} {kwargs} {_builtins_super.__self__}')
         return _builtins_super.__call__(*args, **kwargs)
 
 
 class _MappingProxyType(dict):
     def __getitem__(self, item):
-        print(f'mapping get item {item}')
         return super().__getitem__(item)
 
     def __setitem__(self, key, value):
-        print(f'mapping set item {key} to {value}')
         super().__setitem__(key, value)
 
 
 def _new_class(*args, **kwargs):
-    print(f'new class {args} {kwargs}')
     return _types_new_class(*args, **kwargs)
 
 
 def _prepare_class(*args, **kwargs):
-    print(f'prepare class {args} {kwargs}')
     return _types_prepare_class(*args, **kwargs)
 
 
 def _resolves_bases(*args, **kwargs):
-    print(f'resolves bases {args} {kwargs}')
     return _types_resolves_bases(*args, **kwargs)
 
 
@@ -119,13 +116,3 @@ def _isclass(self, _object):
 def overload_builtins():
     builtins.type = _Type
     builtins.isinstance = _isInstance
-    # builtins.dict = _Dict
-    # builtins.super = _Super
-    # builtins.issubclass = _builtins_issubclass
-
-    types.new_class = _new_class
-    types.prepare_class = _prepare_class
-    types.resolve_bases = _resolves_bases
-    # types.MappingProxyType = _types_MappingProxyType
-
-    inspect.isclass = _inspect_isclass

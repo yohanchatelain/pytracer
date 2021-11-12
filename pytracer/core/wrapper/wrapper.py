@@ -250,6 +250,8 @@ class WrapperInstance:
         self._module = module
 
     def __getattribute__(self, name):
+        if name == _pytracer_instance_attribute:
+            return _pytracer_instance_attribute
         if name == '_name':
             return object.__getattribute__(self, '_name')
         if name == '_function':
@@ -270,8 +272,6 @@ class WrapperInstance:
             return getattr(self._function, '__class__')
         elif name == visited_attr:
             return True
-        elif name == _pytracer_instance_attribute:
-            return _pytracer_instance_attribute
         else:
             attribute = getattr(self._function, name)
             return attribute
@@ -621,6 +621,7 @@ class Wrapper(metaclass=ABCMeta):
             return "<string>"
 
     def handle_excluded_function(self, name, function):
+        cache.increment_exclude(self.real_obj, 'function')
         logger.debug(f"[{self.get_name()}] Excluded function {name}")
         if self.islambda(function):
             self.handle_excluded_lambda(name, function)
@@ -634,6 +635,7 @@ class Wrapper(metaclass=ABCMeta):
         cache.visited_functions[id(function)] = function
 
     def handle_included_function(self, name, function):
+        cache.increment_include(self.real_obj, 'function')
         logger.debug(
             f"[{self.get_name()}] Included function {name}", caller=self)
         if self.islambda(function):
@@ -771,6 +773,7 @@ class Wrapper(metaclass=ABCMeta):
         return inspect.isclass(attr)
 
     def handle_included_class(self, name, clss):
+        cache.increment_include(self.real_obj, 'classe')
         logger.debug(f"[{self.get_name()}] Included class {name}", caller=self)
         wrp = WrapperClass(clss)
         class_wrp = wrp.get_wrapped_object()
@@ -786,6 +789,7 @@ class Wrapper(metaclass=ABCMeta):
             f"[ClassHandler] {clss} ({hex(id(clss))}) -> {class_wrp} ({hex(id(class_wrp))})", caller=self)
 
     def handle_excluded_class(self, name, clss):
+        cache.increment_exclude(self.real_obj, 'classe')
         logger.debug(f"[{self.get_name()}] Excluded class {name}", caller=self)
         classname = getattr(clss, "__name__")
         logger.debug(f"Normal class {clss}", caller=self)
@@ -840,6 +844,7 @@ class Wrapper(metaclass=ABCMeta):
         logger.debug(f"Class {clssname} has been handled", caller=self)
 
     def handle_included_basic(self, name, obj):
+        cache.increment_include(self.real_obj, 'basic')
         logger.debug(f"[{self.get_name()}] Included basic {name}", caller=self)
         wrp_obj = obj
         if not hasattr(obj, visited_attr) and callable(obj):
@@ -852,6 +857,7 @@ class Wrapper(metaclass=ABCMeta):
         setattr(self.wrapped_obj, name, wrp_obj)
 
     def handle_excluded_basic(self, name, obj):
+        cache.increment_exclude(self.real_obj, 'basic')
         logger.debug(f"[{self.get_name()}] Excluded basic {name}", caller=self)
         setattr(self.wrapped_obj, name, obj)
 
@@ -1063,6 +1069,7 @@ class Wrapper(metaclass=ABCMeta):
         """
         for attribute_name in _attributes_names:
             # print(f'Checking {attribute_name}')
+            cache.increment_visit(_object)
             attribute = vars(_object)[attribute_name]
 
             if is_special_attributes(attribute_name):

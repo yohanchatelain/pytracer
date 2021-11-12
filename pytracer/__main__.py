@@ -2,16 +2,16 @@ import argparse
 import os
 import shutil
 
-import pytracer.module.parser_init as parser_init
-import pytracer.module.tracer_init as tracer_init
-import pytracer.module.info_init as info_init
-import pytracer.gui.index_init as visualize_init
-import pytracer.module.clean_init as clean_init
-from pytracer.core.config import config as cfg
-from pytracer.core.config import constant
-import pytracer.module.info as pytracer_info
 import pytracer.builtins
 import pytracer.cache
+import pytracer.gui.index_init as visualize_init
+import pytracer.module.clean_init as clean_init
+import pytracer.module.info as pytracer_info
+import pytracer.module.info_init as info_init
+import pytracer.module.parser_init as parser_init
+import pytracer.module.tracer_init as tracer_init
+from pytracer.core.config import config as cfg
+from pytracer.core.config import constant
 
 
 def clean():
@@ -35,6 +35,7 @@ def pytracer_module_main(args):
         TracerRun(args).main()
         pytracer_info.register.set_trace_size()
         pytracer_info.register.register_trace()
+        pytracer.cache.print_stats()
     elif args.pytracer_module == "parse":
         from pytracer.module.parser import main
         pytracer_info.register.set_args(args)
