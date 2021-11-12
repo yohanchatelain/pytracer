@@ -13,6 +13,7 @@ from contextlib import contextmanager
 import pytracer.cache as cache
 import pytracer.core.inout._init as _init
 import pytracer.core.inout.binding as binding
+import pytracer.core.inout.writer._writer as _writer
 import pytracer.utils as ptutils
 from pytracer.cache import dumped_functions, visited_files
 from pytracer.core.config import config as cfg
@@ -20,8 +21,6 @@ from pytracer.core.config import constant
 from pytracer.utils import get_functions_from_traceback, report
 from pytracer.utils.log import get_logger
 from pytracer.utils.singleton import Counter
-
-from . import _writer
 
 logger = get_logger()
 
@@ -119,8 +118,6 @@ class WriterPickle(_writer.Writer):
             self.ostream = open(self.filename_path, "wb")
             self.pickler = PytracerPickler(
                 self.ostream, protocol=pickle.HIGHEST_PROTOCOL)
-            # self.pickler = pickle.Pickler(
-            #     self.ostream, protocol=pickle.HIGHEST_PROTOCOL)
             self.pickler.fast = True
         except OSError as e:
             logger.error(f"Can't open pickle file: {self.filename_path}",
