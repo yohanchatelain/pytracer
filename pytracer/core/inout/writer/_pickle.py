@@ -107,8 +107,7 @@ class WriterPickle(_writer.Writer):
         for filename in visited_files:
             src = filename
             if os.path.isfile(src):
-                path = self.parameters.cache_sources_path
-                dst = os.path.join([path, filename])
+                dst = f"{self.parameters.cache_sources_path}{os.path.sep}{filename}"
                 dstdir = os.path.dirname(dst)
                 os.makedirs(dstdir, exist_ok=True)
                 shutil.copy(src, dst)
