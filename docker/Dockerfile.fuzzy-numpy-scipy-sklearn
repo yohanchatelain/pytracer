@@ -25,8 +25,8 @@ CMD ["pytracer trace --module "]
 FROM builder 
 
 RUN cd /opt/build/pytracer && \
-    pytest --script-launch-mode=subprocess --nsamples=3 -m "not slow" -v -k "trace_only"
+    pytest -x --script-launch-mode=subprocess --nsamples=3 -m "not slow" -v -k "trace_only"
 RUN cd /opt/build/pytracer && \
-    pytest --script-launch-mode=subprocess --nsamples=3 -m "not slow" -v -k "trace_parse"
+    pytest -x --script-launch-mode=subprocess --nsamples=3 -m "not slow" -v -k "trace_parse"
 
 ENTRYPOINT [ "/bin/bash" ]
