@@ -90,8 +90,14 @@ def increment_visit(module):
     if module in _attribute_counter:
         _attribute_counter[module]['visited'] += 1
     else:
-        _attribute_counter[module] = dict(visited=1, included=dict(
-            function=0, classe=0, basic=0), excluded=dict(function=0, classe=0, basic=0))
+        _attribute_counter[module] = dict(visited=1,
+                                          included=dict(function=0,
+                                                        classe=0,
+                                                        basic=0),
+                                          excluded=dict(function=0,
+                                                        classe=0,
+                                                        basic=0)
+                                          )
 
 
 def increment_include(module, _type):

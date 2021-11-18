@@ -4,6 +4,10 @@ ENV VFC_BACKENDS "libinterflop_ieee.so"
 
 COPY . /opt/build/pytracer 
 
+RUN git clone https://github.com/verificarlo/significantdigits.git /opt/build/significantdigits && \
+    cd /opt/build/significantdigits && \
+    python3 -m pip install . -r requirements_docker.txt
+
 RUN cd /opt/build/pytracer && \
     pip3 install . -r requirements-fuzzy.txt
 

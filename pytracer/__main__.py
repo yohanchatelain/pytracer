@@ -21,10 +21,6 @@ def clean():
     if os.path.isdir(dir_to_clean):
         shutil.rmtree(dir_to_clean, ignore_errors=True)
 
-# Dynamically import module to avoid
-# extra module being imported while tracing
-# like importing the numpy module before tracing it
-
 
 def pytracer_module_main(args):
     if args.pytracer_module == "trace":
@@ -35,7 +31,6 @@ def pytracer_module_main(args):
         TracerRun(args).main()
         pytracer_info.register.set_trace_size()
         pytracer_info.register.register_trace()
-        pytracer.cache.print_stats()
     elif args.pytracer_module == "parse":
         from pytracer.module.parser import main
         pytracer_info.register.set_args(args)
@@ -71,6 +66,7 @@ def main():
         pytracer_module_main(args)
     else:
         parser.print_help()
+
 
 if __name__ == "__main__":
     main()
