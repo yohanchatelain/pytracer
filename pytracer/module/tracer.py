@@ -133,7 +133,7 @@ class PytracerLoader(Loader):
             return wrapped_module
         except ImportError as e:
             logger.warning(f"ImportError encountered for {spec}", caller=self,
-                           error=e, raise_error=True)
+                           error=e)
         except Exception as e:
             logger.critical("Unknown exception", error=e,
                             caller=self)
