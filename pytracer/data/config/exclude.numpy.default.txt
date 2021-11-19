@@ -42,6 +42,7 @@ numpy.core._methods _all
 numpy.core._methods _amax
 numpy.core._methods _amin
 numpy.core._methods _any
+numpy.core._multiarray_umath array
 numpy.core._multiarray_umath add_docstring
 numpy.core._multiarray_umath can_cast
 numpy.core._multiarray_umath copyto

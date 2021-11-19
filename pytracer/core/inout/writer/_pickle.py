@@ -3,7 +3,7 @@ import atexit
 import datetime
 import io
 import os
-import pickle
+import dill as pickle
 import shutil
 import threading
 import traceback
@@ -39,10 +39,10 @@ def increment_visit(module, function):
 class PytracerPickler(pickle.Pickler):
 
     def reducer_override(self, obj):
-        if hasattr(obj, 'generic_wrapper'):
+        if hasattr(obj, 'generic_wrapper') or hasattr(obj, '_generic_wrapper'):
             d = (types.FunctionType, obj.__name__, {
                  k: v for k, v in obj.__dict__.items()
-                 if k != 'generic_wrapper'})
+                 if k not in ('generic_wrapper', '_generic_wrapper')})
             return d
         else:
             return NotImplemented
@@ -116,9 +116,9 @@ class WriterPickle(_writer.Writer):
     def _init_streams(self):
         try:
             self.ostream = open(self.filename_path, "wb")
-            self.pickler = PytracerPickler(
+            self.pickler = pickle.Pickler(
                 self.ostream, protocol=pickle.HIGHEST_PROTOCOL)
-            self.pickler.fast = True
+            # self.pickler.fast = True
         except OSError as e:
             logger.error(f"Can't open pickle file: {self.filename_path}",
                          error=e, caller=self, raise_error=False)

@@ -1,5 +1,5 @@
 import importlib
-import pickle
+import dill as pickle
 
 import pytracer.core.inout._init as _init
 import pytracer.core.inout.reader._reader as _reader

@@ -67,10 +67,18 @@ class WrapperInstance:
             return object.__getattribute__(self, '_function_str')
         if name == '_module':
             return object.__getattribute__(self, '_module')
+        if name == '__module__':
+            return object.__getattribute__(self, '_module')
         if name == '__call__':
             return object.__getattribute__(self, '__call__')
         if name == '_wrap':
             return object.__getattribute__(self, '_wrap')
+        if name == '__getstate__':
+            return object.__getattribute__(self, '__getstate__')
+        if name == '__setstate__':
+            return object.__getattribute__(self, '__setstate__')
+        if name == '__reduce_ex__':
+            return object.__getattribute__(self, '__reduce_ex__')
         if name == '__class__':
             return getattr(self._function, '__class__')
         if name == visited_attr:
@@ -89,6 +97,18 @@ class WrapperInstance:
                                 self._name,
                                 *args, **kwargs)
         return wrapper
+
+    def __setstate__(self, state):
+        print('setstate')
+        self._function = state
+
+    def __getstate__(self):
+        print('getstate')
+        return self._function
+
+    def __reduce_ex__(self, protocol):
+        print('reduce')
+        return (self._function, ())
 
     def __call__(self, *args, **kwargs):
         _function = object.__getattribute__(self, '_function')
