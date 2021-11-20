@@ -86,8 +86,8 @@ class StatisticNumpy:
 
     def _preprocess_values(self, values):
         x0 = values[0]
-        if spr.issparse(x0):
-            return np.array([x.toarray() for x in values])
+        # if spr.issparse(x0):
+        #     return np.array([x.toarray() for x in values])
         if isinstance(x0, np.ma.MaskedArray):
             return np.array([x.data for x in values])
         if isinstance(values, list):
@@ -191,12 +191,12 @@ class StatisticNumpy:
         return _sig
 
     def _sig_part(self, mean, std):
-        if not spr.issparse(mean):
-            method = method_str_to_enum[module_args['method']]
-            sig = significant_digits(self._data, reference=mean, method=method)
-        else:
-            sig = mean.copy()
-            sig.data = np.log2(np.abs(mean.data/self.cached_std_sparse.data))
+        # if not spr.issparse(mean):
+        method = method_str_to_enum[module_args['method']]
+        sig = significant_digits(self._data, reference=mean, method=method)
+        # else:
+        #     sig = mean.copy()
+        #     sig.data = np.log2(np.abs(mean.data/self.cached_std_sparse.data))
         return sig
 
     def _sig(self, mean, std):

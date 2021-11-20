@@ -199,7 +199,10 @@ class ExporterHDF5(_exporter.Exporter):
             mean = raw_mean
             std = raw_std
             sig = raw_sig
-            info = str(stats.values()[0])
+            if not spr.issparse(stats.values()[0]):
+                info = str(stats.values()[0])
+            else:
+                info = ''
         else:
             mean = np.mean(raw_mean, dtype=np.float64)
             std = np.mean(raw_std, dtype=np.float64)
