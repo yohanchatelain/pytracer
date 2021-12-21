@@ -70,19 +70,49 @@ environment_variables = {
     "config": "PYTRACER_CONFIG"
 }
 
+_text_extension = ".txt"
+_json_extension = ".json"
+_pickle_extension = ".pkl"
+_hdf5_extension = ".h5"
+_csv_extension = ".csv"
+
 
 class _Constant(metaclass=Singleton):
     __attributes = {
         "cache": {"root": ".__pytracercache__",
                   "traces": "traces",
                   "stats": "stats",
-                  'sources': 'sources'},
-        "text_ext": ".txt",
-        "json_ext": ".json",
-        "pickle_ext": ".pkl",
-        "iotypes": ["text", "json", "pickle"],
-        "export": {"dat": "stats.pkl",
-                   "header": "header.pkl"},
+                  'sources': 'sources',
+                  'info': 'info',
+                  'report': 'report'},
+        "register": {
+            'trace': 'trace',
+            'aggregation': 'aggregation'
+        },
+        "extension": {
+            'text': _text_extension,
+            'json': _json_extension,
+            'pickle': _pickle_extension,
+            'hdf5': _hdf5_extension,
+            "csv": _csv_extension
+        },
+        "report": {
+            "filename": "report",
+            "ext": _csv_extension
+        },
+        "trace": {
+            "filename": '',
+            "ext": _pickle_extension
+        },
+        "callgraph": {
+            "filename": "callgraph",
+            "ext": _pickle_extension
+        },
+        "export": {
+            "filename": "stats",
+            "ext": _hdf5_extension
+        },
+        "iotypes": ["pickle"],
         "env": environment_variables,
     }
 
@@ -145,6 +175,7 @@ class _Config(object, metaclass=Singleton):
 
     _attributes = ["python_modules_path",
                    "modules_to_load",
+                   "modules_to_exclude",
                    "include_file",
                    "exclude_file",
                    "logger",
@@ -153,14 +184,18 @@ class _Config(object, metaclass=Singleton):
                    "logger.color",
                    "io",
                    "io.type",
-                   "io.filename",
+                   "io.trace",
                    "io.cache",
                    "io.cache.root",
                    "io.cache.stats",
                    "io.cache.traces",
                    "io.cache.sources",
-                   "io.export.dat",
-                   "io.export.header",
+                   "io.cache.report",
+                   "io.cache.info",
+                   "io.export.filename",
+                   "io.stats.filename",
+                   "io.stats.callgraph",
+                   "io.report.filename",
                    "numpy",
                    "numpy.ufunc"
                    ]
@@ -179,13 +214,19 @@ class _Config(object, metaclass=Singleton):
     def __setitem__(self, key, value):
         return NotImplementedError
 
-    def __getattr__(self, name):
+    def __hasattr__(self, name):
+        return getattr(_Config._data, name)
+
+    def __getattr__(self, name, default=None):
         if name in self._attributes:
             try:
                 return getattr(_Config._data, name)
             except KeyError:
                 raise DictAtKeyError(name)
-        raise KeyError(self.key_error(name))
+        elif default is not None:
+            return default
+        else:
+            object.__getattribute__(self, name)
 
     def key_error(self, name):
         msg = f"Configuration: Unknown parameter {name}"
@@ -196,9 +237,11 @@ class _Config(object, metaclass=Singleton):
         cfg_path, _ = os.path.split(config)
         try:
             config_file = open(config)
+            cfg = json.load(config_file)
         except FileNotFoundError as e:
             sys.exit(f"Error while opening file {config}:{os.linesep} {e}")
-        cfg = json.load(config_file)
+        except json.decoder.JSONDecodeError as e:
+            sys.exit(f"Error while reading file {config}:{os.linesep} {e}")
         _fix_path(cfg_path, cfg)
         _Config._data = DictAt(cfg)
 

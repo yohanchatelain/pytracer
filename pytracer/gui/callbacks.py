@@ -1,23 +1,16 @@
+import json
 import plotly.express as px
-import sys
 import astroid
-import cProfile
-from threading import TIMEOUT_MAX
 import dash
-from dash import dependencies
-from pkg_resources import resource_string
 import plotly.graph_objs as go
 import os
 import numpy as np
 import plotly.colors as pcolors
-import tables
 import time
 from flask_caching import Cache
 import dash_ace
 from pytracer.gui.app import app
 import pytracer.gui.core as pgc
-import dash_core_components as dcc
-import dash_html_components as html
 import threading
 import random
 
@@ -29,6 +22,7 @@ cache = Cache(app.server, config={
     'CACHE_TYPE': 'filesystem',
     'CACHE_DIR': 'cache-directory'
 })
+
 
 @app.callback(
     dash.dependencies.Output("info-table", "data"),
@@ -73,10 +67,14 @@ def fill_heatmap_color(color_style):
     return colors
 
 # @cache.memoize(timeout=TIMEOUT)
+
+
 def str_to_utf8(string):
     return bytes(string, 'utf-8')
 
 # @cache.memoize(timeout=TIMEOUT)
+
+
 def utf8_to_str(utf8):
     return utf8.decode('utf-8')
 
@@ -90,97 +88,270 @@ def frame_args(duration):
     }
 
 
-@app.callback(
-    dash.dependencies.Output("info-data-timeline-heatmap", "figure"),
-    dash.dependencies.Output("info-timeline", "style"),
-    [dash.dependencies.Input("timeline", "hoverData"),
-     dash.dependencies.Input("timeline-mode", "value"),
-     dash.dependencies.Input('color-heatmap', 'value'),
-     dash.dependencies.Input('z-scale', 'value'),
-     dash.dependencies.State('info-data-timeline-heatmap', 'figure'),
-     dash.dependencies.State('lines-start', 'value'),
-     dash.dependencies.State('lines-end', 'value'),
-     ],
-    prevent_initial_call=True)
-def print_heatmap(hover_data, mode, color, zscale, fig, lstart, lend):
-    figure = {}
-    display = {"display": "flex", "display-direction": "row"}
+def extra_value_to_heatmap(extra_value):
+    with lock:
+        _ndarray = extra_value.read()
+    ndim = _ndarray.ndim
 
-    ctx = dash.callback_context
+    if ndim == 1:
+        _ndarray = _ndarray.reshape(_ndarray.shape+(1,))
+    if ndim == 3:
+        _row = _ndarray.shape[0]
+        _col = _ndarray.shape[1] * _ndarray.shape[2]
+        _ndarray = _ndarray.reshape((_row, _col))
+    if ndim > 3:
+        _row = _ndarray.shape[0]
+        _col = np.prod(_ndarray.shape[1:])
+        _ndarray = _ndarray.reshape((_row, _col))
 
-    extra_value = None
-    if hover_data:
-        x = hover_data['points'][0]['x']
-        info = hover_data['points'][0]['customdata']
+    _row, _col = _ndarray.shape
+    _x = list(range(_row))
+    _y = list(range(_col))
 
-        try:
-            with lock:
-                extra_value = pgc.data.get_extra_value(info['module'],
+    return _x, _y, _ndarray
+
+
+def extra_value_to_graph(extra_value):
+    with lock:
+        _ndarray = extra_value.read()
+        if _ndarray.ndim == 2:
+            if _ndarray.shape[0] == 1 or _ndarray.shape[1] == 1:
+                return _ndarray.ravel()
+    return _ndarray
+
+
+def get_heatmap(x, y, z, zmin=None, zmax=None):
+    if z is None:
+        return go.Figure()
+    heatmap = go.Figure(data=go.Heatmap(x=x,
+                                        y=y,
+                                        z=z,
+                                        zmin=None,
+                                        zmax=None,
+                                        coloraxis='coloraxis'))
+    heatmap.update_layout(width=700, height=700)
+    return heatmap
+
+
+def read_extra_value(x, info, mode):
+    try:
+        with lock:
+            extra_value = pgc.data.get_extra_value(info['module'],
                                                    info['function'],
                                                    info['label'],
                                                    info['arg'],
                                                    x,
                                                    mode)
 
-        except KeyError:
-            extra_value = None
+    except KeyError:
+        extra_value = None
+    return extra_value
 
-    if extra_value:
-        with lock:
-            _ndarray = extra_value.read()
-        ndim = _ndarray.ndim
 
-        if ndim == 1:
-            _ndarray = _ndarray.reshape(_ndarray.shape+(1,))
-        if ndim == 3:
-            _row = _ndarray.shape[0]
-            _col = _ndarray.shape[1] * _ndarray.shape[2]
-            _ndarray = _ndarray.reshape((_row, _col))
-        if ndim > 3:
-            _row = _ndarray.shape[0]
-            _col = np.prod(_ndarray.shape[1:])
-            _ndarray = _ndarray.reshape((_row, _col))
+def get_graph_complex_1D(z):
+    z_real = go.Scatter(y=z.real, name=r'$ \Re $')
+    z_imag = go.Scatter(y=z.imag, name=r'$ \Im $')
+    return go.Figure(data=[z_real, z_imag])
 
-        if zscale == 'log':
-            _ndarray = np.log(np.abs(_ndarray))
 
-        _row, _col = _ndarray.shape
-        _x = list(range(_row))
-        _y = list(range(_col))
-        if mode == "sig":
-            heatmap = go.Figure(data=go.Heatmap(x=_x,
-                                                y=_y,
-                                                z=_ndarray,
-                                                zmin=0,
-                                                zmax=64,
-                                                coloraxis='coloraxis'))
-        else:
-            heatmap = go.Figure(data=go.Heatmap(x=_x,
-                                                y=_y,
-                                                z=_ndarray,
-                                                coloraxis='coloraxis'))
+def get_graph_complex(z):
+    if z.ndim == 1:
+        return get_graph_complex_1D(z)
+    else:
+        return go.Figure()
 
-        figure = heatmap
-        figure.update_layout(width=700, height=700)
 
-        if color:
-            colorscale = dict(colorscale=color)
-            if mode == "sig":
-                colorscale['cmin'] = 0
-                colorscale['cmax'] = 53
-            figure.update_layout(coloraxis=colorscale)
+def get_scatter_complex_1D(z):
+    z_real = go.Scatter(y=z.real, name=r'$ \Re $', mode='markers')
+    z_imag = go.Scatter(y=z.imag, name=r'$ \Im $', mode='markers')
+    return go.Figure(data=[z_real, z_imag])
+
+
+def get_scatter_complex(z):
+    if z.ndim == 1:
+        return get_scatter_complex_1D(z)
+    else:
+        return go.Figure()
+
+
+def get_graph_real_1D(z):
+    return go.Figure(data=[go.Scatter(y=z)])
+
+
+def get_scatter_real_1D(z):
+    return go.Figure(data=[go.Scatter(y=z, mode='markers')])
+
+
+def get_graph_real(z):
+    if z.ndim == 1:
+        return get_graph_real_1D(z)
+    else:
+        return go.Figure()
+
+
+def get_scatter_real(z):
+    if z.ndim == 1:
+        return get_scatter_real_1D(z)
+    else:
+        return go.Figure()
+
+
+def get_graph_figure(figure_real, extra_value):
+    z = extra_value_to_graph(extra_value)
+
+    if np.iscomplexobj(z):
+        return get_graph_complex(z)
+    else:
+        return get_graph_real(z)
+
+
+def get_scatter_figure(figure_real, extra_value):
+    z = extra_value_to_graph(extra_value)
+
+    if np.iscomplexobj(z):
+        return get_scatter_complex(z)
+    else:
+        return get_scatter_real(z)
+
+
+def get_heatmap_figure(figure_real, figure_imag, extra_value, zscale, mode, min_scale, max_scale, color):
+    _x, _y, _z = extra_value_to_heatmap(extra_value)
+
+    if np.iscomplexobj(_z):
+        _z_real = _z.real
+        _z_imag = _z.imag
+    else:
+        _z_real = _z
+        _z_imag = None
+
+    if zscale == 'log2':
+        _z_real = np.log2(np.abs(_z_real))
+        if _z_imag is not None:
+            _z_imag = np.log2(np.abs(_z_imag))
+
+    if zscale == 'log10':
+        _z_real = np.log10(np.abs(_z_real))
+        if _z_imag is not None:
+            _z_imag = np.log10(np.abs(_z_imag))
+
+    # if zscale == 'log':
+    #     _z_real = np.log(np.abs(_z_real))
+    #     if _z_imag is not None:
+    #         _z_imag = np.log(np.abs(_z_imag))
+
+    if mode == "sig":
+        figure_real = get_heatmap(
+            _x, _y, _z_real, zmin=min_scale, zmax=max_scale)
+        figure_imag = get_heatmap(
+            _x, _y, _z_imag, zmin=min_scale, zmax=max_scale)
+    else:
+        figure_real = get_heatmap(_x, _y, _z_real)
+        figure_imag = get_heatmap(_x, _y, _z_imag)
+
+    colorscale = dict(colorscale=color)
+    if mode == "sig":
+        colorscale['cmin'] = min_scale
+        colorscale['cmax'] = max_scale
+
+    figure_real.update_layout(coloraxis=colorscale)
+    figure_imag.update_layout(coloraxis=colorscale)
+
+    figure_real.update_xaxes(side='top')
+    figure_real.update_yaxes(autorange='reversed')
+
+    figure_imag.update_xaxes(side='top')
+    figure_imag.update_yaxes(autorange='reversed')
+
+    return (figure_real, figure_imag)
+
+
+def handle_color_heatmap_trigger(figure, color):
+    (figure_real, figure_imag) = figure
+    colorscale = dict(colorscale=color)
+    figure_real = go.Figure(figure_real)
+    figure_imag = go.Figure(figure_imag)
+    figure_real.update_layout(coloraxis=colorscale)
+    figure_imag.update_layout(coloraxis=colorscale)
+    return (figure_real, figure_imag)
+
+
+def handle_scale_heatmap_trigger(figure, color, scale):
+    figure_real, figure_imag = figure
+    min_scale, max_scale = scale
+    colorscale = dict(colorscale=color)
+    colorscale['cmin'] = min_scale
+    colorscale['cmax'] = max_scale
+    figure_real = go.Figure(figure_real)
+    figure_imag = go.Figure(figure_imag)
+    figure_real.update_layout(coloraxis=colorscale)
+    figure_imag.update_layout(coloraxis=colorscale)
+    return (figure_real, figure_imag)
+
+
+@app.callback(
+    [dash.dependencies.Output("info-data-timeline-heatmap-real-part", "figure"),
+     dash.dependencies.Output(
+         "info-data-timeline-heatmap-imag-part", "figure"),
+     dash.dependencies.Output("info-timeline", "style")],
+    [dash.dependencies.Input("timeline", "hoverData"),
+     dash.dependencies.Input("timeline-mode", "value"),
+     dash.dependencies.Input('color-heatmap', 'value'),
+     dash.dependencies.Input('z-scale', 'value'),
+     dash.dependencies.Input('heatmap-formats', 'value'),
+     dash.dependencies.Input('minmax-heatmap-button', 'n_clicks'),
+     dash.dependencies.State('min-heatmap-input', 'value'),
+     dash.dependencies.State('max-heatmap-input', 'value'),
+     dash.dependencies.State('info-data-timeline-heatmap-real-part', 'figure'),
+     dash.dependencies.State('info-data-timeline-heatmap-imag-part', 'figure'),
+     ],
+    prevent_initial_call=True)
+def print_heatmap(hover_data, mode, color, zscale, heatmap_format, scale_button, min_scale=0, max_scale=53, fig_real={}, fig_imag={}):
+    figure_real = go.Figure()
+    figure_imag = go.Figure()
+
+    # print('print heatmap')
+
+    display = {"display": "flex", "display-direction": "row"}
+
+    ctx = dash.callback_context
 
     if ctx.triggered:
-        if ctx.triggered[0]['prop_id'] == 'color-heatmap.value':
-            colorscale = dict(colorscale=color)
-            if mode == "sig":
-                colorscale['cmin'] = 0
-                colorscale['cmax'] = 53
-            fig = go.Figure(fig)
-            fig.update_layout(coloraxis=colorscale)
-            figure = fig
+        # print(f'ctx triggered {ctx.triggered[0]["prop_id"]}')
 
-    return (figure, display)
+        figure = (fig_real, fig_imag)
+        scale = (min_scale, max_scale)
+
+        if ctx.triggered[0]['prop_id'] == 'color-heatmap.value':
+            return handle_color_heatmap_trigger(figure, color) + (display,)
+
+        if ctx.triggered[0]['prop_id'] == 'minmax-heatmap-button.n_clicks':
+            return handle_scale_heatmap_trigger(figure, color, scale) + (display,)
+
+    extra_value = None
+    if hover_data:
+        x = hover_data['points'][0]['x']
+        info = hover_data['points'][0]['customdata']
+        extra_value = read_extra_value(x, info, mode)
+
+    if extra_value:
+
+        if heatmap_format == 'heatmap':
+            (figure_real, figure_imag) = get_heatmap_figure(figure_real,
+                                                            figure_imag,
+                                                            extra_value,
+                                                            zscale, mode,
+                                                            min_scale,
+                                                            max_scale, color)
+
+        elif heatmap_format == "graph":
+            figure_real = get_graph_figure(figure_real, extra_value)
+        elif heatmap_format == "scatter":
+            figure_real = get_scatter_figure(figure_real, extra_value)
+        else:
+            raise ValueError(f'Unkwown format {heatmap_format}')
+
+    # print(figure_real)
+    return (figure_real, figure_imag, display)
 
 
 path_cache = {}
@@ -254,13 +425,6 @@ def print_source(hover_data):
     return line, source, description
 
 
-@ app.callback(dash.dependencies.Output('lines-slider-selection', 'children'),
-               dash.dependencies.Input('lines-start', 'value'),
-               dash.dependencies.Input('lines-end', 'value'))
-def print_line_selection(start, end):
-    return f"Selected lines: {start}:{end}"
-
-
 @ app.callback(
     # dash.dependencies.Output("source-modal-body-md", "children"),
     dash.dependencies.Output("source-file", "children"),
@@ -279,7 +443,6 @@ def print_modal_source(on, href, href_description):
             line = get_full_source_line(path, lineno)
             line_start = line.fromlineno
             line_end = line.tolineno
-            print(f"Line {line_start}:{line_end}")
             if os.path.isfile(path):
                 fi = open(path)
                 source_code = fi.read()
@@ -309,67 +472,113 @@ def print_modal_source(on, href, href_description):
 @ app.callback(
     dash.dependencies.Output("info-data-timeline-summary", "children"),
     [dash.dependencies.Input("timeline", "hoverData"),
-     dash.dependencies.Input("info-data-timeline-heatmap", "figure")],
+     dash.dependencies.Input("tabs-heatmap", 'value'),
+     dash.dependencies.Input("info-data-timeline-heatmap-real-part", "figure"),
+     dash.dependencies.Input("info-data-timeline-heatmap-imag-part", "figure"),
+     dash.dependencies.Input("heatmap-formats", "value")
+     ],
     dash.dependencies.State('timeline-mode', 'value'),
     prevent_initial_call=True)
-def print_datahover_summary(hover_data, fig, mode):
+def print_datahover_summary(hover_data, tab, fig_real, fig_imag, heatmap_format, mode):
     text = ""
+
+    if tab == 'tab-real-part':
+        fig = fig_real
+    elif tab == 'tab-imag-part':
+        fig = fig_imag
+    else:
+        fig = None
+
+    # print(f'hover_data {hover_data}')
+    # print(f'figure {fig}')
+
+    if not fig or not hover_data or fig['data'] == []:
+        return text
+
     if hover_data:
-        print(f'hover_data {hover_data}')
-        x = hover_data['points'][0]['x']
         info = hover_data['points'][0]['customdata']
-        extra_value = None
-        try:
-            with lock:
-                extra_value = pgc.data.get_extra_value(info['module'],
-                                                   info['function'],
-                                                   info['label'],
-                                                   info['arg'],
-                                                   x,
-                                                   mode)
-        except KeyError:
-            extra_value = None
 
-        if extra_value:
-            with lock:
-                _ndarray = extra_value.read()
-            ndim = _ndarray.ndim
+        if heatmap_format == 'heatmap':
+            _ndarray = np.array(fig['data'][0]['z'])
+        elif heatmap_format == 'graph':
+            text = (f"Function={info['function'].strip()}",
+                    f"Arg     ={info['arg'].strip()}")
+            return os.linesep.join(map(lambda x: f"- {x.replace(' ', ' &nbsp;')}", text))
+    else:
+        return text
 
-            if ndim == 1:
-                (_size,) = _ndarray.shape
-                norm_fro = np.linalg.norm(_ndarray)
-                norm_inf = np.linalg.norm(_ndarray, ord=np.inf)
-                cond = 1/norm_fro
-                text = (f"Function={info['function']}{os.linesep*2}"
-                        f"Arg={info['arg']}{os.linesep*2}"
-                        f"shape={_size}{os.linesep}{os.linesep}"
-                        f"Frobenius norm={norm_fro:.2}{os.linesep}{os.linesep}"
-                        f"Inf norm={norm_inf:.2}{os.linesep}{os.linesep}"
-                        f"Cond={cond:.2e}{os.linesep}{os.linesep}")
+    try:
+        _min = np.min(_ndarray)
+        _max = np.max(_ndarray)
+        _is_nan = False
+    except Exception:
+        _is_nan = True
+        _min = np.nan
+        _max = np.nan
+        _size = _ndarray.shape
+        norm_fro = np.nan
+        norm_inf = np.nan
+        cond = np.nan
+        text = (f"Function={info['function'].strip()}",
+                f"Arg     ={info['arg'].strip()}",
+                f"Shape   ={_size}",
+                f"Fro norm={norm_fro:.2}",
+                f"Inf norm={norm_inf:.2}",
+                f"Cond    ={cond:.2e}",
+                f"Min     ={_min:.2e}",
+                f"Max     ={_max:.2e}"
+                )
+    # _min = np.min(_ndarray)
+    # _max = np.max(_ndarray)
 
-            elif ndim == 2:
-                _row, _col = _ndarray.shape
-                norm_fro = np.linalg.norm(_ndarray)
-                norm_inf = np.linalg.norm(_ndarray, ord=np.inf)
-                norm_2 = np.linalg.norm(_ndarray, ord=2)
-                cond = np.linalg.cond(_ndarray)
-                text = (f"Function={info['function']}{os.linesep*2}"
-                        f"Arg={info['arg']}{os.linesep*2}",
-                        f"shape={_row}x{_col}{os.linesep}{os.linesep}"
-                        f"Frobenius norm={norm_fro:.2}{os.linesep}{os.linesep}"
-                        f"Inf norm={norm_inf:.2}{os.linesep}{os.linesep}"
-                        f"2-norm={norm_2:.2}{os.linesep}{os.linesep}"
-                        f"Cond={cond:.2e}{os.linesep}{os.linesep}")
+    ndim = _ndarray.ndim
 
-            elif ndim > 2:
-                shape = "x".join(map(str, _ndarray.shape))
-                norm_fro = np.linalg.norm(_ndarray)
-                text = (f"Function={info['function']}{os.linesep*2}"
-                        f"Arg={info['arg']}{os.linesep*2}"
-                        f"shape={shape}{os.linesep}{os.linesep}"
-                        f"Frobenius norm={norm_fro:.2}{os.linesep}{os.linesep}")
+    if _is_nan:
+        pass
+    elif ndim == 1:
+        # if ndim == 1:
+        (_size,) = _ndarray.shape
+        norm_fro = np.linalg.norm(_ndarray)
+        norm_inf = np.linalg.norm(_ndarray, ord=np.inf)
+        cond = 1/norm_fro
+        text = (f"Function={info['function'].strip()}",
+                f"Arg     ={info['arg'].strip()}",
+                f"Shape   ={_size}",
+                f"Fro norm={norm_fro:.2}",
+                f"Inf norm={norm_inf:.2}",
+                f"Cond    ={cond:.2e}",
+                f"Min     ={_min:.2e}",
+                f"Max     ={_max:.2e}"
+                )
 
-    return text
+    elif ndim == 2:
+        _row, _col = _ndarray.shape
+        norm_fro = np.linalg.norm(_ndarray)
+        norm_inf = np.linalg.norm(_ndarray, ord=np.inf)
+        norm_2 = np.linalg.norm(_ndarray, ord=2)
+        cond = np.linalg.cond(_ndarray)
+        text = (f"Function={info['function'].strip()}",
+                f"Arg     ={info['arg'].strip()}",
+                f"Shape   ={_row}x{_col}",
+                f"Fro norm={norm_fro:.2}",
+                f"Inf norm={norm_inf:.2}",
+                f"2-norm  ={norm_2:.2}",
+                f"Cond    ={cond:.2e}",
+                f"Min     ={_min:.2e}",
+                f"Max     ={_max:.2e}"
+                )
+
+    elif ndim > 2:
+        shape = "x".join(map(str, _ndarray.shape))
+        norm_fro = np.linalg.norm(_ndarray)
+        text = (f"Function={info['function'].strip()}",
+                f"Arg     ={info['arg'].strip()}",
+                f"Shape   ={shape}",
+                f"Fro norm={norm_fro:.2}",
+                f"Min     ={_min:.2e}",
+                f"Max     ={_max:.2e}"
+                )
+    return os.linesep.join(map(lambda x: f"- {x.replace(' ', ' &nbsp;')}", text))
 
 
 @ app.callback(
@@ -381,9 +590,27 @@ def open_modal_source(on):
     return style_on if on else style_off
 
 
+def is_object(y):
+    try:
+        if y == []:
+            return True
+        if not np.can_cast(y[0], np.number):
+            return True
+        if np.isnan(y[0]):
+            return True
+        if 'nan' in y or b'nan' in y:
+            return True
+        if 'None' in y or b'None' in y:
+            return True
+    except Exception as e:
+        return True
+    return False
+
 # @cache.memoize(timeout=TIMEOUT)
+
+
 def get_scatter_timeline(module, function, label, backtrace, arg, mode, marker_symbol,
-                         marker_color, customdata=None, time_start=-1, time_end=sys.maxsize):
+                         marker_color, customdata=None):
 
     def get_x(values, col, *argv):
         arg = argv[0]
@@ -391,50 +618,75 @@ def get_scatter_timeline(module, function, label, backtrace, arg, mode, marker_s
         b_label = bytes(label, "utf-8")
         with lock:
             return [x[col] for x in values.where(
-                        '((name == arg) & (label == b_label))')
-                    if x["BacktraceDescription"] == backtrace
-                    and time_start <= x['time'] <= time_end]
+                '((name == arg) & (label == b_label))')
+                if x["BacktraceDescription"] == backtrace
+            ]
 
     x = pgc.data.filter(module, function, get_x, "time", arg, label)
     y = pgc.data.filter(module, function, get_x, mode, arg, label)
+    dtype = pgc.data.filter(module, function, get_x, 'dtype', arg, label)
+    dtype = dtype[0].decode('utf-8') if dtype != [] else ''
     (filename, line, lineno, name) = backtrace
+
+    decoded_arg = arg.decode('utf-8')
 
     info = {'module': module,
             'function': function,
             'label': label,
-            'arg': arg.decode('utf-8'),
+            'arg': decoded_arg,
             'filename': filename.decode('utf-8'),
             'lineno': lineno,
-            'name': name.decode('utf-8')}
+            'name': name.decode('utf-8'),
+            'dtype': dtype
+            }
 
-    customdata = []
-    hovertext = []
-    customdata_append = customdata.append
-    hovertext_append = hovertext.append
-    for i in x:
-        info['time'] = i
-        customdata_append(info)
-        hovertext_append(f"{function}{os.linesep}{arg.decode('utf-8')}")
+    _is_object = is_object(y)
+    y = [1] * len(y) if _is_object else y
+    _str = pgc.data.filter(module, function, get_x, 'info',
+                           arg, label) if _is_object else None
+    marker_symbol = 'star' if _is_object else marker_symbol
+    # y = [1] * len(y) if _is_object else None
 
-    scatter = go.Scattergl(name=f"{function} - {arg.decode('utf-8')} - {lineno}",
+    customdata = [{**info, 'time': i} for i in x]
+    _hovertext = '<br>'.join([function, decoded_arg, dtype]) + os.linesep
+    hovertext = [_hovertext] * len(x)
+
+    hovertemplate = ('<b>X</b>: %{x}',
+                     '<b>Y</b>: %{y:7e}',
+                     '<b>%{text}</b>')
+
+    if _is_object and _str != []:
+        description = f"<b>{_str[0].decode('utf-8')}</b>"
+        hovertemplate += (description,)
+
+    hovertemplate = '<br>'.join(hovertemplate)
+
+    name = f"{function} - {decoded_arg} - {lineno}"
+
+    scatter = go.Scattergl(name=name,
                            #    legendgroup=f"group{backtrace}",
                            x=x,
                            y=y,
-                           hovertemplate='<b>X</b>: %{x}' +
-                           '<br><b>Y</b>: %{y:.7e}<br>' +
-                           '<b>%{text}</b>',
+                           hovertemplate=hovertemplate,
+                           #    '<b>X</b>: %{x}' +
+                           #    '<br><b>Y</b>: %{y:.7e}<br>' +
+                           #    '<b>%{text}</b>',
                            text=hovertext,
                            customdata=customdata,
                            mode="markers",
                            marker_symbol=marker_symbol,
-                           marker_color=marker_color)
+                           marker_color=marker_color,
+                           marker_size=10,
+                           marker_opacity=0.5,
+                           meta={'module': module, 'function': function})
     return scatter
 
 # @cache.memoize(timeout=TIMEOUT)
+
+
 def add_scatter(fig, module, function,
                 label, backtraces_set,
-                argsname, colors, marker, mode,
-                time_start=0, time_end=sys.maxsize):
+                argsname, colors, marker, mode):
 
     for backtrace in backtraces_set:
         for arg in argsname:
@@ -446,13 +698,13 @@ def add_scatter(fig, module, function,
                                            arg,
                                            mode,
                                            marker,
-                                           colors[backtrace],
-                                           time_start=time_start,
-                                           time_end=time_end)
+                                           colors[backtrace])
 
             fig.add_trace(scatter)
 
 # @cache.memoize(timeout=TIMEOUT)
+
+
 def get_name(astname):
     if isinstance(astname, astroid.Attribute):
         name = get_name(astname.expr)
@@ -468,6 +720,8 @@ def get_name(astname):
         raise TypeError
 
 # @cache.memoize(timeout=TIMEOUT)
+
+
 def get_first_call_from_line(lfile, lstart):
     src = None
     with open(lfile) as fi:
@@ -481,31 +735,109 @@ def get_first_call_from_line(lfile, lstart):
     return calls_list
 
 
+_colors_map = dict()
+
+
+def get_colors(module, function):
+    if (key := (module, function)) in _colors_map:
+        return _colors_map[key]
+
+    def get_x_in(values, col):
+        b_inputs = b"inputs"
+        with lock:
+            return [x[col] for x in values.where('((label == b_inputs))')]
+
+    def get_x_out(values, col):
+        b_outputs = b"outputs"
+        with lock:
+            return [x[col] for x in values.where('((label == b_outputs))')]
+
+    backtraces_in = pgc.data.filter(
+        module, function, get_x_in, "BacktraceDescription")
+
+    backtraces_out = pgc.data.filter(
+        module, function, get_x_out, "BacktraceDescription")
+
+    backtraces_set = set.union(set(backtraces_in), set(backtraces_out))
+
+    _colors = pcolors.qualitative.Dark24 * 10
+    random.shuffle(_colors)
+    colors = {bt: _colors[i]
+              for i, bt in enumerate(backtraces_set)}
+
+    key = (module, function)
+    value = (colors, backtraces_set)
+    _colors_map[key] = value
+    return value
+
+
+def remove_scatter(figure, module, function):
+    meta_to_remove = {'module': module, "function": function}
+    for data in figure['data']:
+        if data['meta'] == meta_to_remove:
+            data['visible'] = False
+
+
+@ app.callback(
+    dash.dependencies.Output("download-timeline", "data"),
+    dash.dependencies.Input("dump-timeline", "n_clicks"),
+    dash.dependencies.State("timeline", "figure"),
+    prevent_initial_call=True
+)
+def dump_timeline(n_clicks, figure):
+    data = json.dumps(figure, ensure_ascii=False, indent=2)
+    return dict(content=data, filename='timeline.json')
+
+
+@ app.callback(
+    dash.dependencies.Output("download-heatmap", "data"),
+    dash.dependencies.Input("dump-heatmap-button", "n_clicks"),
+    dash.dependencies.State('tabs-heatmap', 'value'),
+    dash.dependencies.State("info-data-timeline-heatmap-real-part", "figure"),
+    dash.dependencies.State("info-data-timeline-heatmap-real-part", "figure"),
+    prevent_initial_call=True
+)
+def dump_heatmap_real(n_clicks, tab, figure_real, figure_imag):
+    if tab == "tab-real-part":
+        data = json.dumps(figure_real, ensure_ascii=False, indent=2)
+        name = 'heatmap-real.json'
+    elif tab == 'tab-imag-part':
+        data = json.dumps(figure_imag, ensure_ascii=False, indent=2)
+        name = 'heatmap-imag.json'
+    else:
+        raise Exception(f'Unknown tab {tab}')
+
+    return dict(content=data, filename=name)
+
+
+@ app.callback(
+    dash.dependencies.Output("current-selected-rows", "data"),
+    dash.dependencies.Output("previous-selected-rows", "data"),
+    dash.dependencies.Input("info-table", "selected_rows"),
+    dash.dependencies.State("current-selected-rows", "data")
+)
+def update_selected_rows(selected_rows, current_selection):
+    return (selected_rows, current_selection)
+
+
 @ app.callback(
     dash.dependencies.Output("timeline", "figure"),
-    [dash.dependencies.Input("info-table", "selected_rows"),
+    [dash.dependencies.Input("current-selected-rows", "data"),
      dash.dependencies.Input("info-table", "data"),
      dash.dependencies.Input("timeline-mode", "value"),
      dash.dependencies.Input("x-scale", "value"),
      dash.dependencies.Input("y-scale", "value"),
      dash.dependencies.Input("x-format", "value"),
      dash.dependencies.Input("y-format", "value"),
-     dash.dependencies.Input("line-button", "on"),
      dash.dependencies.State("timeline", "figure"),
-     dash.dependencies.State("lines-start", "value"),
-     dash.dependencies.State("lines-end", "value"),
-     dash.dependencies.State("lines-file-selection", "value"),
-     dash.dependencies.State("time-start", "value"),
-     dash.dependencies.State("time-end", "value")
+     dash.dependencies.State("previous-selected-rows", "data"),
      ])
 def update_timeline(selected_rows, data, mode, xscale, yscale,
-                    xfmt, yfmt, line_on, curr_fig, lstart, lend, lfile,
-                    time_start, time_end):
+                    xfmt, yfmt, curr_fig, prev_selected_rows):
     ctx = dash.callback_context
 
     b = time.perf_counter()
     if ctx.triggered:
-        print(ctx.triggered)
         trigger = ctx.triggered[0]['prop_id']
         if trigger in ("x-scale.value", 'y-scale.value', 'x-format.value', 'y-format.value'):
             value = ctx.triggered[0]['value']
@@ -518,27 +850,41 @@ def update_timeline(selected_rows, data, mode, xscale, yscale,
                 fig.update_yaxes(type=value)
             elif trigger == 'y-format.value':
                 fig.update_yaxes(tickformat=value)
-            print("Return fig")
             return fig
 
-    fig = go.Figure(layout={'height': 800})
+    new_fig = go.Figure(
+        layout={'height': 800,
+                'modebar': {'orientation': 'v'}
+                # 'paper_bgcolor': 'hsla(0,0%,0%,0%)',
+                # 'plot_bgcolor': 'hsla(0,0%,0%,0%)',
+                # 'xaxis': {'gridcolor': 'grey'},
+                # 'axis': {'gridcolor': 'grey'}
+                }
+    )
+
+    if curr_fig is None:
+        fig = new_fig
+    else:
+        fig = go.Figure(curr_fig)
+
+    if selected_rows == []:
+        return new_fig
+    else:
+        rows_to_add = set.difference(
+            set(selected_rows), set(prev_selected_rows))
+        rows_to_remove = set.difference(
+            set(prev_selected_rows), set(selected_rows))
+
     ylabel = pgc.get_ylabel(mode)
     fig.update_xaxes(title_text="Invocation", type=xscale)
     fig.update_yaxes(title_text=ylabel,
                      rangemode="tozero", type=yscale)
 
-    module_and_function = [data[x] for x in selected_rows]
-
-    if line_on:
-        if os.path.isfile(lfile):
-            pgc.data.get_first_call_from_line(lstart)
-        else:
-            print(f"File {lfile} does not exit")
-
-    time_start = -1 if time_start is None else int(time_start)
-    time_end = sys.maxsize if time_end is None else int(time_end)
+    module_and_function_to_add = [data[x] for x in rows_to_add]
+    module_and_function_to_remove = [data[x] for x in rows_to_remove]
 
     # @cache.memoize(timeout=TIMEOUT)
+
     def get_x_in(values, col):
         b_inputs = b"inputs"
         with lock:
@@ -550,17 +896,11 @@ def update_timeline(selected_rows, data, mode, xscale, yscale,
         with lock:
             return [x[col] for x in values.where('((label == b_outputs))')]
 
-    for mf in module_and_function:
+    for mf in module_and_function_to_add:
         module = mf["module"]
         function = mf["function"]
 
-        backtraces = pgc.data.filter(
-            module, function, get_x_in, "BacktraceDescription")
-        backtraces_set = set(backtraces)
-        _colors = pcolors.qualitative.Alphabet * 10
-        random.shuffle(_colors)
-        colors = {bt: _colors[i]
-                  for i, bt in enumerate(backtraces_set)}
+        colors, backtraces_set = get_colors(module, function)
 
         names = pgc.data.filter(
             module, function, get_x_in, "name")
@@ -569,8 +909,7 @@ def update_timeline(selected_rows, data, mode, xscale, yscale,
         add_scatter(fig=fig,
                     module=module, function=function,
                     label="inputs", backtraces_set=backtraces_set,
-                    argsname=argsname, colors=colors, marker="triangle-up", mode=mode,
-                    time_start=time_start, time_end=time_end)
+                    argsname=argsname, colors=colors, marker="triangle-up", mode=mode)
 
         names = pgc.data.filter(
             module, function, get_x_out, "name")
@@ -579,9 +918,59 @@ def update_timeline(selected_rows, data, mode, xscale, yscale,
         add_scatter(fig=fig,
                     module=module, function=function,
                     label="outputs", backtraces_set=backtraces_set,
-                    argsname=argsname, colors=colors, marker="triangle-down", mode=mode,
-                    time_start=time_start, time_end=time_end)
+                    argsname=argsname, colors=colors, marker="triangle-down", mode=mode)
+
+    for mf in module_and_function_to_remove:
+        module = mf["module"]
+        function = mf["function"]
+        remove_scatter(figure=fig, module=module, function=function)
 
     e = time.perf_counter()
     print("update_timeline", e-b)
+    # print(fig.data)
     return fig
+
+
+@app.callback(
+    dash.dependencies.Output("histo_bin_selected", "children"),
+    [dash.dependencies.Input("histo_bin_selector", "value")]
+)
+def update_histo_bin_selected(nb_bins):
+    return f"Nb bins: {nb_bins}"
+
+
+@app.callback(
+    dash.dependencies.Output("histo_heatmap", "figure"),
+    [dash.dependencies.Input('tabs-heatmap', 'value'),
+     dash.dependencies.Input("info-data-timeline-heatmap-real-part", "figure"),
+     dash.dependencies.Input("info-data-timeline-heatmap-imag-part", "figure"),
+     dash.dependencies.Input("histo_bin_selector", "value"),
+     dash.dependencies.Input("histo_normalization", "value")],
+    dash.dependencies.State("timeline-mode", "value"))
+def update_histo(tabs, heatmap_real, heatmap_imag, nbins, normalization, mode):
+    if tabs == 'tab-real-part':
+        heatmap = heatmap_real
+    elif tabs == 'tab-imag-part':
+        heatmap = heatmap_imag
+    else:
+        heatmap = None
+
+    if heatmap == {} or heatmap is None:
+        return {}
+
+    if 'data' in heatmap and len(heatmap['data']) > 0 and 'z' in heatmap['data'][0]:
+        x = np.ravel(heatmap['data'][0]['z'])
+    else:
+        return go.Figure()
+
+    fig = get_histo(x, nbins, normalization)
+
+    mode_str = {"sig": "Significant digits",
+                "mean": "Mean", "std": "Standard deviation"}
+    fig.update_xaxes({"title": mode_str[mode]})
+    fig.update_yaxes({"title": normalization if normalization else "count"})
+    return fig
+
+
+def get_histo(x, nbins, normalization):
+    return go.Figure(data=go.Histogram(x=x, nbinsx=nbins, histnorm=normalization))

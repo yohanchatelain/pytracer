@@ -7,14 +7,14 @@ def comparing_various_online_solvers():
     # Author: Rob Zinkov <rob at zinkov dot com>
     # License: BSD 3 clause
 
-    import numpy as np
     import matplotlib.pyplot as plt
-    from sklearn import datasets
+    import numpy as np
 
+    from sklearn import datasets
+    from sklearn.linear_model import (LogisticRegression,
+                                      PassiveAggressiveClassifier, Perceptron,
+                                      SGDClassifier)
     from sklearn.model_selection import train_test_split
-    from sklearn.linear_model import SGDClassifier, Perceptron
-    from sklearn.linear_model import PassiveAggressiveClassifier
-    from sklearn.linear_model import LogisticRegression
 
     heldout = [0.95, 0.90, 0.75, 0.50, 0.01]
     rounds = 20
@@ -55,27 +55,20 @@ def comparing_various_online_solvers():
     # plt.show()
 
 
-@pytest.mark.xfail
-@pytest.mark.usefixtures("turn_numpy_ufunc_on", "cleandir")
-def test_trace_only_ufunc_on(script_runner):
+@pytest.mark.slow
+@pytest.mark.usefixtures("cleandir")
+def test_trace_only(script_runner):
     ret = script_runner.run("pytracer", "trace",
-                            f"--module {__file__}")
-    assert ret.success
-
-
-@pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir")
-def test_trace_only_ufunc_off(script_runner):
-    ret = script_runner.run("pytracer", "trace",
-                            f"--module {__file__}")
+                            f"--command {__file__} --test2=1")
     assert ret.success
 
 
 @pytest.mark.slow
-@pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir", "parse")
+@pytest.mark.usefixtures("cleandir", "parse")
 def test_trace_parse(nsamples, script_runner):
     for _ in range(nsamples):
         ret = script_runner.run("pytracer", "trace",
-                                f"--module {__file__}")
+                                f"--command {__file__} --test2=1")
         assert ret.success
 
 

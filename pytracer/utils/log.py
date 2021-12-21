@@ -5,10 +5,13 @@ import os
 import sys
 from abc import abstractmethod
 from enum import IntEnum, auto
+import traceback
 
+import pytracer.utils as ptutils
 import pytracer.utils.color as color
 import pytracer.utils.singleton as singleton
 from pytracer.core.config import config as cfg
+from pytracer.module.info import register
 
 logger_filename = "pytracer.log"
 
@@ -40,7 +43,7 @@ class LogInitializer(metaclass=singleton.Singleton):
     level_default = Level.INFO
 
     def __init__(self):
-        self.datefmt = "%H:%M:%S"
+        self.datefmt = "%H:%M:%S.%f"
         self.read_parameters()
 
     def read_parameters(self):
@@ -58,14 +61,17 @@ class LogInitializer(metaclass=singleton.Singleton):
         output = cfg.logger.output
         if output:
             if output == "stdout":
-                self.ofilename = "<stdout>"
+                self.filename = "<stdout>"
+                self.filename_path = None
                 self.ostream = sys.stdout
             else:
-                self.ofilename = output
-                self.ostream = open(self.ofilename, "w")
+                self.filename = ptutils.get_filename(output)
+                self.filename_path = os.path.abspath(self.filename)
+                self.ostream = open(self.filename, "w")
         else:
-            self.ofilename = self.ofilename_default
-            self.ostream = open(self.ofilename, "w")
+            self.filename = ptutils.get_filename(self.ofilename_default)
+            self.filename_path = os.path.abspath(self.filename)
+            self.ostream = open(self.filename, "w")
 
         self.color = cfg.logger.color
         _level = level_from_str(cfg.logger.level)
@@ -73,6 +79,12 @@ class LogInitializer(metaclass=singleton.Singleton):
             self.level = _level
         else:
             self.level = self.level_default
+
+    def get_filename(self):
+        return self.filename
+
+    def get_filename_path(self):
+        return self.filename_path
 
     def get_type(self):
         return self.type
@@ -104,11 +116,11 @@ class Log(metaclass=singleton.Singleton):
         pass
 
     @ abstractmethod
-    def error(self, msg, caller=None, error=None):
+    def error(self, msg, caller=None, error=None, raise_error=True):
         pass
 
     @ abstractmethod
-    def critical(self, msg, caller=None, error=None):
+    def critical(self, msg, caller=None, error=None, raise_error=True):
         pass
 
 
@@ -183,17 +195,20 @@ class LogPrint(Log):
         if error:
             self._print(Level.WARNING, caller, error, ostream=sys.stderr)
 
-    def error(self, msg, caller=None, error=None):
+    def error(self, msg, caller=None, error=None, raise_error=True):
         self._print(Level.ERROR, caller, msg, ostream=sys.stderr)
         if error:
             self._print(Level.ERROR, caller, error, ostream=sys.stderr)
+            if raise_error:
+                raise error
         sys.exit(1)
 
-    def critical(self, msg, caller=None, error=None):
+    def critical(self, msg, caller=None, error=None, raise_error=True):
         self._print(Level.CRITICAL, caller, msg, ostream=sys.stderr)
         if error:
             self._print(Level.CRITICAL, caller, error, ostream=sys.stderr)
-            raise error
+            if raise_error:
+                raise error
         sys.exit(2)
 
 
@@ -246,29 +261,33 @@ class LogLogger(Log):
         if error:
             logging.warning(error)
 
-    def error(self, msg, caller=None, error=None):
+    def error(self, msg, caller=None, error=None, raise_error=True):
         _msg = self._caller_str(caller) + str(msg)
         logging.error(_msg)
         if error:
             logging.error(error)
+            if raise_error:
+                raise error
             self.end()
-            raise error
         self.end()
         sys.exit(1)
 
-    def critical(self, msg, caller=None, error=None):
+    def critical(self, msg, caller=None, error=None, raise_error=True):
         _msg = self._caller_str(caller) + str(msg)
         logging.critical(_msg)
         if error:
             logging.critical(error)
+            if raise_error:
+                raise error
             self.end()
-            raise error
         self.end()
         sys.exit(2)
 
 
 def get_logger():
     loginit = LogInitializer()
+    register.set_pytracer_log(loginit.get_filename(),
+                              loginit.get_filename_path())
     if loginit.get_type() == Type.PRINT:
         return LogPrint()
     if loginit.get_type() == Type.LOGGER:

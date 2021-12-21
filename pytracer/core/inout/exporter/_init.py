@@ -32,7 +32,7 @@ class IOInitializer(metaclass=Singleton):
     cache_default = {"root": constant.cache.root,
                      "traces": constant.cache.traces,
                      "stats": constant.cache.stats}
-    export_default = constant.export
+    export_default = constant.export.filename
 
     def __init__(self):
         self.read_parameters()

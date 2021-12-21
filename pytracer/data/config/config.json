@@ -2,9 +2,65 @@
     "modules_to_load": [
         "numpy",
         "scipy",
-        "scipy.linalg",
-        "sklearn",
-        "sklearn.utils.extmath"
+        "sklearn"
+    ],
+    "modules_to_exclude": [
+        "numpy.compat",
+        "numpy.compat._inspect",
+        "numpy.core._dtype",
+        "numpy.core._dtype_ctypes",
+        "numpy.core._internal",
+        "numpy.core._string_helpers",
+        "numpy.core.arrayprint",
+        "numpy.core.getlimits",
+        "numpy.core.overrides",
+        "numpy.lib.utils",
+        "numpy.testing",
+        "scipy._lib.doccer",
+        "scipy.constants",
+        "scipy.linalg._cblas",
+        "scipy.linalg._flapack",
+        "scipy.linalg._fblas",
+        "scipy.linalg.blas",
+        "scipy.linalg.lapack",
+        "scipy.ndimage._ni_docstrings",
+        "scipy.sparse.sputils",
+        "scipy.sparse.linalg.isolve.utils",
+        "sklearn.utils.deprecation",
+        "sklearn.utils.validation",
+        "sklearn.utils._cython_blas",
+        "sklearn.utils._seq_dataset",
+        "scipy._lib._uarray._backend",
+        "scipy._lib._util",
+        "scipy._lib.deprecation",
+        "scipy._lib.decorator",
+        "scipy._lib._threadsafety",
+        "scipy._lib._pep440",
+        "scipy.stats._distn_infrastructure",
+        "scipy._lib._ccallback",
+        "scipy._lib._uarray._uarray",
+        "scipy.fft._pocketfft.helper",
+        "scipy._lib.messagestream",
+        "typing",
+        "pkg_resources",
+        "sklearn._config",
+        "distutils",
+        "multiprocessing",
+        "sklearn.utils._openmp_helpers",
+        "sklearn.utils._pprint",
+        "sklearn.externals._pilutil",
+        "sklearn.datasets._openml",
+        "sklearn.externals._arff",
+        "scipy.sparse.csgraph._validation",
+        "scipy.sparse.csgraph._tools",
+        "sklearn.utils.metaestimators",
+        "numpy.lib.stride_tricks",
+        "numpy.lib.index_tricks",
+        "numpy.lib.type_check",
+        "numpy.core.shape_base",
+        "numpy.lib._datasource",
+        "numpy.lib._iotools",
+        "joblib"
     ],
     "include_file": "",
     "exclude_file": [
@@ -13,7 +69,6 @@
         "exclude.scipy.default.txt",
         "exclude.sklearn.default.txt"
     ],
-    "filter_alias": true,
     "logger": {
         "format": "print",
         "output": "pytracer.log",
@@ -28,6 +83,6 @@
         }
     },
     "numpy": {
-        "ufunc": true
+        "ufunc": false
     }
 }

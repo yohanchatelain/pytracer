@@ -1,0 +1,24 @@
+FROM verificarlo/fuzzy:v0.5.0-lapack-python3.8.5 as builder
+
+COPY . /opt/build/pytracer 
+
+RUN git clone https://github.com/verificarlo/significantdigits.git /opt/build/significantdigits && \
+    cd /opt/build/significantdigits && \
+    python3 -m pip install . -r requirements_docker.txt && \
+    python3 -m pip install scipy
+
+RUN cd /opt/build/pytracer && \
+    pip3 install . -r requirements.txt
+
+ENV PYTRACER_CONFIG /opt/build/pytracer/pytracer/data/config/config.json
+
+CMD ["pytracer trace --module "]
+
+#FROM builder 
+
+RUN cd /opt/build/pytracer && \
+    pytest -x --script-launch-mode=subprocess --nsamples=3 -m "not slow" -v -k "trace_only"
+RUN cd /opt/build/pytracer && \
+    pytest -x --script-launch-mode=subprocess --nsamples=3 -m "not slow" -v -k "trace_parse"
+
+ENTRYPOINT [ "/bin/bash" ]

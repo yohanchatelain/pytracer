@@ -1,18 +1,16 @@
 import functools
-import importlib
 import inspect
-import os
-import re
-import sys
+import types
 from abc import ABCMeta, abstractmethod
-from types import FunctionType, LambdaType, ModuleType
+from types import FunctionType, LambdaType, MappingProxyType, ModuleType
 
+import pytracer
+import pytracer.builtins
+import pytracer.cache as cache
 import pytracer.core.inout.writer as iowriter
-import pytracer.core.wrapper.cache as cache
-from pytracer.core.config import DictAtKeyError
-from pytracer.core.config import config as cfg
+from pytracer.core.inout.writer import Writer
+from pytracer.core.wrapper.filter import FilterExclusion, FilterInclusion
 from pytracer.utils.log import get_logger
-from pytracer.utils.singleton import Singleton
 
 visited_attr = "__Pytracer_visited__"
 
@@ -25,167 +23,6 @@ def special_case(module, attr_obj):
         recognize by the module inspect (ex: numpy.ufunc functions)
     """
     return False
-
-
-class Filter:
-
-    _wildcard = ".*"
-
-    def __init__(self, filenames):
-        self.__modules = {}
-        for filename in filenames:
-            self.load_file(filename)
-
-    def debug(self):
-        logger.debug(f"initialized", caller=self)
-        for module, functions_set in self.__modules.items():
-            logger.debug(f"module:{module}")
-            for function in functions_set:
-                logger.debug(f"\tfunction:{function}")
-
-    def load_file(self, filename):
-        if filename:
-            logger.debug(f"read file: {filename}", caller=self)
-            self.fi = open(filename)
-            self.read_file()
-
-    def _add(self, module, function):
-        module_re = re.compile(module.replace("*", self._wildcard))
-        function_re = re.compile(function.replace("*", self._wildcard))
-        if module_re in self.__modules:
-            self.__modules[module_re].add(function_re)
-        else:
-            self.__modules[module_re] = set([function_re])
-
-    def read_file(self):
-        for line in self.fi:
-            line = line.strip()
-            if line.startswith("#") or line == "":
-                continue
-            module, function = line.split()
-            self._add(module, function)
-
-    def has_module(self, module):
-        if not module:
-            return False
-        if not bool(self.__modules):
-            return False
-        for _module in self.__modules:
-            if _module.fullmatch(module):
-                return True
-        return False
-
-    def has_function(self, functions, module=None):
-        if isinstance(functions, tuple):
-            for function in functions:
-                if self._has_function(function, module):
-                    return True
-            return False
-        if isinstance(functions, str):
-            return self._has_function(functions, module)
-        logger.critical(f"Unknown parameters {functions}", caller=self)
-        return
-
-    def has_submodule(self, submodule, module):
-        return self.has_function(submodule, module)
-
-    def _has_function(self, function, module=None):
-        if not function:
-            return False
-        if not bool(self.__modules):
-            return False
-        # We search function in module
-        if module:
-            for mod in self.__modules:
-                if mod.fullmatch(module):
-                    functions = self.__modules[mod]
-                    for _function in functions:
-                        if _function.fullmatch(function):
-                            return True
-            return False
-
-        # We search function across all modules
-        for function_set in self.__modules.values():
-            for _function in function_set:
-                if _function.fullmatch(function):
-                    return True
-        return False
-
-    def has_entire_module(self, module):
-        return self.has_function(self._wildcard, module)
-
-
-class FilterInclusion(Filter, metaclass=Singleton):
-
-    def __init__(self):
-        try:
-            super().__init__(cfg.include_file)
-        except DictAtKeyError:
-            logger.debug("No filename provided")
-            super().__init__(None)
-        except FileNotFoundError:
-            logger.error(f"include-file {cfg.include_file} not found")
-        # self.debug()
-
-
-class FilterExclusion(Filter, metaclass=Singleton):
-
-    def __init__(self):
-        try:
-            super().__init__(cfg.exclude_file)
-        except DictAtKeyError:
-            logger.debug("No filename provided")
-            super().__init__(None)
-        except FileNotFoundError:
-            logger.error(f"exclude-file {cfg.exclude_file} not found")
-        self.default_exclusion()
-        # self.debug()
-
-    def default_exclusion(self):
-        modules_to_load = [module.strip() for module in cfg.modules_to_load]
-
-        for builtin_module in sys.builtin_module_names:
-            if builtin_module not in modules_to_load:
-                self._add(builtin_module, "*")
-
-        if cfg.python_modules_path:
-            python_modules_path = cfg.python_modules_path
-        else:
-            version = sys.version_info
-            major = version.major
-            minor = version.minor
-            python_modules_path = f"{sys.prefix}/lib/python{major}.{minor}"
-            python_modules = os.listdir(python_modules_path)
-            for python_module in python_modules:
-                if python_module.endswith(".py"):
-                    python_module, _ = os.path.splitext(python_module)
-                self._add(python_module, "*")
-
-
-def instance_wrapper(function):
-    writer = iowriter.Writer()
-    _wrapper = iowriter.wrapper_instance
-
-    def wrapper(self, *args, **kwargs):
-        return _wrapper(writer, self, *args, **kwargs)
-    for attr in dir(function):
-        try:
-            obj = getattr(function, attr, None)
-            setattr(function, attr, obj)
-        except Exception:
-            continue
-    return wrapper
-
-
-def instance_wrapper_ufunc(function):
-    writer = iowriter.Writer()
-    _wrapper = iowriter.wrapper_ufunc
-
-    def wrapper(*args, **kwargs):
-        return _wrapper(writer, function, *args, **kwargs)
-    wrapper.__name__ = function.__name__
-    wrapper.types = function.types
-    return wrapper
 
 
 def is_arithmetic_operator(name):
@@ -201,140 +38,161 @@ def is_special_attributes(name):
         (name.startswith("__") and name.endswith("__"))
 
 
-def prepare_attributes(attributes):
+cached_error = set()
 
-    new_attributes = dict(attributes)
-    new_attributes["visited_attr"] = True
-    for name, attr in attributes.items():
-        if callable(attr) and not is_special_attributes(name):
-            new_attributes[name] = instance_wrapper(attr)
-
-    return new_attributes
+_pytracer_instance_attribute = '_Pytracer_instance'
 
 
-def wrap_instance(instance):
-    from numpy import frompyfunc, isnan, ufunc
+class WrapperInstance:
+    def __init__(self, name, module, function):
+        if WrapperInstance.isinstance(function):
+            logger.error(
+                f'Instance {function} is already wrapped', caller=self)
 
-    x = None
+        self._Pytracer_instance = True
+        self._Pytracer_class_ = pytracer.builtins._builtins_type(self)
+        self._function = function
+        self._function_str = getattr(self._function, '__name__', name)
+        self._name = name
+        self._module = module
 
-    if isinstance(instance, ufunc):
-        if cfg.numpy.ufunc:
-            nin = instance.nin
-            nout = instance.nout
-            wrp_instance = instance_wrapper_ufunc(instance)
-            x = frompyfunc(wrp_instance, nin, nout, identity=instance.identity)
+    def __getattribute__(self, name):
+        if name == _pytracer_instance_attribute:
+            return _pytracer_instance_attribute
+        if name == '_name':
+            return object.__getattribute__(self, '_name')
+        if name == '_function':
+            return object.__getattribute__(self, '_function')
+        if name == '_function_str':
+            return object.__getattribute__(self, '_function_str')
+        if name == '_module':
+            return object.__getattribute__(self, '_module')
+        if name == '__module__':
+            return object.__getattribute__(self, '_module')
+        if name == '__call__':
+            return object.__getattribute__(self, '__call__')
+        if name == '_wrap':
+            return object.__getattribute__(self, '_wrap')
+        if name == '__getstate__':
+            return object.__getattribute__(self, '__getstate__')
+        if name == '__setstate__':
+            return object.__getattribute__(self, '__setstate__')
+        if name == '__reduce_ex__':
+            return object.__getattribute__(self, '__reduce_ex__')
+        if name == '__class__':
+            return getattr(self._function, '__class__')
+        if name == visited_attr:
+            return True
+
+        attribute = getattr(self._function, name)
+        if callable(attribute) and not is_special_attributes(name):
+            return self._wrap(attribute)
         else:
-            x = None
-    else:
-        attributes = {name: getattr(instance, name)
-                      for name in dir(instance)}
+            return attribute
 
-        new_attributes = prepare_attributes(attributes)
-        clss = instance.__class__
-        clss_name = clss.__name__
-        try:
-            wrapped_instance = type(clss_name, (clss,), new_attributes)
-            x = wrapped_instance.__new__(wrapped_instance)
+    def _wrap(self, attribute):
+        def wrapper(*args, **kwargs):
+            return Writer.write(attribute,
+                                self._module,
+                                self._name,
+                                *args, **kwargs)
+        return wrapper
 
-            for attr_instance in dir(instance):
-                iv = getattr(instance, attr_instance)
-                ix = getattr(x, attr_instance)
-                if iv != ix:
-                    if not isnan(iv):
-                        logger.error(
-                            f"Attributes {attr_instance} differs {iv} {ix} {type(iv)} {type(ix)}")
+    def __setstate__(self, state):
+        print('setstate')
+        self._function = state
 
-        except TypeError as e:
-            if "is not an acceptable base type" in e.args[0]:
-                logger.warning(
-                    f"Instance {instance} cannot be wrapped")
-                logger.debug(f"Instance {instance}: {e}")
-            x = None
-        except Exception as e:
-            logger.warning(
-                f"Instance {instance} cannot be wrapped")
-            logger.debug("Instance {instance}: {e}")
-            x = None
+    def __getstate__(self):
+        print('getstate')
+        return self._function
 
-    return x
+    def __reduce_ex__(self, protocol):
+        print('reduce')
+        return (self._function, ())
+
+    def __call__(self, *args, **kwargs):
+        _function = object.__getattribute__(self, '_function')
+        _module = object.__getattribute__(self, '_module')
+        _name = object.__getattribute__(self, '_name')
+        # print(f'{_function} {_module} {_name}')
+        return Writer.write(_function,
+                            _module,
+                            _name,
+                            *args, **kwargs)
+
+    def isinstance(_object):
+        return hasattr(_object, _pytracer_instance_attribute)
+
+
+def get_instance_wrapper(name, module, instance):
+    wrapper = WrapperInstance(name, module, instance)
+    ty = pytracer.builtins._builtins_type(instance)
+    cache.add_type(wrapper, ty)
+
+    if type(wrapper) != ty or not isinstance(wrapper, ty):
+        logger.error(f'InstanceWrapper ({wrapper}) is not recognized as {ty}')
+
+    return wrapper
+
+
+def get_function_wrapper(name, module, function):
+    wrapper = WrapperInstance(name, module, function)
+    ty = pytracer.builtins._builtins_type(function)
+    cache.add_type(wrapper, ty)
+
+    if type(wrapper) != types.FunctionType:
+        logger.error(f'FunctionWrapper ({wrapper}) is not recognized as {ty}')
+    if type(wrapper) != types.BuiltinFunctionType:
+        logger.error(f'FunctionWrapper ({wrapper}) is not recognized as {ty}')
+    if not isinstance(wrapper, ty):
+        logger.error(f'FunctionWrapper ({wrapper}) is not recognized as {ty}')
+
+    return wrapper
 
 
 class Wrapper(metaclass=ABCMeta):
 
     cache = set()
-    wrapped_cache = set()
     wrapper_visited = set()
-    m2wm = {}
     modules_not_initialized = {}
 
     def __init__(self, obj, parent=None):
         if hasattr(obj, visited_attr):
             logger.error("Object {obj} already visited", caller=self)
-            # self.wrapped_obj = obj
-            # self.real_obj = obj
         else:
-            self.writer = iowriter.Writer()
+            self.writer = iowriter.Writer
             self.lazy_dict = {}
             self.included = FilterInclusion()
             self.excluded = FilterExclusion()
             self.real_obj = obj
-            self.parent_obj = parent
             self.obj_name = getattr(self.real_obj, "__name__")
             self.wrapped_obj = self.new_obj()
             self.init_attributes()
-            Wrapper.wrapped_cache.add(self.wrapped_obj)
             self.populate(self.real_obj, self.attributes)
-            Wrapper.m2wm[self.real_obj] = self.wrapped_obj
+            self.update_globals()
+            cache.add_global_mapping(self.real_obj, self.wrapped_obj)
+            self.compute_dependencies(self.real_obj, self.wrapped_obj)
+            self.update_dependencies(self.real_obj, self.wrapped_obj)
 
-    @ abstractmethod
+    @abstractmethod
     def new_obj(self):
         pass
 
     def init_attributes(self):
-        self.attributes = dir(self.real_obj)
-        logger.debug(f"Initialized attributes for module {self.obj_name}")
+        self.attributes = list(vars(self.real_obj))
 
-    def assert_lazy_modules_loaded(self):
-        entry = 0
-        no_entry = 0
-        total_entry = len(Wrapper.m2wm)
-        logger.info(f"Lazy evaluation for module: {self.obj_name}")
-        logger.info(
-            f"Ensure that all lazy modules ({total_entry}) have been initialized")
-        for module, submodule in Wrapper.m2wm.items():
-            modname = getattr(module, "__name__")
-            if submodule is None:
-                logger.debug(f"  module {modname} as no entry")
-                no_entry += 1
-            else:
-                submodname = getattr(submodule, "__name__")
-                logger.debug(f"  module {modname} as entry for {submodname}")
-                entry += 1
+    def update_globals(self):
+        for _, _globals in cache.globals_to_update.items():
+            for _name, _value in _globals.items():
+                if _value_wrapped := cache.get_global_mapping(_value):
+                    _globals[_name] = _value_wrapped
 
-        logger.debug(f"\tTotal_entry: {total_entry}")
-        logger.debug(f"\t      entry: {entry}")
-        logger.debug(f"\t      empty: {no_entry}")
-        assert(entry == total_entry)
-        logger.info("All modules have been initialized")
-
-    def assert_lazy_attributes_are_initialized(self):
-        logger.info("Ensure that all attributes are initialized")
-        for (submodule, attrs) in self.modules_not_initialized.items():
-            for attr, wrp_module in attrs:
-                if not hasattr(wrp_module, attr):
-                    logger.debug(
-                        f"Entry {attr} is missing in {wrp_module}, we add it with {Wrapper.m2wm[submodule]}")
-                    setattr(wrp_module, attr, Wrapper.m2wm[submodule])
-        logger.info("All attributes have been initialized")
-
-    def flush_cache(self):
-        self.m2wm.clear()
+    def mark_function_as_visited(self, func):
+        logger.debug(f"Function {func} marked as visited", caller=self)
+        setattr(func, visited_attr, True)
 
     def get_name(self):
         return self.obj_name
-
-    def get_module_name(self, obj):
-        return getattr(obj, "__module__", getattr(type(obj), "__module__"))
 
     def get_real_object(self):
         return self.real_obj
@@ -348,21 +206,11 @@ class Wrapper(metaclass=ABCMeta):
         """
         function_module, function_name = info
         function_id = id(function)
-        logger.debug(
-            f"GET WRAPPER: id {function_id}, name {function_name}, module {function_module}")
         info = (function_id, function_module, function_name)
         wrapper_code = f"""def {function_wrapper_name}(*args, **kwargs):
             return generic_wrapper({info},*args,**kwargs)
         """
-#            return generic_wrapper({self.get_name()}.{function_name},*args,**kwargs)
         return wrapper_code
-
-    # def getwrapperbasic(self, basic):
-    #     """
-    #     Return wrapper for basic python objects
-    #     """
-    #     wrapper_code = f"{basic} = {self.module_name}.{basic}{os.linesep}"
-    #     return wrapper_code
 
     def isfunction(self, attr_obj):
         """
@@ -387,6 +235,7 @@ class Wrapper(metaclass=ABCMeta):
         Handler for lambda functions
         """
         cache.visited_functions[id(function)] = function
+        cache.add_global_mapping(function, function)
         setattr(self.wrapped_obj, name, function)
 
     def handle_excluded_lambda(self, name, function):
@@ -394,131 +243,178 @@ class Wrapper(metaclass=ABCMeta):
         Handler for lambda functions
         """
         cache.visited_functions[id(function)] = function
+        cache.add_global_mapping(function, function)
         setattr(self.wrapped_obj, name, function)
 
+    def _get_dict(self, function, name):
+
+        _dict = getattr(function, '__global__', {})
+        _dict["generic_wrapper"] = getattr(self.wrapped_obj, "generic_wrapper")
+        return _dict
+
+    def _compute_dependencies_generic(self,
+                                      original_object,
+                                      wrapped_object,
+                                      map_name,
+                                      dependency_map):
+
+        try:
+            _map_original = getattr(original_object, map_name, {})
+            if isinstance(_map_original, MappingProxyType):
+                return
+            _map_wrapper = getattr(wrapped_object, map_name, {})
+            for _name, _referenced_object in _map_original.items():
+                if not callable(_referenced_object) and \
+                        not inspect.ismodule(_referenced_object):
+                    continue
+                if _name.startswith('__') and _name.endswith('__'):
+                    continue
+                # if _name == "_preprocess_data":
+                #     continue
+                is_same_object = id(_referenced_object) == id(original_object)
+                _wrapped_referenced_object = cache.get_global_mapping(
+                    _referenced_object)
+
+                if not is_same_object and\
+                        _wrapped_referenced_object is not None:
+                    _map_wrapper[_name] = _wrapped_referenced_object
+
+                else:
+                    _id = id(_referenced_object)
+                    if not (s := dependency_map.get(_id, set())):
+                        dependency_map[id(_referenced_object)] = s
+                    s.add((_name, original_object))
+                    _map_wrapper[_name] = _referenced_object
+
+        except Exception as e:
+            msg = f"Error while computing dependencies of {original_object}"
+            logger.critical(msg, caller=self, error=e)
+
+    def compute_dependencies(self, original_object, wrapped_object):
+        self._compute_dependencies_generic(
+            original_object,
+            wrapped_object,
+            "__globals__",
+            cache.function_to_dependencies_globals)
+        self._compute_dependencies_generic(
+            original_object,
+            wrapped_object,
+            "__dict__",
+            cache.function_to_dependencies_dict)
+
+    def _update_dependencies_generic(self, original_object,
+                                     wrapped_object,
+                                     map_name,
+                                     dependency_map):
+        if (to_modify := dependency_map.get(id(original_object), None)):
+            for _name, _object in to_modify:
+                getattr(_object, map_name)[_name] = wrapped_object
+
+    def update_dependencies(self, original_object, wrapped_object):
+        self._update_dependencies_generic(
+            original_object,
+            wrapped_object,
+            "__globals__",
+            cache.function_to_dependencies_globals)
+        self._update_dependencies_generic(
+            original_object,
+            wrapped_object,
+            "__dict__",
+            cache.function_to_dependencies_dict)
+
+    def get_function_path(self, function):
+        try:
+            return inspect.getfile(function)
+        except TypeError:
+            return "<string>"
+
     def handle_excluded_function(self, name, function):
+        cache.increment_exclude(self.real_obj, 'function')
         logger.debug(f"[{self.get_name()}] Excluded function {name}")
         if self.islambda(function):
             self.handle_excluded_lambda(name, function)
             return
+
+        cache.add_global_mapping(function, function)
+        # self.compute_dependencies(function, function)
+
         setattr(self.wrapped_obj, name, function)
+        cache.id_dict[id(function)] = function
         cache.visited_functions[id(function)] = function
 
-    def _get_dict(self, function, name):
-
-        new_func_dict = {
-            "generic_wrapper": getattr(self.wrapped_obj, "generic_wrapper")}
-
-        for attr in dir(function):
-            # Cause segfault with dipy
-            if attr == "__kwdefaults__":
-                continue
-            new_func_dict[attr] = getattr(function, attr)
-
-        if hasattr(function, "__module__"):
-            new_func_dict["__module__"] = getattr(function, "__module__")
-        else:
-            new_func_dict["__module__"] = self.get_name()
-
-        if hasattr(function, "__name__"):
-            new_func_dict["__name__"] = getattr(function, "__name__")
-        else:
-            new_func_dict["__name__"] = name
-
-        return new_func_dict
-
     def handle_included_function(self, name, function):
-        logger.debug(f"[{self.get_name()}] Included function {name}")
+        cache.increment_include(self.real_obj, 'function')
+        logger.debug(
+            f"[{self.get_name()}] Included function {name}", caller=self)
         if self.islambda(function):
             self.handle_included_lambda(name, function)
             return
 
-        try:
-            function_path = inspect.getfile(function)
-        except TypeError:
-            function_path = "<string>"
-
         func_dict = self._get_dict(function, name)
+
         func_name = getattr(function, "__name__", name)
         func_module = getattr(function, "__module__", self.get_name())
         func_name = func_name if func_name else name
         func_module = func_module if func_module else self.get_name()
-        assert(func_module and func_name)
+
+        if func_module is None and func_name is None:
+            logger.error(f'Included function {function} has no name')
+
         info = (func_module, func_name)
         wrapped_fun = self.getwrapperfunction(info, function, name)
-        code = compile(wrapped_fun, function_path, "exec")
-        func = FunctionType(code.co_consts[0], func_dict, name)
-        setattr(func, '__name__', func_dict['__name__'])
-        setattr(func, '__module__', func_dict['__module__'])
-        setattr(func, visited_attr, True)
-        setattr(self.wrapped_obj, name, func)
-        cache.visited_functions[id(function)] = func
-        logger.debug(
-            f"Function {name} at {hex(id(function))} -> {hex(id(func))}")
+        code = compile(wrapped_fun, "", "exec")
+        function_wrapped = FunctionType(code.co_consts[0], func_dict, name)
+
+        for attr in dir(function):
+            if attr in ("__globals__", "__code__"):
+                continue
+            try:
+                obj = getattr(function, attr)
+                new_obj = getattr(function_wrapped, attr)
+                if id(obj) != new_obj:
+                    setattr(function_wrapped, attr, obj)
+            except Exception:
+                continue
+
+        if _globals := getattr(function, '__global__', None):
+            cache.globals_to_update[id(_globals)] = _globals
+
+        cache.add_global_mapping(function, function_wrapped)
+        self.mark_function_as_visited(function_wrapped)
+        setattr(self.wrapped_obj, name, function_wrapped)
+        cache.id_dict[id(function)] = function
+        cache.visited_functions[id(function)] = function_wrapped
+        cache.add_global_mapping(function, function_wrapped)
+        self.compute_dependencies(function, function_wrapped)
+        self.update_dependencies(function, function_wrapped)
 
     def handle_function(self, name, function, module=None, exclude=False):
         """
         Handler for functions
         """
+
+        logger.debug(f"[FunctionHandler] {name} -> {function}", caller=self)
+
         if isinstance(function, functools.partial):
-            setattr(self.wrapped_obj, name, function)
-            return
-
-        alias_function_name = name
-        function_name = getattr(function, "__name__", name)
-        names = (alias_function_name, function_name)
-        module_name = self.obj_name
-
-        if hasattr(function, visited_attr):
-            logger.debug(f"Function {name} {function} has been visited ")
             setattr(self.wrapped_obj, name, function)
             return
 
         fid = id(function)
 
         if fid in cache.id_dict:
-            # if function in cache.visited_functions:
             logger.debug(f"Function {name} ({function}) cached")
             cached_function = cache.visited_functions[fid]
             try:
                 setattr(self.wrapped_obj, name, cached_function)
             except TypeError as e:
-                # pass
                 logger.warning(
                     f"Cannot set attribute {name}", caller=self, error=e)
             return
 
-        if fid in cache.id_dict:
-            logger.error(
-                f"Function {function} in cache (id:{fid} -> {cache.id_dict[fid]}) but not visited",
-                caller=self)
-        else:
-            logger.info(
-                f"Adding function {function} in cache (fid:{fid})", caller=self)
-            assert fid not in cache.id_dict
-            cache.id_dict[fid] = function
-
-        logger.debug(
-            f"Handling function {name} from {module_name} ({id(function)})")
-
         if exclude:
-            self.handle_excluded_function(alias_function_name, function)
-        elif is_arithmetic_operator(name):
-            self.handle_included_function(alias_function_name, function)
-        elif function_name == ("generic_wrapper", "_generic_wrapper"):
-            self.handle_excluded_function(alias_function_name, function)
-        elif self.included.has_module(module_name):
-            if self.included.has_function(names, module_name):
-                self.handle_included_function(alias_function_name, function)
-            else:
-                self.handle_excluded_function(alias_function_name, function)
-        elif self.excluded.has_function(names, module_name):
-            self.handle_excluded_function(alias_function_name, function)
+            self.handle_excluded_function(name, function)
         else:
-            self.handle_included_function(alias_function_name, function)
-
-        logger.debug(
-            f"create function {function_name} in module {self.get_name()}")
+            self.handle_included_function(name, function)
 
     def ismodule(self, attr):
         """
@@ -526,97 +422,25 @@ class Wrapper(metaclass=ABCMeta):
         """
         return inspect.ismodule(attr)
 
-    def handle_excluded_module(self, attr, submodule):
-        logger.debug(f"[{self.get_name()}] Excluded module {attr}")
-        submodname = submodule.__name__.split(".")[-1]
-        setattr(self.wrapped_obj, attr, submodule)
-        setattr(self.wrapped_obj, submodname, submodule)
-        # The submodule is excluded so we add itself as value
-        Wrapper.m2wm[submodule] = submodule
-
-        try:
-            _ = sys.modules.pop(submodule.__name__)
-        except KeyError:
-            pass
-
-        sys.modules[submodule.__name__] = submodule
-        globals()[submodule.__name__] = submodule
-
-        logger.debug(f"submodule {submodname} excluded")
-
-    def handle_included_module(self, attr, submodule):
-        logger.debug(f"[{self.get_name()}] Included module {attr}")
-        submodname = submodule.__name__.split(".")[-1]
-        parent = self.parent_obj if self.parent_obj else []
-        wrp = WrapperModule(submodule, [self.real_obj]+parent)
-        submodule_wrp = wrp.get_wrapped_module()
-        setattr(submodule_wrp, visited_attr, True)
-        setattr(self.wrapped_obj, attr, submodule_wrp)
-        setattr(self.wrapped_obj, submodname, submodule_wrp)
-        # The submodule is included so we add the wrapped module as value
-        Wrapper.m2wm[submodule] = submodule_wrp
-
-        try:
-            _ = sys.modules.pop(submodule.__name__)
-        except KeyError:
-            pass
-
-        sys.modules[submodule.__name__] = submodule_wrp
-        globals()[submodule.__name__] = submodule_wrp
-
-        logger.debug(f"submodule {submodname} included")
+    def update_module_depedencies(self, module):
+        for attribute_name, attribute in vars(module).items():
+            wrapped_attribute = cache.get_global_mapping(attribute)
+            if wrapped_attribute is not None:
+                setattr(module, attribute_name, wrapped_attribute)
 
     def handle_module(self, attr, submodule, exclude=False):
         """
         Handler for submodules
         """
-        submodqualname = getattr(submodule, "__name__")
-        modulename = ".".join(submodqualname.split(".")[:-1])
-        submodname = submodqualname.split(".")[-1]
+        logger.debug(f"[ModuleHandler] {attr} -> {submodule}", caller=self)
 
-        if submodule in Wrapper.m2wm:
-            # Submodule has been visited
-            if Wrapper.m2wm[submodule] is not None:
-                # Submodule is already initialized so we can
-                # add it in the wrapped module entries
-                logger.debug(f"submodule {attr} cached as {submodname}")
-                setattr(self.wrapped_obj, attr, Wrapper.m2wm[submodule])
-            else:
-                if submodule in Wrapper.modules_not_initialized:
-                    Wrapper.modules_not_initialized[submodule].add(
-                        (attr, self.wrapped_obj))
-                else:
-                    Wrapper.modules_not_initialized[submodule] = set(
-                        [(attr, self.wrapped_obj)])
+        if submodule_wrapped := cache.get_global_mapping(submodule):
+            submodule = submodule_wrapped
 
-                logger.debug(f"submodule {attr} cached but not initialized")
-            return
+        if submodule.__name__ not in cache.module_to_not_update:
+            self.update_module_depedencies(submodule)
 
-        # submodule is visited so add an entry for it
-        # we set the value to None since it has not been
-        # initialized yet
-        Wrapper.m2wm[submodule] = None
-
-        logger.debug(f"submodule detected: {submodqualname}")
-
-        # random       * -> <submodulename>  *
-        # numpy.random * -> <submodqualname> *
-        # numpy random   -> <module> <attr>
-
-        if exclude:
-            self.handle_excluded_module(attr, submodule)
-        elif submodname == "wrapper.wrapper":
-            self.handle_excluded_module(attr, submodname)
-        elif hasattr(submodule, visited_attr):
-            self.handle_excluded_module(attr, submodule)
-        elif self.included.has_submodule(attr, modulename) or \
-                self.included.has_module(submodqualname):
-            self.handle_included_module(attr, submodule)
-        elif self.excluded.has_submodule(attr, modulename) or \
-                self.excluded.has_entire_module(submodqualname):
-            self.handle_excluded_module(attr, submodule)
-        else:
-            self.handle_included_module(attr, submodule)
+        setattr(self.wrapped_obj, attr, submodule)
 
     def isclass(self, attr):
         """
@@ -625,20 +449,29 @@ class Wrapper(metaclass=ABCMeta):
         return inspect.isclass(attr)
 
     def handle_included_class(self, name, clss):
+        cache.increment_include(self.real_obj, 'classe')
         logger.debug(f"[{self.get_name()}] Included class {name}", caller=self)
         wrp = WrapperClass(clss)
         class_wrp = wrp.get_wrapped_object()
+        cache.add_global_mapping(clss, class_wrp)
+        self.compute_dependencies(clss, class_wrp)
+        self.update_dependencies(clss, class_wrp)
         classname = getattr(clss, "__name__")
         logger.debug(f"Wrapped class {class_wrp}", caller=self)
         setattr(self.wrapped_obj, name, class_wrp)
         setattr(self.wrapped_obj, classname, class_wrp)
 
-#        wrp_clss = new_class(name, inspect.getmro(clss))
+        debug_msg = (f"[ClassHandler] {clss} ({hex(id(clss))})"
+                     f" -> "
+                     f"{class_wrp} ({hex(id(class_wrp))})")
+        logger.debug(debug_msg, caller=self)
 
     def handle_excluded_class(self, name, clss):
+        cache.increment_exclude(self.real_obj, 'classe')
         logger.debug(f"[{self.get_name()}] Excluded class {name}", caller=self)
         classname = getattr(clss, "__name__")
         logger.debug(f"Normal class {clss}", caller=self)
+        cache.add_global_mapping(clss, clss)
         setattr(self.wrapped_obj, name, clss)
         setattr(self.wrapped_obj, classname, clss)
 
@@ -646,11 +479,13 @@ class Wrapper(metaclass=ABCMeta):
         """
             Handler for class
         """
+        logger.debug(f"[ClassHandler] {attr} -> {clss}", caller=self)
 
-        if clss in WrapperClass.visited_class:
-            if WrapperClass.visited_class[clss] is not None:
+        if id(clss) in WrapperClass.visited_class:
+            logger.debug(f"{clss} has been visited", caller=self)
+            if WrapperClass.visited_class[id(clss)] is not None:
                 setattr(self.wrapped_obj, attr,
-                        WrapperClass.visited_class[clss])
+                        WrapperClass.visited_class[id(clss)])
             else:
                 setattr(self.wrapped_obj, attr, None)
             return
@@ -661,11 +496,6 @@ class Wrapper(metaclass=ABCMeta):
             f"Handling class {clssname} from module {modname}", caller=self)
 
         if exclude:
-            self.handle_excluded_class(attr, clss)
-        elif inspect.isabstract(clss):
-            self.handle_excluded_class(attr, clss)
-        # Exclude class inhereting from BaseException
-        elif issubclass(clss, BaseException):
             self.handle_excluded_class(attr, clss)
         elif self.included.has_module(modname):
             if self.included.has_function(clssname, modname) or \
@@ -685,16 +515,16 @@ class Wrapper(metaclass=ABCMeta):
         logger.debug(f"Class {clssname} has been handled", caller=self)
 
     def handle_included_basic(self, name, obj):
+        cache.increment_include(self.real_obj, 'basic')
         logger.debug(f"[{self.get_name()}] Included basic {name}", caller=self)
         wrp_obj = obj
         if not hasattr(obj, visited_attr) and callable(obj):
-            logger.debug(
-                f"Create wrapper instance with {obj} at {name} ({hex(id(obj))})", caller=self)
-            wrp_obj = wrap_instance(obj)
-            wrp_obj = wrp_obj if wrp_obj else obj
+            wrp_obj = get_instance_wrapper(name, self.get_name(), obj)
+            cache.add_global_mapping(obj, wrp_obj)
         setattr(self.wrapped_obj, name, wrp_obj)
 
     def handle_excluded_basic(self, name, obj):
+        cache.increment_exclude(self.real_obj, 'basic')
         logger.debug(f"[{self.get_name()}] Excluded basic {name}", caller=self)
         setattr(self.wrapped_obj, name, obj)
 
@@ -709,26 +539,16 @@ class Wrapper(metaclass=ABCMeta):
         """
             Handler for basic objects
         """
-        obj_name = getattr(obj, "__name__", "")
-        names = (name, obj_name)
-        module_name = self.get_name()
-        logger.debug(f"check object {name} in {module_name}", caller=self)
 
-        # self.handle_excluded_basic(name, obj)
+        if name == "__spec__":
+            obj.origin = "Pytracer"
+            setattr(self.wrapped_obj, name, obj)
+            return
 
-        if self.is_hashable(obj) and obj in Wrapper.m2wm:
-            self.handle_excluded_basic(name, Wrapper.m2wm[obj])
-        elif exclude:
-            self.handle_excluded_basic(name, obj)
-        elif isinstance(obj, functools.partial):
-            self.handle_excluded_basic(name, obj)
-        elif hasattr(obj, "visited_attr"):
-            self.handle_excluded_basic(name, obj)
-        elif isinstance(obj, Wrapper):
-            self.handle_excluded_basic(name, obj)
-        elif self.included.has_function(names, module_name):
-            self.handle_included_basic(name, obj)
-        elif self.excluded.has_function(names, module_name):
+        if name == ("__cached__", "__file__"):
+            return
+
+        if exclude:
             self.handle_excluded_basic(name, obj)
         else:
             self.handle_included_basic(name, obj)
@@ -743,13 +563,13 @@ class Wrapper(metaclass=ABCMeta):
         """
             Handler for special attributes
         """
-
+        logger.debug(f"[SpecialHandler] {attr}", caller=self)
         try:
             setattr(self.wrapped_obj, attr, attr_obj)
         except Exception as e:
             logger.critical(f"{self} {attr} {attr_obj}", error=e, caller=self)
 
-    def is_excluded(self, obj, attr):
+    def is_excluded(self, obj, attr, is_module=False):
         """
             A = {set of all attributes for a object}
             o = {empty set}
@@ -757,11 +577,11 @@ class Wrapper(metaclass=ABCMeta):
             E = {set of excluded attributes}
             intersection = ∩
             union = ∪
-            difference = \
+            difference = /
             complement = ^
                     Object              |     Included    | Excluded
             -----------------------------------------------------------
-                Include and     Exclude | I \ (I ∩ E)     | I ∩ E
+                Include and     Exclude | I / (I ∩ E)     | I ∩ E
                 Include and not Exclude | I               | I^
             not Include and     Exclude | E^              | E
             not Include and not Exclude | A               | o
@@ -772,7 +592,7 @@ class Wrapper(metaclass=ABCMeta):
             |  *            *     |       o         |    A
             |  I            *     |       o         |    A
             |  *            E     |       E^        |    E
-            |  I            E     |   I \ (I ∩ E)   |  I' ∪ (I ∩ E)
+            |  I            E     |   I / (I ∩ E)   |  I' ∪ (I ∩ E)
             ---------------------------------------------------
             |  *            -     |       A         |    o
             |  I            -     |       I         |    I^
@@ -802,71 +622,147 @@ class Wrapper(metaclass=ABCMeta):
                 else: # not eo
                     include = True
         """
+
         io = self.included.has_module(obj)
         eo = self.excluded.has_module(obj)
         ia = self.included.has_function(attr, obj)
         ea = self.excluded.has_function(attr, obj)
-        if (not eo or (eo and not ea)) and (not io or (io and ia)):
-            exclude = False
-        else:
-            exclude = True
+
+        logger.debug(f"Is module {obj} included: {io}",
+                     caller=self)
+        logger.debug(f"Is module {obj} excluded: {eo}",
+                     caller=self)
+        logger.debug(f"Has module {obj} function {attr} included: {ia}",
+                     caller=self)
+        logger.debug(f"Has module {obj} function {attr} excluded: {ea}",
+                     caller=self)
+
+        if is_module:
+            if io:
+                return False
+            elif eo:
+                return True
+            else:
+                return True
+
+        if io:
+            if eo:
+                if ia and not ea:
+                    exclude = False
+                else:
+                    exclude = True
+            else:  # not eo
+                if ia:
+                    exclude = False
+                else:
+                    exclude = True
+        else:  # not io
+            if eo:
+                if ea:
+                    exclude = True
+                else:
+                    exclude = False
+            else:  # not eo
+                exclude = False
 
         return exclude
 
-    def populate(self, obj, attributes):
+    def get_module_name(self, _object):
+        if (module := inspect.getmodule(_object)) is not None:
+            return module.__name__
+        if inspect.isclass(_object):
+            return getattr(_object, "__module__")
+        elif inspect.isfunction(_object):
+            return getattr(_object, "__module__")
+        elif inspect.ismethod(_object) or inspect.ismethoddescriptor(_object):
+            module = inspect.getmodule(_object)
+            return self.get_object_name(module, '')
+        elif inspect.ismodule(_object):
+            return None
+        else:
+            return None
+
+    def get_object_name(self, _object, name):
+
+        if inspect.isclass(_object):
+            return getattr(_object, "__name__")
+        elif inspect.isfunction(_object):
+            name = getattr(_object, "__name__")
+            return getattr(_object, "__qualname__", name)
+        elif inspect.ismethod(_object) or inspect.ismethoddescriptor(_object):
+            if inspect.isbuiltin(_object):
+                return getattr(_object, "__name__")
+            if qualname := getattr(_object, "__qualname__", None):
+                return qualname.split('.')[0]
+            return getattr(_object, "__name__", name)
+        elif inspect.ismodule(_object):
+            return getattr(_object, "__name__")
+        else:
+            return None
+
+    def is_instrumented(self, _object):
+        return hasattr(_object, visited_attr) or\
+            WrapperInstance.isinstance(_object)
+
+    def handle_excluded(self, _attribute_name, _attribute):
+        setattr(self.wrapped_obj, _attribute_name, _attribute)
+
+    def populate(self, _object, _attributes_names):
         """
             Create wrapper for each attribute in the module
         """
-        for attr in attributes:
-            logger.debug(f"[{self.obj_name}] Checking {attr}", caller=self)
-            try:
-                attr_obj = getattr(obj, attr)
-            except AttributeError:
-                logger.warning((f"{attr} is not handled by "
-                                "inspec.getattr_static"), caller=self)
-                try:
-                    logger.debug(
-                        f"Trying loading module {attr}", caller=self)
-                    objname = getattr(obj, "__name__")
-                    attr_obj = importlib.import_module(
-                        objname + "." + attr)
-                except ModuleNotFoundError:
-                    logger.warning(
-                        f"Attribute {attr} cannot be handled", caller=self)
-                    continue
-                except ImportError:
-                    logger.warning(
-                        f"Attribute {attr} cannot be imported", caller=self)
-                    continue
+        for attribute_name in _attributes_names:
+            cache.increment_visit(_object)
+            attribute = vars(_object)[attribute_name]
 
-            logger.debug(f"Object {attr} at {hex(id(attr_obj))}", caller=self)
+            if is_special_attributes(attribute_name):
+                continue
 
-            if hasattr(obj, "__module__") and hasattr(obj, "__qualname__"):
-                modulename = getattr(obj, "__module__")
-                qualname = getattr(obj, "__qualname__")
-                qualname = ".".join(qualname.split(".")[:-1])
-                obj_name = f"{modulename}.{qualname}"
+            if isinstance(attribute, functools.partial):
+                setattr(self.wrapped_obj, attribute_name, attribute)
+                continue
+
+            if self.is_instrumented(attribute):
+                self.handle_excluded(attribute_name, attribute)
+                continue
+
+            logger.debug(f'attribute {attribute_name}', caller=self)
+            module_name = self.get_module_name(attribute)
+            logger.debug(f'module_name {module_name}', caller=self)
+            module_name = module_name if module_name else self.get_name()
+            object_name = self.get_object_name(attribute, attribute_name)
+            logger.debug(f'object_name {object_name}', caller=self)
+            object_name = object_name if object_name else attribute_name
+
+            exclude = self.is_excluded(module_name,
+                                       object_name,
+                                       is_module=inspect.ismodule(attribute))
+
+            if self.isspecialattr(attribute_name):
+                self.handle_special(attribute_name, attribute)
+            elif self.isclass(attribute):
+                if issubclass(attribute, dict):
+                    self.handle_basic(
+                        attribute_name, attribute, exclude=exclude)
+                else:
+                    self.handle_class(
+                        attribute_name, attribute, exclude=exclude)
+            elif self.isfunction(attribute):
+                self.handle_function(
+                    attribute_name, attribute, exclude=exclude)
+            elif self.ismodule(attribute):
+                self.handle_module(attribute_name, attribute, exclude=exclude)
             else:
-                obj_name = getattr(obj, "__name__")
-
-            exclude = self.is_excluded(obj_name, attr)
-
-            if self.isspecialattr(attr):
-                self.handle_special(attr, attr_obj)
-            elif self.isclass(attr_obj):
-                self.handle_class(attr, attr_obj, exclude=exclude)
-            elif self.isfunction(attr_obj):
-                self.handle_function(attr, attr_obj, exclude=exclude)
-            elif self.ismodule(attr_obj):
-                self.handle_module(attr, attr_obj, exclude=exclude)
-            else:
-                self.handle_basic(attr, attr_obj, exclude=exclude)
+                self.handle_basic(attribute_name, attribute, exclude=exclude)
 
 
 class WrapperModule(Wrapper):
 
     def new_obj(self):
-        return ModuleType(self.get_name())
+        new_obj = ModuleType(self.get_name())
+        logger.debug(
+            f"New object created {new_obj} {hex(id(new_obj))}", caller=self)
+        return new_obj
 
     def get_wrapped_module(self):
         return self.get_wrapped_object()
@@ -876,12 +772,8 @@ class WrapperModule(Wrapper):
 
     def init_attributes(self):
         super().init_attributes()
-        if self.parent_obj:
-            for parent in self.parent_obj:
-                self.wrapped_obj.__dict__[parent.__name__] = parent
-        setattr(self.wrapped_obj, self.obj_name, self.real_obj)
         setattr(self.wrapped_obj, "generic_wrapper",
-                self.writer.wrapper_function)
+                Writer.write_function)
 
 
 class WrapperClass(Wrapper):
@@ -894,24 +786,26 @@ class WrapperClass(Wrapper):
                           "__eq__", "__neq__", "__dir__", "__format__",
                           "__ge__", "__getattribute__", "__getstate__",
                           "__new__", "__reduce__", "__reduce_ex__",
-                          "__repr__", "__setattr__", "__setstate__", "__repr__"]
+                          "__repr__", "__setattr__", "__setstate__"]
 
     def generic_wrapper(self, info):
-        _wrapper = self.writer.wrapper_class
+        _wrapper = self.writer.write_function
 
         def _generic_wrapper(*args, **kwargs):
             return _wrapper(info, *args, **kwargs)
-        setattr(_generic_wrapper, visited_attr, True)
+        self.mark_function_as_visited(_generic_wrapper)
         return _generic_wrapper
 
     def __init__(self, clss):
         super().__init__(clss)
+        self.module_class = getattr(self.real_obj, "__module__")
         wrp_class = self.get_wrapped_object()
-        self.visited_class[self.real_obj] = wrp_class
+        self.visited_class[id(self.real_obj)] = wrp_class
+        cache.add_global_mapping(self.real_obj, wrp_class)
 
     def init_attributes(self):
-        super().init_attributes()
-        self.writer = iowriter.Writer()
+        self.attributes = list(self.real_obj.__dict__.keys())
+        self.writer = iowriter.Writer
 
     def get_module(self):
         if hasattr(self, "__module_name__"):
@@ -920,11 +814,11 @@ class WrapperClass(Wrapper):
         return self.__module_name__
 
     def new_obj(self):
-        if self.real_obj in self.visited_class:
-            if self.visited_class is not None:
-                return self.visited_class[self.real_obj]
+        if id(self.real_obj) in self.visited_class:
+            if self.visited_class[id(self.real_obj)] is not None:
+                return self.visited_class[id(self.real_obj)]
             return self.real_obj
-        self.visited_class[self.real_obj] = None
+        self.visited_class[id(self.real_obj)] = None
         return self.real_obj
 
     def is_cython_function(self, function):
@@ -940,7 +834,7 @@ class WrapperClass(Wrapper):
             src = inspect.getsource(function)
             if ('@staticmethod' in src) or ('@classmethod' in src):
                 return True
-        except TypeError:
+        except (TypeError, OSError):
             pass
 
         try:
@@ -959,8 +853,9 @@ class WrapperClass(Wrapper):
             self.handle_visited_function(name, function)
         elif registered:
             if not visited:
-                logger.error(
-                    f"Function registered={registered} and visited={visited}")
+                error = (f"Function registered={registered} "
+                         f"and not visited={visited}")
+                logger.error(error)
         elif exclude:
             self.handle_excluded_function(name, function)
         elif self.isstatic(function):
@@ -986,24 +881,27 @@ class WrapperClass(Wrapper):
         elif inspect.isbuiltin(function):
             self.handle_excluded_function(name, function)
         else:
-            super().handle_function(name, function)
+            module_name = f"{self.get_module()}.{self.obj_name}"
+            super().handle_function(name, function, module=module_name)
 
     def check_not_visited(self, function, function_id):
         if function_id in cache.id_dict:
-            logger.error(f"Function {function} (id:{hex(function_id)}) has been registered twice",
-                         caller=self)
+            error_msg = (f"Function {function} (id:{hex(function_id)}) "
+                         f"has been registered twice")
+            logger.error(error_msg, caller=self)
 
     def handle_included_methoddescriptor(self, name, function):
         function_id = id(function)
         function_class = function.__objclass__.__name__
-        # function_name = function_class + '.' + function.__name__
         function_name = function.__qualname__
         info = (function_id, function_class, function_name)
         wrapped_function = self.generic_wrapper(info)
         self.check_not_visited(function, function_id)
         cache.id_dict[function_id] = function
         cache.visited_functions[function_id] = wrapped_function
-        assert hasattr(wrapped_function, visited_attr)
+        cache.add_global_mapping(function, wrapped_function)
+        if not hasattr(wrapped_function, visited_attr):
+            logger.error(f'Included method has no {visited_attr} set')
         try:
             setattr(self.wrapped_obj, name, wrapped_function)
         except TypeError as e:
@@ -1015,53 +913,35 @@ class WrapperClass(Wrapper):
             if function_id in cache.visited_functions:
                 cache.visited_functions.pop(function_id)
         except Exception as e:
-            logger.critical(f"Unkown error while wrapping method {function} named {name}",
-                            error=e, caller=self)
+            error_msg = (f"Unkown error while wrapping "
+                         f"method {function} named {name}")
+            logger.critical(error_msg, error=e, caller=self)
         else:
-            logger.debug(f"[{self.get_name()}] Include methoddescriptor {name}",
-                         caller=self)
-
-    # TODO: This function should be safely removed
-    #       since Class object contains function
-    #       method are for instances class
-    def handle_included_method(self, name, function):
-        function_id = id(function)
-        function_class = function.__self__.__name__
-        function_name = function.__qualname__
-        # function_name = function.__name__
-        info = (function_id, function_class, function_name)
-        wrapped_function = self.generic_wrapper(info)
-        self.check_not_visited(function, function_id)
-        cache.id_dict[function_id] = function
-        cache.visited_functions[function_id] = wrapped_function
-        try:
-            setattr(self.wrapped_obj, name, wrapped_function)
-        except TypeError as e:
-            logger.warning((
-                f"cannot handle method {name}"),
-                error=e, caller=self)
-            if function_id in cache.id_dict:
-                cache.id_dict.pop(function_id)
-            if function_id in cache.visited_functions:
-                cache.visited_functions.pop(function_id)
-        except Exception as e:
-            logger.critical(f"Unkown error while wrapping method {function} named {name}",
-                            error=e, caller=self)
-        else:
-            logger.debug(
-                f"[{self.get_name()}] Include method {function_name}", caller=self)
+            debug_msg = f"[{self.get_name()}] Include methoddescriptor {name}"
+            logger.debug(debug_msg, caller=self)
 
     def handle_included_function(self, name, function):
         function_id = id(function)
         function_module = function.__module__
         function_name = function.__qualname__
-        assert function_module
-        # function_name = getattr(function, "__name__")
+
+        if function_module is None:
+            logger.error(f'Included function {function} has no module name')
+
         info = (function_id, function_module, function_name)
         wrapped_function = self.generic_wrapper(info)
+        self.mark_function_as_visited(wrapped_function)
         self.check_not_visited(function, function_id)
         cache.id_dict[function_id] = function
         cache.visited_functions[function_id] = wrapped_function
+        cache.add_global_mapping(function, wrapped_function)
+
+        if _globals := getattr(function, '__global__', None):
+            cache.globals_to_update[id(_globals)] = _globals
+
+        self.compute_dependencies(function, wrapped_function)
+        self.update_dependencies(function, wrapped_function)
+
         try:
             setattr(self.wrapped_obj, name, wrapped_function)
         except TypeError as e:
@@ -1073,24 +953,34 @@ class WrapperClass(Wrapper):
             if function_id in cache.visited_functions:
                 cache.visited_functions.pop(function_id)
         except Exception as e:
-            logger.critical(f"Unkown error while wrapping method {function} named {name}",
-                            error=e, caller=self)
+            error_msg = (f"Unkown error while "
+                         f"wrapping method {function} named {name}")
+            logger.critical(error_msg, error=e, caller=self)
         else:
-            logger.debug(
-                f"[{self.get_name()}] Include function {function_name} ({function_id})", caller=self)
+
+            debug_msg = (f"[{self.get_name()}] "
+                         f"Include function {function_name} ({function_id})")
+            logger.debug(debug_msg, caller=self)
 
     def handle_visited_function(self, name, function):
-        logger.debug(
-            f"[{self.real_obj.__name__}] (Visited) Include method {name} ({id(function)})")
+        debug_msg = (f"[{self.real_obj.__name__}] (Visited) "
+                     f"Include method {name} ({id(function)})")
+        logger.debug(debug_msg)
         wrapped_function = cache.visited_functions[id(function)]
-        setattr(self.wrapped_obj, name, wrapped_function)
+        try:
+            setattr(self.wrapped_obj, name, wrapped_function)
+        except TypeError:
+            pass
 
     def handle_excluded_function(self, name, function):
         cache.visited_functions[id(function)] = function
+        cache.add_global_mapping(function, function)
+
         logger.debug(
             f"[{self.real_obj.__name__}] Exclude method {name}")
 
     def handle_special(self, attr, attr_obj):
+        logger.debug(f"[SpecialHandler] {attr}", caller=self)
         if attr.startswith("__") and attr.endswith("__"):
             return
         if attr in self.special_attributes:
@@ -1102,8 +992,7 @@ class WrapperClass(Wrapper):
             if exclude:
                 super().handle_excluded_basic(name, obj)
             else:
-                super().handle_included_basic(name, obj)
-            # setattr(self.wrapped_obj, name, obj)
+                super().handle_basic(name, obj)
             logger.debug(
                 f"[{self.get_name()}] Include object {name}", caller=self)
         except TypeError as e:
@@ -1114,8 +1003,8 @@ class WrapperClass(Wrapper):
                 f"Cannot handle basic object {name}", error=e, caller=self)
 
     def handle_class(self, attr, clss, exclude=False):
-        if clss in self.visited_class:
-            if self.visited_class[clss] is not None:
-                return self.visited_class[clss]
+        if id(clss) in self.visited_class:
+            if self.visited_class[id(clss)] is not None:
+                return self.visited_class[id(clss)]
             return
         super().handle_class(attr, clss, exclude=exclude)

@@ -3,6 +3,7 @@ import sys
 
 # https://scikit-learn.org/stable/auto_examples/linear_model/plot_tweedie_regression_insurance_claims.html#sphx-glr-auto-examples-linear-model-plot-tweedie-regression-insurance-claims-py
 
+
 def tweedie_regression_insurance_claims():
     """
     ======================================
@@ -592,29 +593,20 @@ def tweedie_regression_insurance_claims():
     ax.legend(loc="upper left")
 
 
-@pytest.mark.xfail
 @pytest.mark.slow
-@pytest.mark.usefixtures("turn_numpy_ufunc_on", "cleandir")
-def test_trace_only_ufunc_on(script_runner):
+@pytest.mark.usefixtures("cleandir")
+def test_trace_only(script_runner):
     ret = script_runner.run("pytracer", "trace",
-                            f"--module {__file__}")
-    assert not ret.success
-
-
-@pytest.mark.slow
-@pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir")
-def test_trace_only_ufunc_off(script_runner):
-    ret = script_runner.run("pytracer", "trace",
-                            f"--module {__file__}")
+                            f"--command {__file__} --test2=1")
     assert ret.success
 
 
 @pytest.mark.slow
-@pytest.mark.usefixtures("turn_numpy_ufunc_off", "cleandir", "parse")
+@pytest.mark.usefixtures("cleandir", "parse")
 def test_trace_parse(nsamples, script_runner):
     for _ in range(nsamples):
         ret = script_runner.run("pytracer", "trace",
-                                f"--module {__file__}")
+                                f"--command {__file__} --test2=1")
         assert ret.success
 
 

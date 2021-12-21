@@ -15,11 +15,13 @@ class TypeValue(IntEnum):
     TUPLE = auto()
     FUNCTION = auto()
     SKLEARN = auto()
+    STRING = auto()
     OTHER = auto()
 
     def is_scalar(self):
         if not hasattr(self, "__scalar"):
-            self.__scalar = (self.INT,
+            self.__scalar = (self.BOOL,
+                             self.INT,
                              self.FLOAT)
         return self in self.__scalar
 
@@ -47,50 +49,47 @@ class TypeValue(IntEnum):
         return not self.is_function() and not self.is_other()
 
 
-_type_cache = set()
-
-
 def get_type(value):
     from pytracer.core.stats.numpy import StatisticNumpy
-    from pytracer.core.stats.sklearn import is_sklearn_value
     import numpy as np
     _type = None
-    if isinstance(value, int):
+    if isinstance(value, bool):
+        _type = TypeValue.BOOL
+    elif isinstance(value, int):
         _type = TypeValue.INT
     elif isinstance(value, float):
         _type = TypeValue.FLOAT
-    elif StatisticNumpy.hasinstance(value):
+    elif StatisticNumpy.hasinstance(value) or isinstance(value, np.ndarray):
         _type = TypeValue.NUMPY
     elif isinstance(value, list):
-        array = np.array(value, dtype=np.object)
-        if StatisticNumpy.hasinstance(array):
-            _type = TypeValue.LIST
-        else:
-            _type = TypeValue.OTHER
+        try:
+            array = np.array(value, dtype=np.float64)
+            if StatisticNumpy.hasinstance(array):
+                _type = TypeValue.LIST
+            else:
+                _type = TypeValue.OTHER
+        except (ValueError, TypeError):
+            array = tuple(value)
+            _type = TypeValue.TUPLE
     elif isinstance(value, tuple):
         _type = TypeValue.TUPLE
     elif isinstance(value, FunctionType):
         _type = TypeValue.FUNCTION
-    elif is_sklearn_value(value):
-        _type = TypeValue.SKLEARN
     else:
         _type = TypeValue.OTHER
-        if not isinstance(value, (str, np.ndarray, np.dtype, type)):
-            if type(value) not in _type_cache:
-                logger.warning(f"Unknown type: {type(value)} {value}")
-                _type_cache.add(type(value))
     return _type
 
 
 def check_type(values):
     types = [*map(type, values)]
     # Ensure that values have all the same type
-    assert(len(set(types)) == 1)
+    if len(set(types)) != 1:
+        logger.error('Parsed values do not have the same type: {set(types)}')
 
 
 def get_stats(values):
     from pytracer.core.stats.numpy import StatisticNumpy
-    from pytracer.core.stats.sklearn import get_sklearn_stat
+    from pytracer.core.stats.generic import get_stat
     import numpy as np
     check_type(values)
     _type = get_type(values[0])
@@ -102,7 +101,11 @@ def get_stats(values):
         array = np.array(values, dtype=np.float64)
         _stats = StatisticNumpy(array)
     elif _type == TypeValue.LIST:
-        array = np.array(values)
+        try:
+            array = np.concatenate(values)
+        except ValueError as e:
+            logger.error(
+                f'Array length mismatch between samples {values}', error=e)
         _stats = StatisticNumpy(array)
     elif _type == TypeValue.TUPLE:
         types = [*map(get_type, values[0])]
@@ -112,21 +115,20 @@ def get_stats(values):
         append = _stats.append
         for ty, v in zip(types, zipv):
             if ty == TypeValue.OTHER:
-                append(StatisticNumpy(v, empty=True))
+                append(get_stat(np.array(v, dtype=np.object)))
             else:
                 append(StatisticNumpy(np.array(v)))
     elif _type == TypeValue.NUMPY:
         try:
             array = np.array(values)
             _stats = StatisticNumpy(array)
-        except:
-            logger.debug(f"Could not parse {values}")
+        except Exception:
+            logger.debug(f"Cannot parse {values}")
             _stats = StatisticNumpy(values, empty=True)
-    elif _type == TypeValue.SKLEARN:
-        _stats = get_sklearn_stat(values, type(values[0]))
+    elif _type == TypeValue.STRING:
+        _stats = StatisticNumpy(values, empty=True, dtype=type(values[0]))
     else:
-        _stats = StatisticNumpy(values, empty=True)
-        # _stats = values[0]
+        _stats = get_stat(np.array(values, dtype=np.object))
 
     return _stats
 

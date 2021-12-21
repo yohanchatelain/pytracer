@@ -1,72 +1,49 @@
 import argparse
-import copy
 import os
 import pickle
-import tempfile
+import time
 from enum import Enum, auto
 
 import networkx as nx
 import pytracer.core.inout as ptinout
+import pytracer.core.inout._init as _init
 import pytracer.core.inout.exporter as ioexporter
 import pytracer.core.inout.reader as ioreader
-import pytracer.core.parser_init as parser_init
-import pytracer.utils.context as ptcontext
+import pytracer.module.parser_init as parser_init
+import pytracer.utils as ptutils
 from pytracer.core.config import constant
 from pytracer.core.stats.stats import print_stats
+from pytracer.module.info import register
+from pytracer.utils.enum import AutoNumber
 from pytracer.utils.log import get_logger
 from tqdm import tqdm
-
-import time
-import cProfile
-import pstats
 
 logger = get_logger()
 
 
 class Group:
 
-    def __init__(self, iotype, data):
+    '''
+    Group class holds several traces and
+    facilitates iteration over them
+    '''
+
+    def __init__(self, iotype, filenames):
         self.iotype = iotype
-        self.reader = ioreader.Reader()
-        self.parse_filenames(data)
-        self.init_reader()
+        self.init_reader(filenames)
 
-    def __repr__(self):
-        return str(self._data)
-
-    # Data: List of filename
-    def parse_filenames(self, data):
-        self._filenames = {}
-        for filename in data:
-            _, count, _ = ptinout.split_filename(filename)
-            self._filenames[int(count)] = filename
-
-    def init_reader(self):
-        self._index_file = min(self._filenames)
-        self._nb_file = len(self._filenames)
-        filename = self._filenames[self._index_file]
-        self._data = self.reader.read(filename)
-        self._index_data = 0
-        self._nb_data = len(self._data)
+    def init_reader(self, filenames):
+        self.readers = [iter(ioreader.Reader(f)) for f in filenames]
 
     def __iter__(self):
+        self.iterator = zip(*self.readers)
         return self
 
     def __next__(self):
-        if self._index_data >= self._nb_data:
-            # We have finish to read this index
-            # Look if there is a another file
-            self._index_file += 1
-            if self._index_file >= self._nb_file:
-                raise StopIteration
-            filename = self._filenames[self._index_file]
-            self._data = self.reader.read(filename)
-            self._index_data = 0
-            self._nb_data = len(self._data)
-
-        data = self._data[self._index_data]
-        self._index_data += 1
-        return data
+        try:
+            return next(self.iterator)
+        except EOFError:
+            raise StopIteration
 
 
 class Parser:
@@ -84,61 +61,58 @@ class Parser:
     def check_args(self, args):
         if args.directory:
             if not os.path.isdir(args.directory):
-                logger.error(f"{args.directory} is not a directory")
+                logger.error(
+                    f"{args.directory} is not a directory", caller=self)
             self.directory = args.directory
         if args.filename:
             if not os.path.isfile(args.filename):
-                logger.error(f"{args.filename} is not a file")
+                logger.error(f"{args.filename} is not a file", caller=self)
             self.filename = args.filename
 
     def auto_detect_format(self, filename):
-        if filename.endswith(constant.text_ext):
-            return ptinout.IOType.TEXT
-        if filename.endswith(constant.json_ext):
-            return ptinout.IOType.JSON
-        if filename.endswith(constant.pickle_ext):
+        if filename.endswith(constant.extension.pickle):
             return ptinout.IOType.PICKLE
         return None
 
-    # Regroup files that belongs to the same trace
-    # ie, sharing the same date
-    # <date>.<count>.<filename>.<ext>
-    def group_files(self, iotype, filenames):
-        groups = {}
-        while len(filenames) > 0:
-            filename = filenames[0]
-            name, _, _ = ptinout.split_filename(filename)
-            similar = [f for f in filenames if name in f]
-            groups[name] = Group(iotype, similar)
-            for visited in similar:
-                filenames.pop(filenames.index(visited))
-        return groups
-
-    def merge_dict(self, args):
+    # def merge_dict(self, args):
+    #     from pytracer.core.stats.stats import get_stats
+    #     args_name = [arg.keys() for arg in args]
+    #     for arg_name in args_name:
+    #         assert (all([d == arg_name for d in args_name]))
+    def merge_dict(self, args, info):
         from pytracer.core.stats.stats import get_stats
         args_name = [arg.keys() for arg in args]
         for arg_name in args_name:
-            assert (all([d == arg_name for d in args_name]))
+            if not (all([d == arg_name for d in args_name])):
+                logger.error(
+                    f'Divergence found {args_name} in {info}', caller=self)
 
         stats_dict = {}
         for arg_name in args_name[0]:
             arg_value = [arg[arg_name] for arg in args]
             arg_stat = get_stats(arg_value)
-            stats_dict[arg_name] = arg_stat
+            if isinstance(arg_stat, (tuple, list)):
+                for i, arg in enumerate(arg_stat):
+                    stats_dict[f"{arg_name}.{i}"] = arg
+            else:
+                stats_dict[arg_name] = arg_stat
 
         return stats_dict
 
-    # def merge_raw(self, raws):
-    #     return stats.get_stats(raws)
-
     def _merge(self, values, attr, do_not_check=False):
         attrs = None
-        if isinstance(attr, str):
-            attrs = [value[attr] for value in values]
-        elif callable(attr):
-            attrs = [*map(attr, values)]
-        else:
-            logger.error(f"Unknow type attribute during merging: {attr}")
+        try:
+            if isinstance(attr, str):
+                attrs = [value[attr] for value in values]
+            elif callable(attr):
+                attrs = [*map(attr, values)]
+            else:
+                logger.error(f"Unknow type attribute during merging: {attr}")
+        except KeyError:
+            return [{}]*len(values)
+        except Exception as e:
+            logger.critical(
+                f"Error while merging traces {values} for attribute {attr}", caller=self, error=e)
 
         if not do_not_check and len(set(attrs)) != 1:
             logger.error(
@@ -159,7 +133,9 @@ class Parser:
         # Args may be different
         args = self._merge(values, "args", do_not_check=True)
 
-        stats_args = self.merge_dict(args)
+        info = (function_id, times, modules, functions, labels, backtraces)
+        stats_args = self.merge_dict(args, info)
+        # stats_args = self.merge_dict(args)
 
         # We can pick any of the list since
         # we ensure that they are equal
@@ -178,15 +154,21 @@ class Parser:
                 "backtrace": backtrace,
                 "args": stats_args}
 
-    def parse_directory(self):
-
+    def get_traces(self):
         filenames = []
         sizes = set()
-        for file in os.listdir(self.directory):
-            abs_file = os.path.abspath(f"{self.directory}{os.sep}{file}")
-            if os.path.isfile(abs_file):
-                filenames.append(abs_file)
-            sizes.add(os.stat(abs_file).st_size)
+
+        def abspath(file):
+            return f"{self.directory}{os.sep}{file}"
+
+        ls = os.listdir(os.path.abspath(self.directory))
+        filenames = []
+        filenames = [os.path.abspath(abspath(file))
+                     for file in os.listdir(self.directory) if os.path.isfile(abspath(file))]
+        sizes = set([os.stat(file).st_size for file in filenames])
+
+        if filenames == []:
+            logger.error("No traces to analyze", caller=self)
 
         if len(sizes) != 1:
             msg = (f"Traces do not have the same size{os.linesep}"
@@ -194,25 +176,31 @@ class Parser:
                    f"program executions or your program is non deterministic {os.linesep}"
                    f"sizes: {sizes}")
             logger.warning(msg, caller=self)
-        else:
-            print(f"Filesize: {sizes}")
-        logger.debug(f"List of files to parse: {filenames}")
 
-        iotype = self.auto_detect_format(filenames[0])
-        logger.info(f"Auto-detection type: {iotype.name} file")
-        filenames_grouped = self.group_files(iotype, filenames)
+        logger.debug(f"List of files to parse: {filenames}", caller=self)
+        logger.debug(f"Filesize: {sizes}", caller=self)
+
+        return filenames
+
+    def parse_traces(self, traces):
+
+        iotype = self.auto_detect_format(traces[0])
+        logger.info(f"Auto-detection type: {iotype.name} file", caller=self)
+        filenames_grouped = Group(iotype, traces)
 
         if self.online:
-            for value in tqdm(zip(*filenames_grouped.values()), desc="Parsing..."):
+            for value in tqdm(filenames_grouped, desc="Parsing..."):
                 yield self.merge(value)
         else:
             stats_values = []
             append = stats_values.append
-            for value in tqdm(zip(*filenames_grouped.values()), desc="Parsing..."):
+            for value in tqdm(filenames_grouped, desc="Parsing..."):
                 append(self.merge(value))
                 if len(stats_values) % self.batch_size == 0:
                     yield stats_values
                     stats_values.clear()
+            if len(stats_values) > 0:
+                yield stats_values
 
 
 def parse_stat_value(stats_value, info_dict, counter):
@@ -236,8 +224,8 @@ def parse_stat_value(stats_value, info_dict, counter):
                   f"function: {function},"
                   f"{label}"))
     # if isinstance(args, dict):
-    for arg, stat in args.items():
-        print_stats(arg, stat)
+    # for arg, stat in args.items():
+    #     print_stats(arg, stat)
 
 
 class EdgeType(Enum):
@@ -252,21 +240,46 @@ class CallChain:
     _input_label = "inputs"
     _output_label = "outputs"
 
-    _id_index = 0
-    _name_index = _id_index + 1
-    _label_index = _name_index + 1
-    _bt_index = _label_index + 1
-    _time_index = _bt_index + 1
+    class Index(AutoNumber):
+        id = ()
+        name = ()
+        label = ()
+        backtrace = ()
+        time = ()
 
-    _bt_filename_index = 0
-    _bt_line_index = _bt_filename_index + 1
-    _bt_lineno_index = _bt_line_index + 1
-    _bt_name_index = _bt_lineno_index + 1
+    class BacktraceIndex(AutoNumber):
+        file = ()
+        line = ()
+        lineno = ()
+        name = ()
 
     def __init__(self):
-        fo = open("callgraph.pkl", "wb")
-        self._pickler = pickle.Pickler(fo, protocol=pickle.HIGHEST_PROTOCOL)
+        self.parameters = _init.IOInitializer()
+        self._init_filename()
+        self._ostream = open(self.get_filename_path(), "wb")
+        self._pickler = pickle.Pickler(
+            self._ostream, protocol=pickle.HIGHEST_PROTOCOL)
         self._stack = []
+
+    def _init_filename(self):
+        filename = self.parameters.callgraph
+        self.filename = ptutils.get_filename(
+            filename, constant.extension.pickle)
+        self.filename_path = self._get_filename_path(self.get_filename())
+
+    def get_filename(self):
+        return self.filename
+
+    def get_filename_path(self):
+        return self.filename_path
+
+    def _get_filename_path(self, filename):
+        ptutils.check_extension(filename, constant.extension.pickle)
+        filename, ext = os.path.splitext(filename)
+        ext = ext if ext else constant.extension.pickle
+        return (f"{self.parameters.cache_path}{os.sep}"
+                f"{self.parameters.cache_stats}{os.sep}"
+                f"{filename}{ext}")
 
     def to_call(self, obj):
         module = obj["module"]  # .replace(".", "$")
@@ -305,42 +318,42 @@ class CallChain:
 
     @classmethod
     def get_id(cls, call):
-        return call[cls._id_index]
+        return call[cls.Index.id.value]
 
     @classmethod
     def get_name(cls, call):
-        return call[cls._name_index]
+        return call[cls.Index.name.value]
 
     @classmethod
     def get_label(cls, call):
-        return call[cls._label_index]
+        return call[cls.Index.label.value]
 
     @classmethod
     def get_bt(cls, call):
-        return call[cls._bt_index]
+        return call[cls.Index.backtrace.value]
 
     @classmethod
     def get_lineno(cls, call):
-        return call[cls._bt_index][cls._bt_lineno_index]
+        return cls.get_bt(call)[cls.BacktraceIndex.lineno.value]
 
     @classmethod
-    def get_filename(cls, call):
-        return call[cls._bt_index][cls._bt_filename_index]
+    def get_file(cls, call):
+        return cls.get_bt(call)[cls.BacktraceIndex.file.value]
 
     @classmethod
     def get_line(cls, call):
-        return call[cls._bt_index][cls._bt_line_index]
+        return cls.get_bt(call)[cls.BacktraceIndex.line.value]
 
     @classmethod
     def get_caller(cls, call):
-        return call[cls._bt_index][cls._bt_name_index]
+        return cls.get_bt(call)[cls.BacktraceIndex.name.value]
 
     @classmethod
     def get_time(cls, call):
-        return call[cls._time_index]
+        return call[cls.Index.time.value]
 
     def is_input_call(self, call):
-        return call[self._label_index] == self._input_label
+        return self.get_label(call) == self._input_label
 
     def print_stack(self, stack, name=None, to_print=False):
         if not to_print:
@@ -480,26 +493,29 @@ class CallChain:
         (id1, name1, _, bt1, t1) = call1
         (id2, name2, _, bt2, t2) = call2
 
-        if call1 == (id2, name2, self._input_label, bt2, t2) and \
-                call2 == (id1, name1, self._output_label, bt1, t1):
-            return True
+        if call1 == (id2, name2, self._input_label, bt2, t2) and call2 == (id1, name1, self._output_label, bt1, t1):
+            is_closure = True
         else:
-            return False
+            is_closure = False
+
+        return is_closure
 
     def to_number(self, as_dict=False):
 
         counter = 1
         call_to_id = {}
         for call in self._stack:
-            key = f"{call[self._id_index]}{call[self._name_index]}{call[self._bt_index]}"
+            key = f"{self.get_id(call)}{self.get_name(call)}{self.get_bt(call)}"
+            # key = f"{call[self._id_index]}{call[self._name_index]}{call[self._bt_index]}"
             if key not in call_to_id:
                 call_to_id[key] = f"{counter}"
                 counter += 1
 
         _str = "" if not as_dict else {}
         for call in self._stack:
-            key = f"{call[self._id_index]}{call[self._name_index]}{call[self._bt_index]}"
-            dir = "<" if call[self._label_index] == self._input_label else ">"
+            key = f"{self.get_id(call)}{self.get_name(call)}{self.get_bt(call)}"
+            # key = f"{call[self._id_index]}{call[self._name_index]}{call[self._bt_index]}"
+            dir = "<" if self.is_input_call(call) else ">"
             if as_dict:
                 _str[call] = f"{call_to_id[key]}{dir}"
             else:
@@ -508,7 +524,6 @@ class CallChain:
         return _str
 
     def push(self, call, short=False):
-        # print(f"{self._indent}Push {call} onto stack -> {self._stack}")
 
         if self._stack == []:
             self._stack.append(call)
@@ -562,12 +577,18 @@ def main(args):
 
     parser = Parser(args)
 
-    stats_values = parser.parse_directory()
+    traces = parser.get_traces()
+    register.add_traces(traces)
+    stats_values = parser.parse_traces(traces)
 
     # Construct call chain
     callchain = CallChain()
+    register.set_callgraph(callchain.get_filename(),
+                           callchain.get_filename_path())
 
     export = ioexporter.Exporter()
+    register.set_aggregation(export.get_filename(), export.get_filename_path())
+
     expectedrows = [10]
 
     if args.online:
@@ -602,13 +623,3 @@ if __name__ == "__main__":
     parser_init.init_module(subparser)
     args = parser.parse_args()
     main(args)
-
-    # t = tempfile.NamedTemporaryFile()
-    # t.write(ptcontext.verificarlo.getenv(
-    #     ptcontext.verificarlo.BackendType.IEEE))
-    # env = {"VFC_BACKENDS_FROM_FILE": t.name}
-    # env_excluded = ["VFC_BACKENDS"]
-
-    # with ptcontext.context.ContextManager(env, env_excluded):
-
-    # t.close()

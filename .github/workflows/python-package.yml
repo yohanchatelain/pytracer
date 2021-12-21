@@ -17,8 +17,7 @@ jobs:
       matrix:
         python-version: [3.8]
         python-test: [ 
-          '"trace_only and ufunc_off"',
-          '"trace_only and ufunc_on"',
+          '"trace_only"',
           '"trace_parse"'
         ]
         python-long: [
@@ -28,6 +27,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+      with:
+        submodules: 'true'
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
@@ -43,6 +44,10 @@ jobs:
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    - name: Install significantdigits
+      run: |
+        cd significantdigits
+        pip install . -r requirements.txt
     - name: Install pytracer
       run: |
         pip install .
@@ -50,4 +55,4 @@ jobs:
       env:
         PYTRACER_CONFIG: ${{ github.workspace }}/pytracer/data/config/config.json
       run: |
-        pytest --script-launch-mode=subprocess --nsamples=3 -m ${{ matrix.python-long }} -v -k ${{ matrix.python-test }} --durations=0
+        pytest -x --script-launch-mode=subprocess --nsamples=3 -m ${{ matrix.python-long }} -v -k ${{ matrix.python-test }} --durations=0

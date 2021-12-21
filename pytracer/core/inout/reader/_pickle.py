@@ -1,13 +1,12 @@
-import pickle
-import sys
 import importlib
+import dill as pickle
 
+import pytracer.core.inout._init as _init
+import pytracer.core.inout.reader._reader as _reader
 import pytracer.utils as ptutils
+from pytracer.core.config import config as cfg
 from pytracer.core.config import constant
 from pytracer.utils.log import get_logger
-from pytracer.core.config import config as cfg
-
-from . import _init, _reader
 
 logger = get_logger()
 
@@ -15,12 +14,17 @@ logger = get_logger()
 class ReaderPickle(_reader.Reader):
 
     modules_to_load = []
+    are_module_imported = False
 
-    def __init__(self):
+    def __init__(self, filename):
+        self.filename = filename
         self.parameters = _init.IOInitializer()
         self._import_modules()
+        self.__init_generator(filename)
 
     def _import_modules(self):
+        if ReaderPickle.are_module_imported:
+            return
         append = self.modules_to_load.append
         if self.modules_to_load == []:
             for module in cfg.modules_to_load:
@@ -28,24 +32,14 @@ class ReaderPickle(_reader.Reader):
                 append(module_name)
         for module in self.modules_to_load:
             importlib.import_module(module)
+        ReaderPickle.are_module_imported = True
 
-    def read(self, filename):
+    def __init_generator(self, filename):
         try:
-            ptutils.check_extension(filename, constant.pickle_ext)
+            ptutils.check_extension(filename, constant.extension.pickle)
             logger.debug(f"Opening {filename}", caller=self)
             fi = open(filename, "rb")
-            unpickler = pickle.Unpickler(fi)
-            data = []
-            while True:
-                try:
-                    _obj = unpickler.load()
-                    data.append(_obj)
-                except EOFError:
-                    break
-                except Exception as e:
-                    logger.critical("Unknown exception",
-                                    error=e, caller=self)
-            return data
+            self.unpickler = pickle.Unpickler(fi)
         except OSError as e:
             logger.error(f"Can't open Pickle file: {filename}",
                          error=e, caller=self)
@@ -54,4 +48,16 @@ class ReaderPickle(_reader.Reader):
                          error=e, caller=self)
         except Exception as e:
             logger.critical("Unexpected error",
+                            error=e, caller=self)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        try:
+            return self.unpickler.load()
+        except EOFError:
+            raise StopIteration
+        except Exception as e:
+            logger.critical("Unknown exception",
                             error=e, caller=self)

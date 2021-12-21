@@ -1,3 +1,5 @@
+import inspect
+import collections
 from enum import Enum
 import sys
 import os
@@ -73,9 +75,45 @@ def str2bool(v):
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
 
-def get_filename(name):
+def get_filename(name, ext=""):
     i = 0
-    while os.path.isfile(name):
-        name = f"{name}.{i}"
+    name = f"{name}.{os.getpid()}{ext}" if ext else f"{name}.{os.getpid()}"
+    _name = name
+    while os.path.isfile(_name):
+        _name = f"{name}.{i}"
         i += 1
-    return name
+    return _name
+
+
+def ishashable(_object):
+    try:
+        hash(_object)
+    except TypeError:
+        return False
+    return isinstance(_object, collections.Hashable)
+
+
+def get_functions_from_traceback():
+    def pretty_print(stack):
+        function = stack.frame.f_globals[stack.function]
+        module = getattr(function, "__module__")
+        function = getattr(function, "__qualname__",
+                           getattr(function, "__name__"))
+        return f"{module}:{function}"
+
+    def is_exclude(module):
+        if module in ["__main__", "_frozen_importlib", "runpy"]:
+            return True
+        if module.startswith('pytracer'):
+            return True
+
+    def to_return(stack):
+        if stack.function not in stack.frame.f_globals:
+            return False
+        function = stack.frame.f_globals[stack.function]
+        module = getattr(function, "__module__")
+        if is_exclude(module):
+            return False
+        return True
+
+    return [pretty_print(stack) for stack in inspect.stack() if to_return(stack)]
