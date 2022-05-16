@@ -500,7 +500,7 @@ def print_datahover_summary(hover_data, tab, fig_real, fig_imag, heatmap_format,
 
         if heatmap_format == 'heatmap':
             _ndarray = np.array(fig['data'][0]['z'])
-        elif heatmap_format == 'graph':
+        elif heatmap_format == 'graph' or heatmap_format == 'scatter':
             text = (f"Function={info['function'].strip()}",
                     f"Arg     ={info['arg'].strip()}")
             return os.linesep.join(map(lambda x: f"- {x.replace(' ', ' &nbsp;')}", text))
