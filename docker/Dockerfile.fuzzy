@@ -1,4 +1,4 @@
-FROM verificarlo/fuzzy:v0.5.0-lapack-python3.8.5 as builder
+FROM yohanchatelain/fuzzy:v0.7.2-lapack-python3.8.5 as builder
 
 COPY . /opt/build/pytracer 
 
