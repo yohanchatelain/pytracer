@@ -4,6 +4,8 @@ COPY . /opt/build/pytracer
 
 ENV CC=gcc
 ENV CXX=g++
+ENV CFLAGS=""
+ENV CXXFLAGS=""
 
 RUN git clone https://github.com/verificarlo/significantdigits.git /opt/build/significantdigits && \
     cd /opt/build/significantdigits && \
