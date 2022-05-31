@@ -2,8 +2,8 @@ FROM verificarlo/verificarlo:latest as builder
 
 COPY . /opt/build/pytracer 
 
-ENV CC=gcc
-ENV CXX=g++
+ENV CC=gcc-7
+ENV CXX=g++-7
 
 RUN git clone https://github.com/verificarlo/significantdigits.git /opt/build/significantdigits && \
     cd /opt/build/significantdigits && \
