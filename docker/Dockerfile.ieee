@@ -2,6 +2,9 @@ FROM verificarlo/verificarlo:latest as builder
 
 COPY . /opt/build/pytracer 
 
+ENV CC=gcc
+ENV CXX=g++
+
 RUN git clone https://github.com/verificarlo/significantdigits.git /opt/build/significantdigits && \
     cd /opt/build/significantdigits && \
     python3 -m pip install . -r requirements_docker.txt && \
