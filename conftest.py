@@ -4,19 +4,21 @@ import pytest
 
 
 @pytest.fixture
-def cleandir(script_runner, tmp_path):
+def cleandir(bash, tmp_path):
     os.chdir(tmp_path)
+    bash.auto_return_code_error = False
     yield
-    ret = script_runner.run("pytracer", "clean")
-    assert(ret.success)
+    bash.run_script("pytracer", ["clean"])
+    assert(bash.last_return_code == 0)
     os.chdir("..")
 
 
 @pytest.fixture
-def parse(script_runner):
+def parse(bash):
+    bash.auto_return_code_error = False
     yield
-    ret = script_runner.run("pytracer", "parse", "--online")
-    assert(ret.success)
+    bash.run_script("pytracer", ["parse", "--online"])
+    assert(bash.last_return_code == 0)
 
 
 def pytest_addoption(parser):

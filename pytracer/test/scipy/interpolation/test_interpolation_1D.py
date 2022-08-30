@@ -2,6 +2,8 @@ import numpy as np
 import pytest
 from scipy.interpolate import interp1d
 
+from pytracer.test.utils import trace
+
 
 def main():
     x = np.linspace(0, 10, num=11, endpoint=True)
