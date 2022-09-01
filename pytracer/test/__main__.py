@@ -1,9 +1,7 @@
 import argparse
-import importlib
 import os
-import sys
 import subprocess
-from sys import prefix
+import sys
 
 from pytracer.core.config import constant
 from pytracer.utils import color, get_human_size

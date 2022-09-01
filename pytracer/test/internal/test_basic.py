@@ -2,9 +2,9 @@
 
 import argparse
 import math
-
 import numpy as np
 import pytest
+from pytracer.test.utils import trace
 
 
 def f(x, y, z):
@@ -81,25 +81,19 @@ def main():
 
 
 @pytest.mark.usefixtures("cleandir")
-def test_trace_only_no_arg(script_runner):
-    ret = script_runner.run("pytracer", "trace",
-                            f"--command {__file__}")
-    assert(not ret.success)
+def test_trace_only_no_arg(bash):
+    trace(__file__, bash, expect_failure=True)
 
 
 @pytest.mark.usefixtures("cleandir")
-def test_trace_only(script_runner):
-    ret = script_runner.run("pytracer", "trace",
-                            f"--command {__file__} --test2=1")
-    assert(ret.success)
+def test_trace_only(bash):
+    trace(__file__, bash, kwargs='--test2=1')
 
 
 @pytest.mark.usefixtures("cleandir", "parse")
-def test_trace_parse(nsamples, script_runner):
+def test_trace_parse(nsamples, bash):
     for _ in range(nsamples):
-        ret = script_runner.run("pytracer", "trace",
-                                f"--command {__file__} --test2=1")
-        assert(ret.success)
+        trace(__file__, bash, kwargs='--test2=1')
 
 
 if '__main__' == __name__:

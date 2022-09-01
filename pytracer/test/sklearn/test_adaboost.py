@@ -5,6 +5,7 @@
 # License: BSD 3 clause
 
 # importing necessary libraries
+from pytracer.test.utils import trace
 import os
 
 import numpy as np
@@ -60,18 +61,14 @@ def adaboost():
 
 
 @pytest.mark.usefixtures("cleandir")
-def test_trace_only(script_runner):
-    ret = script_runner.run("pytracer", "trace",
-                            f"--command {__file__} --test2=1")
-    assert ret.success
+def test_trace_only(bash):
+    trace(__file__, bash)
 
 
 @pytest.mark.usefixtures("cleandir", "parse")
-def test_trace_parse(nsamples, script_runner):
+def test_trace_parse(nsamples, bash):
     for _ in range(nsamples):
-        ret = script_runner.run("pytracer", "trace",
-                                f"--command {__file__} --test2=1")
-        assert ret.success
+        trace(__file__, bash)
 
 
 if __name__ == "__main__":
