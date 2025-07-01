@@ -206,7 +206,7 @@ class _Config(object, metaclass=Singleton):
         self.read_config()
 
     def __bool__(self):
-        return len(_Config._data()) != 0
+        return len(_Config._data) != 0
 
     def __getitem__(self, key):
         return NotImplementedError
@@ -236,8 +236,8 @@ class _Config(object, metaclass=Singleton):
         config = ptutils.getenv(self.pytracer_config)
         cfg_path, _ = os.path.split(config)
         try:
-            config_file = open(config)
-            cfg = json.load(config_file)
+            with open(config) as config_file:
+                cfg = json.load(config_file)
         except FileNotFoundError as e:
             sys.exit(f"Error while opening file {config}:{os.linesep} {e}")
         except json.decoder.JSONDecodeError as e:

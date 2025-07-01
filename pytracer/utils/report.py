@@ -114,3 +114,10 @@ class Report(metaclass=Singleton):
                      "call": total_call,
                      "memory": total_memory}
         writer.writerow(total_row)
+        
+    def close(self):
+        if hasattr(self, '_report_ostream') and self._report_ostream:
+            self._report_ostream.close()
+            
+    def __del__(self):
+        self.close()

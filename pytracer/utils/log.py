@@ -151,6 +151,8 @@ class LogPrint(Log):
     def end(self):
         self.flush()
         self.info("--End--")
+        if hasattr(self.parameters, 'ostream') and self.parameters.ostream != sys.stdout:
+            self.parameters.ostream.close()
 
     def flush(self):
         self.parameters.ostream.flush()

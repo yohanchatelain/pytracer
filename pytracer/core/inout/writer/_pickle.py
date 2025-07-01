@@ -64,15 +64,17 @@ class PytracerPickleTrace(dict):
 
 @contextmanager
 def safe_dump(self, pickler):
-    if self.is_dumping:
-        return
-    self.is_dumping = True
+    with lock:
+        if self.is_dumping:
+            return
+        self.is_dumping = True
     try:
         yield pickler
     except Exception as e:
         logger.warning('Pickle object cannot be saved', caller=self, error=e)
     finally:
-        self.is_dumping = False
+        with lock:
+            self.is_dumping = False
 
 
 class WriterPickle(_writer.Writer):
@@ -143,30 +145,36 @@ class WriterPickle(_writer.Writer):
                 f"{filename}{ext}")
 
     def is_writable(self, obj):
-        if self.is_dumping:
-            return False
-        self.is_dumping = True
+        with lock:
+            if self.is_dumping:
+                return False
+            self.is_dumping = True
         try:
             pickle.dump(obj, io.BytesIO(),
                         protocol=pickle.HIGHEST_PROTOCOL)
         except Exception as e:
             print(e)
-            self.is_dumping = False
+            with lock:
+                self.is_dumping = False
             return False
         else:
-            self.is_dumping = False
+            with lock:
+                self.is_dumping = False
             return True
 
     def _dump(self, obj):
-        if self.is_dumping:
-            return False
-        self.is_dumping = True
+        with lock:
+            if self.is_dumping:
+                return False
+            self.is_dumping = True
         try:
             self.pickler.dump(obj)
         except Exception:
-            self.is_dumping = False
+            with lock:
+                self.is_dumping = False
         else:
-            self.is_dumping = False
+            with lock:
+                self.is_dumping = False
 
     def _write(self, to_write):
         self._dump(to_write)

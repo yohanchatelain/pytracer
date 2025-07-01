@@ -1,4 +1,5 @@
 import argparse
+import ast
 import os
 import pickle
 import time
@@ -306,7 +307,10 @@ class CallChain:
         [fid, name, label, bt, time] = str.split(sep)
         # get original type
         fid_ori = int(fid)
-        bt_ori = eval(bt)
+        try:
+            bt_ori = ast.literal_eval(bt)
+        except (ValueError, SyntaxError):
+            bt_ori = bt
         time_ori = int(time)
         return (fid_ori, name, label, bt_ori, time_ori)
 
