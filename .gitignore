@@ -6,4 +6,7 @@ __pycache__
 .__pytracercache__/
 cache-directory
 *.error
-log
+log.venv/
+.pytracer/
+__pycache__/
+*.egg-info/
