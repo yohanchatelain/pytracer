@@ -59,3 +59,4 @@ class TraceEvent(msgspec.Struct, omit_defaults=True):
     payload_ref: str | None = None
     source: SourceRef | None = None
     note: str | None = None  # exception text on phase == "exception"
+    ts_ns: int | None = None  # monotonic nanoseconds within the run
