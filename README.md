@@ -27,6 +27,15 @@ pytracer run examples/cancellation.py --repeat 5
 open .pytracer/runs/latest/report/report.html
 ```
 
+`examples/` is a gallery of classical numerical-accuracy pathologies —
+catastrophic cancellation (variance, quadratic formula, expm1/log1p,
+polynomial evaluation near a root), summation-order non-associativity,
+ill-conditioning (Hilbert matrix), and the finite-difference step-size
+dilemma — each pairing an unstable formulation with its stable fix. They
+double as pytracer's detection regression suite: CI asserts the unstable
+variant of every pathology loses significantly more bits than its stable
+twin. See `examples/README.md`.
+
 Typical output:
 
 ```
