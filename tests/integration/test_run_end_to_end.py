@@ -73,6 +73,22 @@ def test_deterministic_run_shows_full_stability(workdir):
     assert "Pytracer run complete" in proc.stdout
 
 
+def test_run_script_outside_cwd_works(workdir):
+    external = workdir.parent / "external-script-dir"
+    external.mkdir()
+    script = external / "simple_numpy.py"
+    shutil.copy(PROGRAMS / "simple_numpy.py", script)
+
+    proc = run_cli(
+        ["run", str(script), "--repeat", "1", "--plugins", "--target", "numpy.sum"],
+        workdir,
+    )
+    assert proc.returncode == 0, proc.stderr
+    exp = experiment_dir(workdir)
+    assert (exp / "runs" / "run-000" / "spec.json").is_file()
+    assert (exp / "runs" / "run-000" / "metadata.json").is_file()
+
+
 def test_variability_is_detected(workdir):
     proc = run_cli(
         ["run", "random_variability.py", "--repeat", "3",

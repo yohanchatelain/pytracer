@@ -10,3 +10,5 @@ log.venv/
 .pytracer/
 __pycache__/
 *.egg-info/
+.coverage
+.coverage.*
