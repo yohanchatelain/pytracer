@@ -78,7 +78,7 @@ def run_experiment(
     continue_on_error: bool = False,
     env_overrides: dict[str, str] | None = None,
 ) -> ExperimentResult:
-    script_path = Path(script)
+    script_path = Path(script).resolve()
     if not script_path.is_file():
         raise ExperimentError(f"script not found: {script}")
     if repeat < 1:
@@ -102,7 +102,7 @@ def run_experiment(
         json.dumps(
             {
                 "experiment_id": experiment_id,
-                "script": str(script_path.resolve()),
+                "script": str(script_path),
                 "script_args": script_args,
                 "repeat": repeat,
                 "targets": target_specs,
@@ -116,13 +116,13 @@ def run_experiment(
 
     for k in range(repeat):
         run_id = f"run-{k:03d}"
-        run_dir = experiment_dir / "runs" / run_id
+        run_dir = (experiment_dir / "runs" / run_id).resolve()
         run_dir.mkdir(parents=True)
         spec = {
             "experiment_id": experiment_id,
             "run_id": run_id,
             "run_dir": str(run_dir),
-            "script": str(script_path.resolve()),
+            "script": str(script_path),
             "script_args": script_args,
             "targets": target_specs,
             "instrumentation": config.trace.instrumentation,
@@ -132,7 +132,7 @@ def run_experiment(
             "array_store_threshold": config.trace.array_store_threshold,
             "array_backend": config.trace.array_backend,
         }
-        spec_path = run_dir / "spec.json"
+        spec_path = (run_dir / "spec.json").resolve()
         spec_path.write_text(json.dumps(spec, indent=2))
 
         env = dict(os.environ)
@@ -153,7 +153,7 @@ def run_experiment(
         proc = subprocess.run(
             [sys.executable, "-m", "pytracer._bootstrap", str(spec_path)],
             env=env,
-            cwd=str(script_path.resolve().parent),
+            cwd=str(script_path.parent),
         )
         result.runs.append(RunResult(run_id=run_id, run_dir=run_dir, exit_code=proc.returncode))
         if proc.returncode != 0 and not continue_on_error:
