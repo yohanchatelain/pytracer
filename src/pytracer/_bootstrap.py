@@ -44,6 +44,7 @@ def run_from_spec(spec: dict) -> int:
         run_dir,
         spec.get("store_arrays", "never"),
         spec.get("array_store_threshold", 100_000),
+        backend=spec.get("array_backend", "auto"),
     )
     recorder = Recorder(
         writer,

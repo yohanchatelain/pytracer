@@ -32,6 +32,7 @@ class TraceConfig:
     capture_backtrace: bool = True
     store_arrays: str = "auto"
     array_store_threshold: int = 100_000
+    array_backend: str = "auto"
     native_census: bool = False
 
 
@@ -81,6 +82,11 @@ class PytracerConfig:
             raise ConfigError(
                 f"trace.store_arrays must be one of {_VALID_STORE_ARRAYS}, "
                 f"got {self.trace.store_arrays!r}"
+            )
+        if self.trace.array_backend not in ("auto", "npy", "zarr"):
+            raise ConfigError(
+                "trace.array_backend must be one of ('auto', 'npy', 'zarr'), "
+                f"got {self.trace.array_backend!r}"
             )
         if not isinstance(self.trace.array_store_threshold, int) or (
             self.trace.array_store_threshold < 0

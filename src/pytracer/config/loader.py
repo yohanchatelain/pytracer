@@ -25,6 +25,7 @@ mode = "summary"                # summary | metadata
 capture_backtrace = true
 store_arrays = "auto"          # auto | always | never; enables element-wise sig
 array_store_threshold = 100000 # max elements per stored array in auto mode
+array_backend = "auto"         # auto | npy | zarr (compressed; pip install pytracer[arrays])
 
 [storage]
 output_dir = ".pytracer/runs"

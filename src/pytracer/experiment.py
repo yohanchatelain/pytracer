@@ -130,6 +130,7 @@ def run_experiment(
             "capture_backtrace": config.trace.capture_backtrace,
             "store_arrays": config.trace.store_arrays,
             "array_store_threshold": config.trace.array_store_threshold,
+            "array_backend": config.trace.array_backend,
         }
         spec_path = run_dir / "spec.json"
         spec_path.write_text(json.dumps(spec, indent=2))

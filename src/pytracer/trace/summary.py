@@ -47,27 +47,35 @@ def _summarize_array(array: np.ndarray) -> NumericSummary:
     else:
         values = array
 
-    finite = np.isfinite(values)
-    n_finite = int(np.count_nonzero(finite))
-    summary.nan_count = int(np.count_nonzero(np.isnan(values)))
-    summary.inf_count = int(np.count_nonzero(np.isinf(values)))
     summary.zero_count = int(np.count_nonzero(values == 0))
 
     if values.dtype.kind == "f":
+        finite = np.isfinite(values)
+        n_finite = int(np.count_nonzero(finite))
+        summary.nan_count = int(np.count_nonzero(np.isnan(values)))
+        summary.inf_count = size - n_finite - summary.nan_count
         tiny = np.finfo(values.dtype).tiny
         with np.errstate(invalid="ignore"):
             absv = np.abs(values)
             summary.subnormal_count = int(np.count_nonzero((absv > 0) & (absv < tiny)))
+    else:
+        # integer/bool data cannot hold NaN/Inf/subnormals: skip those passes
+        finite = None
+        n_finite = size
 
     if n_finite:
-        fv = values[finite] if n_finite != size else values
+        if finite is not None and n_finite != size:
+            fv = values[finite]
+        else:
+            fv = values
         fv64 = fv.astype(np.float64, copy=False)
         summary.mean = float(np.mean(fv64))
         summary.std = float(np.std(fv64))
         summary.min = float(np.min(fv64))
         summary.max = float(np.max(fv64))
+        # |x|_inf from the extrema already computed: saves an abs pass
+        summary.linf_norm = max(abs(summary.min), abs(summary.max))
         summary.l2_norm = float(np.linalg.norm(fv64.ravel()))
-        summary.linf_norm = float(np.max(np.abs(fv64)))
 
     summary.fingerprint = array_fingerprint(array)
     return summary

@@ -146,6 +146,7 @@ mode = "summary"
 capture_backtrace = true
 store_arrays = "auto"          # enables element-wise significant digits
 array_store_threshold = 100000
+array_backend = "auto"         # zarr (compressed) when installed, else npy
 
 [storage]
 output_dir = ".pytracer/runs"
@@ -165,6 +166,30 @@ formats = ["markdown", "html", "json"]
 No environment variables are required. The captured run metadata includes
 an **allowlisted** subset of the environment only (`OMP_*`, `VFC_*`,
 `PATH`, …) — never the raw environment.
+
+## Overhead
+
+Measured with `python benchmarks/bench.py` (Python 3.13, numpy 2.5,
+worst-case microbenchmarks where the traced operation itself is ~2 µs;
+real workloads with meaningful compute per call sit far below these ratios):
+
+| Workload | Tier | Overhead | Throughput |
+|---|---|---|---|
+| 20k tiny `numpy.sum` calls | T1 | ~110x (~190 µs/call) | ~10k events/s |
+| 2M-element `numpy.sum` calls | T1 | ~28x | summary stats dominate |
+| operator loop under taint | T3 | ~300x | drill-down tier by design |
+
+The per-call cost is the summaries (mean/std/min/max/norms/fingerprint × 2
+events) — the measurements *are* the product. Use targeted tracing for hot
+loops, `mode = "metadata"` to skip summaries entirely, and T3 taint only to
+drill into a region T1/T2 already localized.
+
+## Verificarlo / stochastic arithmetic
+
+See `examples/verificarlo/` for the full workflow: a `pytracer.toml` that
+rotates the MCA seed per run via `[perturb.env]`, run inside a
+`verificarlo/fuzzy` container. Element-wise significant digits across those
+runs directly estimate the MCA significant bits of every traced value.
 
 ## Limitations
 

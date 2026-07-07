@@ -7,6 +7,7 @@ Recording failures never propagate into the traced program.
 
 from __future__ import annotations
 
+import functools
 import inspect
 import time
 
@@ -27,6 +28,19 @@ def get_active_recorder() -> Recorder | None:
 def set_active_recorder(recorder: Recorder | None) -> None:
     global _active_recorder
     _active_recorder = recorder
+
+
+@functools.lru_cache(maxsize=2048)
+def _signature_of(fn):
+    return inspect.signature(fn)
+
+
+def _cached_signature(fn):
+    # inspect.signature is ~70us per call; hot wrappers call it per event.
+    try:
+        return _signature_of(fn)
+    except TypeError:  # unhashable callable: fall back uncached
+        return inspect.signature(fn)
 
 
 class Recorder:
@@ -111,7 +125,7 @@ class Recorder:
     def _bind_arguments(bind_with, args, kwargs) -> dict[str, object]:
         if bind_with is not None:
             try:
-                sig = inspect.signature(bind_with)
+                sig = _cached_signature(bind_with)
                 bound = sig.bind(*args, **kwargs)
                 arguments = dict(bound.arguments)
                 arguments.pop("self", None)

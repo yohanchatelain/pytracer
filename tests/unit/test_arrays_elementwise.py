@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from pytracer.analysis.elementwise import elementwise_sig, stack_arrays
 from pytracer.storage.arrays import ArrayStore, load_array, make_array_store
@@ -110,3 +111,36 @@ def test_stack_arrays_complex_uses_abs():
     stack = stack_arrays([np.array([3 + 4j]), np.array([3 + 4j])])
     assert stack is not None
     np.testing.assert_allclose(stack, [[5.0], [5.0]])
+
+
+zarr_missing = __import__("importlib").util.find_spec("zarr") is None
+
+
+@pytest.mark.skipif(zarr_missing, reason="zarr not installed")
+def test_zarr_backend_roundtrip(tmp_path):
+    store = ArrayStore(tmp_path, mode="always", backend="zarr")
+    a = np.arange(12.0).reshape(3, 4)
+    ref = store.maybe_store(2, "output", "Ret", a)
+    assert ref is not None and ref.endswith(".zarr")
+    loaded = load_array(tmp_path, ref)
+    np.testing.assert_array_equal(loaded, a)
+
+
+@pytest.mark.skipif(zarr_missing, reason="zarr not installed")
+def test_mixed_backend_load(tmp_path):
+    npy_store = ArrayStore(tmp_path, mode="always", backend="npy")
+    zarr_store = ArrayStore(tmp_path, mode="always", backend="zarr")
+    a = np.ones(5)
+    ref_npy = npy_store.maybe_store(1, "input", "x", a)
+    ref_zarr = zarr_store.maybe_store(1, "output", "y", a * 2)
+    np.testing.assert_array_equal(load_array(tmp_path, ref_npy), a)
+    np.testing.assert_array_equal(load_array(tmp_path, ref_zarr), a * 2)
+
+
+def test_backend_resolution():
+    from pytracer.storage.arrays import resolve_backend
+
+    assert resolve_backend("npy") == "npy"
+    assert resolve_backend("auto") in ("npy", "zarr")
+    with pytest.raises(ValueError):
+        resolve_backend("hdf5")
