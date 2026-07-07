@@ -51,17 +51,18 @@ def run_from_spec(spec: dict) -> int:
         capture_backtrace=spec.get("capture_backtrace", True),
         mode=spec.get("mode", "summary"),
         array_store=array_store,
+        taint_outputs=instrumentation == "taint",
     )
     set_active_recorder(recorder)
 
     patcher = Patcher(recorder)
-    if instrumentation in ("hybrid", "patch"):
+    if instrumentation in ("hybrid", "patch", "taint"):
         report = resolve_targets(spec.get("targets", []))
         meta.unresolved_targets = report.errors
         patcher.patch(report.resolved)
 
     monitor = Monitor(scope_dir=Path(script).resolve().parent, run_dir=run_dir)
-    if instrumentation in ("hybrid", "monitor"):
+    if instrumentation in ("hybrid", "monitor", "taint"):
         monitor.start()
         if not monitor.available:
             meta.notes.append("sys.monitoring unavailable; T4 monitor disabled")

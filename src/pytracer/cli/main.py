@@ -34,8 +34,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_run.add_argument("--plugins", nargs="*", default=None, help="plugins to enable")
     p_run.add_argument(
-        "--instrument", choices=["hybrid", "patch", "monitor"], default=None,
-        help="instrumentation tiers (default from config: hybrid)",
+        "--instrument", choices=["hybrid", "patch", "monitor", "taint"], default=None,
+        help="instrumentation tiers (default: hybrid; taint adds T3 tracer arrays)",
     )
     p_run.add_argument("--alignment", choices=["strict", "callsite", "fuzzy"], default=None)
     p_run.add_argument("--output-dir", default=None)

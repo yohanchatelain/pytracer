@@ -20,7 +20,7 @@ DEFAULT_TOML = """\
 [trace]
 plugins = ["numpy"]
 targets = []                    # extra targets, e.g. ["numpy.linalg.*", "mymodule.solver"]
-instrumentation = "hybrid"      # hybrid (patch + monitor) | patch | monitor
+instrumentation = "hybrid"      # hybrid (patch+monitor) | patch | monitor | taint (hybrid+T3)
 mode = "summary"                # summary | metadata
 capture_backtrace = true
 store_arrays = "auto"          # auto | always | never; enables element-wise sig

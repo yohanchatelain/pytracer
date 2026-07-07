@@ -144,3 +144,22 @@ def test_suggest_targets_command(workdir):
         assert "sum" in proc.stdout
     else:
         assert proc.returncode == 1
+
+
+def test_taint_mode_closes_operator_blind_spot(workdir):
+    """The same script traced in hybrid vs taint mode: operator ops
+    (multiply, add, add.reduce) appear only under --instrument taint."""
+    proc = run_cli(
+        ["run", "operators_taint.py", "--repeat", "2", "--plugins",
+         "--instrument", "taint"],
+        workdir,
+    )
+    assert proc.returncode == 0, proc.stderr
+    (exp,) = experiment_dirs(workdir)
+    functions = json.loads((exp / "analysis" / "function_summary.json").read_text())
+    names = {f["function"] for f in functions}
+    assert "numpy.multiply" in names
+    assert "numpy.add" in names
+    assert "numpy.add.reduce" in names
+    tiers = {t for f in functions for t in f["tiers"]}
+    assert "t3" in tiers

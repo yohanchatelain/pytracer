@@ -11,12 +11,12 @@ from typing import Any, Literal
 
 from pytracer._errors import ConfigError
 
-Instrumentation = Literal["hybrid", "patch", "monitor"]
+Instrumentation = Literal["hybrid", "patch", "monitor", "taint"]
 TraceMode = Literal["summary", "metadata"]
 AlignmentMode = Literal["strict", "callsite", "fuzzy"]
 ReportFormat = Literal["markdown", "html", "json"]
 
-_VALID_INSTRUMENTATION = ("hybrid", "patch", "monitor")
+_VALID_INSTRUMENTATION = ("hybrid", "patch", "monitor", "taint")
 _VALID_MODES = ("summary", "metadata")
 _VALID_ALIGNMENT = ("strict", "callsite", "fuzzy")
 _VALID_FORMATS = ("markdown", "html", "json")

@@ -53,6 +53,12 @@ instrumentation tiers → event stream → append-safe capture → Parquet
   `at` while keeping `isinstance(np.add, np.ufunc)` true (tier T2); on
   Python 3.12+, `sys.monitoring` records a census of *untraced* C callables
   and per-line execution counts for control-flow divergence (tier T4).
+- `--instrument taint` adds **tracer arrays** (tier T3): tainted values
+  (`pytracer.taint(x)`, plus outputs of traced calls) dispatch every NumPy
+  operation — including `a + b` and `a @ b` operator syntax and calls from
+  third-party code, immune to aliasing — through the array protocol.
+  High overhead, alters `type(x)` checks; the drill-down tool, not the
+  default.
 - Every event is schema-versioned. Capture is JSON-lines (crash-safe);
   each run is also finalized to `events.parquet` for pandas/duckdb.
 - Runs are aligned **call-by-call** (module, function, callsite, occurrence)
@@ -90,7 +96,7 @@ pytracer run SCRIPT [opts] [-- script args]
     --target PATH                  extra target, repeatable; globs allowed
                                    (numpy.linalg.*, mymodule.solver)
     --plugins numpy scipy sklearn  plugin target sets
-    --instrument hybrid|patch|monitor
+    --instrument hybrid|patch|monitor|taint
     --store-arrays auto|always|never
     --alignment strict|callsite|fuzzy
     --continue-on-error
@@ -155,10 +161,13 @@ an **allowlisted** subset of the environment only (`OMP_*`, `VFC_*`,
 
 - Pytracer does not perturb arithmetic; identical deterministic runs will
   (correctly) show zero variability.
-- Attribute patching cannot see operator dispatch (`a + b`) or calls made
-  inside C/Cython extensions; the coverage report quantifies what was
-  missed. Deeper tiers (tracer arrays, native BLAS census) are planned —
-  see `PYTRACER2_PLAN.md`.
+- In the default hybrid mode, attribute patching cannot see operator
+  dispatch (`a + b`); use `--instrument taint` to close that gap for
+  tainted data (taint is stripped by `np.asarray` at many C entry points —
+  traced-call outputs are re-tainted to re-seed it).
+- Calls made inside C/Cython extensions are invisible to every Python
+  tier; the coverage report quantifies what was missed. A native BLAS
+  census tier is planned — see `PYTRACER2_PLAN.md`.
 - Only the parent process is traced; joblib/multiprocessing workers are not.
 - The T4 monitor requires Python ≥ 3.12.
 
