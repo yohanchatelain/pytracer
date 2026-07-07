@@ -64,7 +64,8 @@ def test_deterministic_run_shows_full_stability(workdir):
     functions = json.loads((exp / "analysis" / "function_summary.json").read_text())
     by_name = {f["function"]: f for f in functions}
     assert by_name["numpy.sum"]["min_output_sig_bits"] == 53.0  # determinism invariant
-    assert by_name["numpy.sum"]["sig_basis"] == "summary"
+    # store_arrays defaults to "auto": element-wise sig is the common case
+    assert by_name["numpy.sum"]["sig_basis"] == "element"
 
     for name in ("report.md", "report.html", "report.json"):
         assert (exp / "report" / name).is_file()

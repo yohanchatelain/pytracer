@@ -20,6 +20,7 @@ from pathlib import Path
 from pytracer.instrumentation.monitor import Monitor
 from pytracer.instrumentation.patcher import Patcher, resolve_targets
 from pytracer.instrumentation.recorder import Recorder, set_active_recorder
+from pytracer.storage.arrays import make_array_store
 from pytracer.storage.parquet import finalize_run
 from pytracer.trace.metadata import collect_run_metadata, write_metadata
 from pytracer.trace.writer import TraceWriter
@@ -39,11 +40,17 @@ def run_from_spec(spec: dict) -> int:
     )
 
     writer = TraceWriter(run_dir)
+    array_store = make_array_store(
+        run_dir,
+        spec.get("store_arrays", "never"),
+        spec.get("array_store_threshold", 100_000),
+    )
     recorder = Recorder(
         writer,
         spec["run_id"],
         capture_backtrace=spec.get("capture_backtrace", True),
         mode=spec.get("mode", "summary"),
+        array_store=array_store,
     )
     set_active_recorder(recorder)
 

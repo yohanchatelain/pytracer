@@ -34,10 +34,12 @@ class Recorder:
         *,
         capture_backtrace: bool = True,
         mode: str = "summary",
+        array_store=None,
     ):
         self.writer = writer
         self.run_id = run_id
         self.mode = mode
+        self.array_store = array_store
         self.context = CallContext(capture_backtrace=capture_backtrace)
 
     # -- event emission -----------------------------------------------------
@@ -66,6 +68,15 @@ class Recorder:
         with_payload: bool = True,
     ) -> None:
         summary = self._summary(value) if with_payload else None
+        payload_ref = None
+        if with_payload and self.array_store is not None and phase in ("input", "output"):
+            payload_ref = self.array_store.maybe_store(call_id, phase, arg_name, value)
+        if payload_ref is not None:
+            payload_kind = "array_ref"
+        elif summary is not None:
+            payload_kind = "summary"
+        else:
+            payload_kind = "none"
         event = TraceEvent(
             schema_version=SCHEMA_VERSION,
             run_id=self.run_id,
@@ -80,8 +91,9 @@ class Recorder:
             ufunc_method=ufunc_method,
             arg_name=arg_name,
             inplace=inplace,
-            payload_kind="summary" if summary is not None else "none",
+            payload_kind=payload_kind,  # type: ignore[arg-type]
             summary=summary,
+            payload_ref=payload_ref,
             source=source,
             note=note,
         )
