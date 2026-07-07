@@ -7,15 +7,19 @@ per-callsite counter, so identical control flow aligns exactly.
 
 Modes:
 - strict:   every call must match in every run; first divergence is an error.
-- callsite: keys missing from some runs are reported, matched keys proceed.
-- fuzzy:    alias of callsite in this version (LCS matching planned); it
-            exists so configs written now keep working when it lands.
+- callsite: keys (including occurrence index) missing from some runs are
+            reported, matched keys proceed. Known limitation: one inserted
+            call at a callsite shifts every later occurrence there.
+- fuzzy:    per-callsite longest-common-subsequence matching on argument
+            signatures (dtype/shape), so insertions and deletions are
+            localized as extra/missing calls instead of cascading.
 """
 
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from difflib import SequenceMatcher
 from pathlib import Path
 
 from pytracer._errors import AlignmentError, PytracerError
@@ -104,6 +108,76 @@ def load_experiment_calls(
     return run_ids, calls_per_run, truncated
 
 
+def _call_signature(call: CallRecord) -> tuple:
+    """Perturbation-stable identity of a call's arguments (dtype/shape only)."""
+    return tuple(
+        sorted(
+            (name, s.dtype if s else None, s.shape if s else None)
+            for name, s in call.inputs.items()
+        )
+    )
+
+
+def _fuzzy_align(
+    run_ids: list[str],
+    calls_per_run: list[list[CallRecord]],
+    truncated_runs: list[str] | None,
+) -> Alignment:
+    n_runs = len(run_ids)
+    Site = tuple  # (module, qualname, ufunc_method, file, lineno)
+    sites: dict[Site, list[list[CallRecord]]] = {}
+    site_order: list[Site] = []
+    for run_index, calls in enumerate(calls_per_run):
+        for call in calls:
+            site = call.key[:5]
+            if site not in sites:
+                sites[site] = [[] for _ in range(n_runs)]
+                site_order.append(site)
+            sites[site][run_index].append(call)
+
+    alignment = Alignment(
+        mode="fuzzy", run_ids=run_ids, truncated_runs=list(truncated_runs or [])
+    )
+    for site in site_order:
+        per_run = sites[site]
+        # reference: the run with the most calls at this site
+        ref_index = max(range(n_runs), key=lambda i: len(per_run[i]))
+        ref_calls = per_run[ref_index]
+        ref_sigs = [_call_signature(c) for c in ref_calls]
+
+        # slots[ref_pos][run] = matched call (LCS on argument signatures)
+        slots: list[list[CallRecord | None]] = [[None] * n_runs for _ in ref_calls]
+        extras: list[tuple[int, CallRecord]] = []
+        for run_index in range(n_runs):
+            calls = per_run[run_index]
+            if run_index == ref_index:
+                for pos, call in enumerate(calls):
+                    slots[pos][run_index] = call
+                continue
+            sigs = [_call_signature(c) for c in calls]
+            matched_positions = set()
+            matcher = SequenceMatcher(None, ref_sigs, sigs, autojunk=False)
+            for block in matcher.get_matching_blocks():
+                for offset in range(block.size):
+                    slots[block.a + offset][run_index] = calls[block.b + offset]
+                    matched_positions.add(block.b + offset)
+            extras.extend(
+                (run_index, call)
+                for pos, call in enumerate(calls)
+                if pos not in matched_positions
+            )
+
+        for pos, row in enumerate(slots):
+            alignment.groups.append(AlignedGroup(key=(*site, pos), calls=row))
+        # extra calls (present in a non-reference run only) become singleton
+        # groups with synthetic negative occurrences so keys stay unique
+        for j, (run_index, call) in enumerate(extras):
+            row = [None] * n_runs
+            row[run_index] = call
+            alignment.groups.append(AlignedGroup(key=(*site, -1 - j), calls=row))
+    return alignment
+
+
 def align(
     run_ids: list[str],
     calls_per_run: list[list[CallRecord]],
@@ -111,7 +185,7 @@ def align(
     truncated_runs: list[str] | None = None,
 ) -> Alignment:
     if mode == "fuzzy":
-        mode = "callsite"  # LCS matching planned; callsite is the safe superset
+        return _fuzzy_align(run_ids, calls_per_run, truncated_runs)
     indexes = [{c.key: c for c in run_calls} for run_calls in calls_per_run]
     ordered_keys: list[CallKey] = []
     seen: set[CallKey] = set()

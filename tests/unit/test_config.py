@@ -45,3 +45,21 @@ def test_invalid_toml_reported(tmp_path):
     (tmp_path / CONFIG_FILENAME).write_text("not [valid toml")
     with pytest.raises(ConfigError, match="invalid TOML"):
         load_config(tmp_path)
+
+
+def test_perturb_env_templating_valid():
+    config = config_from_dict(
+        {"perturb": {"env": {"VFC_BACKENDS": "mca --seed={run_index}"}}}
+    )
+    assert config.perturb.env["VFC_BACKENDS"].format(run_index=3, run_id="x") == \
+        "mca --seed=3"
+
+
+def test_perturb_env_bad_template_rejected():
+    with pytest.raises(ConfigError, match="perturb.env"):
+        config_from_dict({"perturb": {"env": {"X": "seed={unknown_var}"}}})
+
+
+def test_perturb_env_non_string_rejected():
+    with pytest.raises(ConfigError, match="perturb.env"):
+        config_from_dict({"perturb": {"env": {"X": 5}}})

@@ -32,6 +32,7 @@ class TraceConfig:
     capture_backtrace: bool = True
     store_arrays: str = "auto"
     array_store_threshold: int = 100_000
+    native_census: bool = False
 
 
 @dataclass(slots=True)
@@ -45,6 +46,19 @@ class AnalysisConfig:
 
 
 @dataclass(slots=True)
+class PerturbConfig:
+    """Per-run environment overrides driving an external perturbation
+    backend (Verificarlo, Verrou, fuzzy libmath). Values are templates:
+    {run_index} and {run_id} are substituted per run, e.g.
+
+        [perturb.env]
+        VFC_BACKENDS = "libinterflop_mca.so --mode=mca --seed={run_index}"
+    """
+
+    env: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
 class ReportConfig:
     formats: list[str] = field(default_factory=lambda: ["markdown", "html", "json"])
 
@@ -54,6 +68,7 @@ class PytracerConfig:
     trace: TraceConfig = field(default_factory=TraceConfig)
     storage: StorageConfig = field(default_factory=StorageConfig)
     analysis: AnalysisConfig = field(default_factory=AnalysisConfig)
+    perturb: PerturbConfig = field(default_factory=PerturbConfig)
     report: ReportConfig = field(default_factory=ReportConfig)
 
     def validate(self) -> None:
@@ -91,6 +106,18 @@ class PytracerConfig:
         ):
             if not isinstance(value, list) or not all(isinstance(x, str) for x in value):
                 raise ConfigError(f"{name} must be a list of strings")
+        if not isinstance(self.perturb.env, dict) or not all(
+            isinstance(k, str) and isinstance(v, str) for k, v in self.perturb.env.items()
+        ):
+            raise ConfigError("perturb.env must be a table of string values")
+        for key, template in self.perturb.env.items():
+            try:
+                template.format(run_index=0, run_id="run-000")
+            except (KeyError, IndexError, ValueError) as e:
+                raise ConfigError(
+                    f"perturb.env.{key}: invalid template {template!r} "
+                    f"(only {{run_index}} and {{run_id}} are substituted): {e}"
+                ) from e
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -100,6 +127,7 @@ _SECTIONS = {
     "trace": TraceConfig,
     "storage": StorageConfig,
     "analysis": AnalysisConfig,
+    "perturb": PerturbConfig,
     "report": ReportConfig,
 }
 

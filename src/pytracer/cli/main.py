@@ -44,6 +44,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="store array payloads for element-wise significant digits "
         "(default from config: auto)",
     )
+    p_run.add_argument(
+        "--native", action="store_true",
+        help="enable the native BLAS kernel census (T5; Linux + C compiler)",
+    )
     p_run.add_argument("--continue-on-error", action="store_true")
     p_run.add_argument("--no-report", action="store_true", help="skip analysis and report")
     # Script arguments are passed after a literal `--`; they are split off
@@ -139,6 +143,8 @@ def cmd_run(args) -> int:
         config.storage.output_dir = args.output_dir
     if args.store_arrays:
         config.trace.store_arrays = args.store_arrays
+    if args.native:
+        config.trace.native_census = True
     config.validate()
 
     script_args = args.script_args
