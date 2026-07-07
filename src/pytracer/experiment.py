@@ -117,6 +117,8 @@ def run_experiment(
             "instrumentation": config.trace.instrumentation,
             "mode": config.trace.mode,
             "capture_backtrace": config.trace.capture_backtrace,
+            "store_arrays": config.trace.store_arrays,
+            "array_store_threshold": config.trace.array_store_threshold,
         }
         spec_path = run_dir / "spec.json"
         spec_path.write_text(json.dumps(spec, indent=2))

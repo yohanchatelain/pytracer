@@ -55,6 +55,8 @@ class CallRecord:
     parent_call_id: int | None = None
     inputs: dict[str, NumericSummary | None] = field(default_factory=dict)
     outputs: dict[str, NumericSummary | None] = field(default_factory=dict)
+    input_refs: dict[str, str] = field(default_factory=dict)
+    output_refs: dict[str, str] = field(default_factory=dict)
     exception: str | None = None
     first_event_id: int = 0
 
@@ -95,9 +97,15 @@ def assemble_calls(events: list[TraceEvent]) -> list[CallRecord]:
             )
             calls[ev.call_id] = rec
         if ev.phase == "input":
-            rec.inputs[ev.arg_name or f"Arg{len(rec.inputs)}"] = ev.summary
+            name = ev.arg_name or f"Arg{len(rec.inputs)}"
+            rec.inputs[name] = ev.summary
+            if ev.payload_ref:
+                rec.input_refs[name] = ev.payload_ref
         elif ev.phase == "output":
-            rec.outputs[ev.arg_name or "Ret"] = ev.summary
+            name = ev.arg_name or "Ret"
+            rec.outputs[name] = ev.summary
+            if ev.payload_ref:
+                rec.output_refs[name] = ev.payload_ref
         elif ev.phase == "exception":
             rec.exception = ev.note or "exception"
     return sorted(calls.values(), key=lambda r: r.first_event_id)

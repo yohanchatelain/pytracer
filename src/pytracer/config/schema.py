@@ -20,6 +20,7 @@ _VALID_INSTRUMENTATION = ("hybrid", "patch", "monitor")
 _VALID_MODES = ("summary", "metadata")
 _VALID_ALIGNMENT = ("strict", "callsite", "fuzzy")
 _VALID_FORMATS = ("markdown", "html", "json")
+_VALID_STORE_ARRAYS = ("auto", "always", "never")
 
 
 @dataclass(slots=True)
@@ -29,6 +30,8 @@ class TraceConfig:
     instrumentation: str = "hybrid"
     mode: str = "summary"
     capture_backtrace: bool = True
+    store_arrays: str = "auto"
+    array_store_threshold: int = 100_000
 
 
 @dataclass(slots=True)
@@ -59,6 +62,15 @@ class PytracerConfig:
                 f"trace.instrumentation must be one of {_VALID_INSTRUMENTATION}, "
                 f"got {self.trace.instrumentation!r}"
             )
+        if self.trace.store_arrays not in _VALID_STORE_ARRAYS:
+            raise ConfigError(
+                f"trace.store_arrays must be one of {_VALID_STORE_ARRAYS}, "
+                f"got {self.trace.store_arrays!r}"
+            )
+        if not isinstance(self.trace.array_store_threshold, int) or (
+            self.trace.array_store_threshold < 0
+        ):
+            raise ConfigError("trace.array_store_threshold must be a non-negative integer")
         if self.trace.mode not in _VALID_MODES:
             raise ConfigError(
                 f"trace.mode must be one of {_VALID_MODES}, got {self.trace.mode!r}"

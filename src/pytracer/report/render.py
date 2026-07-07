@@ -12,10 +12,15 @@ from pathlib import Path
 
 from jinja2 import Environment
 
-_SIG_NOTE = (
+_SIG_NOTE_SUMMARY = (
     "Significance values are `sig(mean)` in bits: the cross-run stability of each "
     "argument's mean, capped at 53. This is an optimistic proxy for element-wise "
     "significant digits, which require stored arrays (not enabled in this run)."
+)
+_SIG_NOTE_ELEMENT = (
+    "Significance values are element-wise significant digits in bits (relative-std "
+    "estimator, capped at 53), computed from arrays stored during capture. Rows "
+    "with basis `summary` fall back to the `sig(mean)` proxy for that argument."
 )
 
 
@@ -47,7 +52,8 @@ def render_markdown(data: dict) -> str:
     if a.get("truncated_runs"):
         add(f"- **Truncated runs**: {', '.join(a['truncated_runs'])}")
     add("")
-    add(f"> {_SIG_NOTE}")
+    any_element = any(f.get("sig_basis") == "element" for f in data.get("functions", []))
+    add(f"> {_SIG_NOTE_ELEMENT if any_element else _SIG_NOTE_SUMMARY}")
     add("")
 
     add("## Coverage: what was observed")
@@ -73,11 +79,13 @@ def render_markdown(data: dict) -> str:
     add("")
     top = data.get("top_unstable", [])
     if top:
-        add("| Function | min sig (bits) | max amplification (bits) | divergence | NaN | Inf |")
-        add("|---|---|---|---|---|---|")
+        add("| Function | min sig (bits) | basis | max amplification (bits) "
+            "| divergence | NaN | Inf |")
+        add("|---|---|---|---|---|---|---|")
         for row in top:
             add(
                 f"| `{row['function']}` | {_fmt(row['min_output_sig_bits'])} "
+                f"| {row.get('sig_basis', 'summary')} "
                 f"| {_fmt(row['max_amplification_bits'])} "
                 f"| {_fmt(row['divergence_score'], 3)} "
                 f"| {'yes' if row['nan_instability'] else '-'} "

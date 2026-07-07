@@ -39,6 +39,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_run.add_argument("--alignment", choices=["strict", "callsite", "fuzzy"], default=None)
     p_run.add_argument("--output-dir", default=None)
+    p_run.add_argument(
+        "--store-arrays", choices=["auto", "always", "never"], default=None,
+        help="store array payloads for element-wise significant digits "
+        "(default from config: auto)",
+    )
     p_run.add_argument("--continue-on-error", action="store_true")
     p_run.add_argument("--no-report", action="store_true", help="skip analysis and report")
     # Script arguments are passed after a literal `--`; they are split off
@@ -65,6 +70,37 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_clean = sub.add_parser("clean", help="delete pytracer experiment directories")
     p_clean.add_argument("--output-dir", default=None)
+
+    p_check = sub.add_parser(
+        "check", help="gate on stability thresholds (nonzero exit on violation)"
+    )
+    p_check.add_argument("experiment_dir")
+    p_check.add_argument("--min-sig-bits", type=float, default=None)
+    p_check.add_argument("--max-divergence", type=float, default=None)
+    p_check.add_argument("--no-nan", action="store_true", help="fail on NaN instability")
+    p_check.add_argument("--no-inf", action="store_true", help="fail on Inf instability")
+    p_check.add_argument(
+        "--thresholds", default=None, metavar="FILE",
+        help="thresholds TOML (default: ./pytracer-thresholds.toml when present)",
+    )
+
+    p_diff = sub.add_parser("diff", help="compare two experiments (A/B)")
+    p_diff.add_argument("experiment_a")
+    p_diff.add_argument("experiment_b")
+    p_diff.add_argument(
+        "--tolerance-bits", type=float, default=1.0,
+        help="sig drop considered a regression (default 1.0)",
+    )
+    p_diff.add_argument(
+        "--fail-on-regression", action="store_true",
+        help="exit nonzero when regressions are found",
+    )
+
+    p_suggest = sub.add_parser(
+        "suggest-targets", help="suggest --target entries from the monitor census"
+    )
+    p_suggest.add_argument("experiment_dir")
+    p_suggest.add_argument("--top", type=int, default=15)
 
     return parser
 
@@ -101,6 +137,8 @@ def cmd_run(args) -> int:
         config.analysis.alignment = args.alignment
     if args.output_dir:
         config.storage.output_dir = args.output_dir
+    if args.store_arrays:
+        config.trace.store_arrays = args.store_arrays
     config.validate()
 
     script_args = args.script_args
@@ -231,6 +269,99 @@ def cmd_clean(args) -> int:
     return 0
 
 
+def cmd_check(args) -> int:
+    from pytracer.analysis.check import (
+        THRESHOLDS_FILENAME,
+        Thresholds,
+        check_experiment,
+        load_thresholds_file,
+    )
+
+    thresholds = Thresholds()
+    thresholds_path = args.thresholds
+    if thresholds_path is None and Path(THRESHOLDS_FILENAME).is_file():
+        thresholds_path = THRESHOLDS_FILENAME
+    if thresholds_path is not None:
+        thresholds = load_thresholds_file(thresholds_path)
+    if args.min_sig_bits is not None:
+        thresholds.min_sig_bits = args.min_sig_bits
+    if args.max_divergence is not None:
+        thresholds.max_divergence = args.max_divergence
+    if args.no_nan:
+        thresholds.allow_nan = False
+    if args.no_inf:
+        thresholds.allow_inf = False
+
+    if (
+        thresholds.min_sig_bits is None
+        and thresholds.max_divergence is None
+        and thresholds.allow_nan
+        and thresholds.allow_inf
+        and not thresholds.per_function
+    ):
+        print(
+            "error: no thresholds given (use --min-sig-bits/--max-divergence/"
+            f"--no-nan/--no-inf or a {THRESHOLDS_FILENAME})",
+            file=sys.stderr,
+        )
+        return 2
+
+    violations = check_experiment(args.experiment_dir, thresholds)
+    if violations:
+        print(f"FAIL: {len(violations)} stability violation(s)")
+        for violation in violations:
+            print(f"  - {violation}")
+        return 1
+    print("PASS: all stability thresholds satisfied")
+    return 0
+
+
+def cmd_diff(args) -> int:
+    from pytracer.analysis.diff import diff_experiments, format_diff
+
+    result = diff_experiments(args.experiment_a, args.experiment_b)
+    print(format_diff(result, tolerance_bits=args.tolerance_bits))
+    regressions = result.regressions(args.tolerance_bits)
+    if regressions:
+        print(f"\n{len(regressions)} regression(s) beyond {args.tolerance_bits} bits")
+        if args.fail_on_regression:
+            return 1
+    else:
+        print("\nno regressions")
+    return 0
+
+
+def cmd_suggest_targets(args) -> int:
+    coverage_path = Path(args.experiment_dir) / "analysis" / "coverage.json"
+    if not coverage_path.is_file():
+        print(
+            f"error: {coverage_path} not found (run `pytracer analyze` first)",
+            file=sys.stderr,
+        )
+        return 1
+    coverage = json.loads(coverage_path.read_text())
+    untraced = coverage.get("untraced_numerical_callables", [])[: args.top]
+    if not coverage.get("monitor_available", False):
+        print(
+            "monitor (T4) was not available for this experiment; "
+            "no census to suggest from",
+            file=sys.stderr,
+        )
+        return 1
+    if not untraced:
+        print("no untraced numerical callables observed — coverage looks complete")
+        return 0
+    print("# Untraced numerical callables observed by the monitor.")
+    print("# Add to pytracer.toml, or pass as --target flags:")
+    print("[trace]")
+    targets = ", ".join(f'"{entry["function"]}"' for entry in untraced)
+    print(f"targets = [{targets}]")
+    print()
+    for entry in untraced:
+        print(f"# {entry['function']:<44s} {entry['calls']} call(s)")
+    return 0
+
+
 _COMMANDS = {
     "init": cmd_init,
     "run": cmd_run,
@@ -240,6 +371,9 @@ _COMMANDS = {
     "plugins": cmd_plugins,
     "doctor": cmd_doctor,
     "clean": cmd_clean,
+    "check": cmd_check,
+    "diff": cmd_diff,
+    "suggest-targets": cmd_suggest_targets,
 }
 
 

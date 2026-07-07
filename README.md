@@ -70,11 +70,16 @@ stability.
 
 ### Metric honesty
 
-Reported significance is `sig(mean)` in bits — the cross-run stability of
-each argument's mean, an optimistic proxy for element-wise significant
-digits. Element-wise significance (requires storing arrays) is on the
-roadmap; every metric row carries a `sig_basis` field so the two are never
-conflated.
+Two significance bases, never conflated (`sig_basis` on every metric row):
+
+- **element**: element-wise significant digits across runs, computed from
+  arrays stored during capture (`store_arrays = "auto"`, the default,
+  stores numeric arrays up to `array_store_threshold` elements as .npy
+  payloads). This is the real measurement.
+- **summary**: `sig(mean)` — the cross-run stability of the argument's
+  mean, used when payloads were not stored. It is an *optimistic proxy*:
+  element permutations across runs are nearly invisible to it (a pinned
+  test demonstrates >40 proxy bits vs <8 element-wise bits).
 
 ## CLI
 
@@ -86,10 +91,18 @@ pytracer run SCRIPT [opts] [-- script args]
                                    (numpy.linalg.*, mymodule.solver)
     --plugins numpy scipy sklearn  plugin target sets
     --instrument hybrid|patch|monitor
+    --store-arrays auto|always|never
     --alignment strict|callsite|fuzzy
     --continue-on-error
 pytracer analyze EXPERIMENT_DIR    (re)run alignment + aggregation
 pytracer report EXPERIMENT_DIR     (re)generate reports
+pytracer check EXPERIMENT_DIR --min-sig-bits 20 --max-divergence 0.01
+                                   CI gate: nonzero exit on violations;
+                                   also reads ./pytracer-thresholds.toml
+pytracer diff EXPERIMENT_A EXPERIMENT_B [--fail-on-regression]
+                                   A/B comparison (library upgrades, flags)
+pytracer suggest-targets EXPERIMENT_DIR
+                                   propose --target entries from the T4 census
 pytracer plugins list|targets NAME
 pytracer config show|validate
 pytracer doctor                    environment / config / BLAS checks
@@ -121,6 +134,8 @@ targets = []
 instrumentation = "hybrid"
 mode = "summary"
 capture_backtrace = true
+store_arrays = "auto"          # enables element-wise significant digits
+array_store_threshold = 100000
 
 [storage]
 output_dir = ".pytracer/runs"

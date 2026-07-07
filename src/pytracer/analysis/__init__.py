@@ -35,7 +35,8 @@ def analyze_experiment(
     alignment = align(run_ids, calls_per_run, mode=alignment_mode, truncated_runs=truncated)
     write_alignment(experiment_dir, alignment)
 
-    aggregation = aggregate(alignment)
+    run_dirs = [experiment_dir / "runs" / run_id for run_id in run_ids]
+    aggregation = aggregate(alignment, run_dirs=run_dirs)
     write_aggregation(experiment_dir, aggregation)
 
     coverage = build_coverage(experiment_dir, calls_per_run, target_specs)

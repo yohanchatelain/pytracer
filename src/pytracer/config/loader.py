@@ -23,6 +23,8 @@ targets = []                    # extra targets, e.g. ["numpy.linalg.*", "mymodu
 instrumentation = "hybrid"      # hybrid (patch + monitor) | patch | monitor
 mode = "summary"                # summary | metadata
 capture_backtrace = true
+store_arrays = "auto"          # auto | always | never; enables element-wise sig
+array_store_threshold = 100000 # max elements per stored array in auto mode
 
 [storage]
 output_dir = ".pytracer/runs"
