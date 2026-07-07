@@ -8,6 +8,7 @@ Recording failures never propagate into the traced program.
 from __future__ import annotations
 
 import inspect
+import time
 
 from pytracer.instrumentation.call_context import CallContext
 from pytracer.trace.event import SCHEMA_VERSION, NumericSummary, SourceRef, TraceEvent
@@ -102,6 +103,7 @@ class Recorder:
             payload_ref=payload_ref,
             source=source,
             note=note,
+            ts_ns=time.monotonic_ns(),
         )
         self.writer.write_event(event)
 

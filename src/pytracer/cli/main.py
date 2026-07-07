@@ -106,6 +106,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_suggest.add_argument("experiment_dir")
     p_suggest.add_argument("--top", type=int, default=15)
 
+    p_dash = sub.add_parser("dashboard", help="interactive dashboard (needs [gui] extra)")
+    p_dash.add_argument("experiment_dir")
+    p_dash.add_argument("--host", default="127.0.0.1")
+    p_dash.add_argument("--port", type=int, default=8050)
+    p_dash.add_argument("--debug", action="store_true")
+
+    p_export = sub.add_parser("export", help="export the experiment timeline")
+    p_export.add_argument("experiment_dir")
+    p_export.add_argument("--format", choices=["perfetto"], default="perfetto")
+    p_export.add_argument("-o", "--output", default=None)
+
     return parser
 
 
@@ -368,6 +379,23 @@ def cmd_suggest_targets(args) -> int:
     return 0
 
 
+def cmd_dashboard(args) -> int:
+    from pytracer.dashboard.app import run_dashboard
+
+    print(f"Dashboard: http://{args.host}:{args.port}/ (Ctrl-C to stop)")
+    run_dashboard(args.experiment_dir, host=args.host, port=args.port, debug=args.debug)
+    return 0
+
+
+def cmd_export(args) -> int:
+    from pytracer.report.perfetto import export_perfetto
+
+    out = export_perfetto(args.experiment_dir, args.output)
+    print(f"wrote {out}")
+    print("open it at https://ui.perfetto.dev or chrome://tracing")
+    return 0
+
+
 _COMMANDS = {
     "init": cmd_init,
     "run": cmd_run,
@@ -380,6 +408,8 @@ _COMMANDS = {
     "check": cmd_check,
     "diff": cmd_diff,
     "suggest-targets": cmd_suggest_targets,
+    "dashboard": cmd_dashboard,
+    "export": cmd_export,
 }
 
 

@@ -110,6 +110,9 @@ pytracer diff EXPERIMENT_A EXPERIMENT_B [--fail-on-regression]
                                    A/B comparison (library upgrades, flags)
 pytracer suggest-targets EXPERIMENT_DIR
                                    propose --target entries from the T4 census
+pytracer dashboard EXPERIMENT_DIR  interactive dashboard (pip install pytracer[gui])
+pytracer export EXPERIMENT_DIR     Perfetto/Chrome-Tracing timeline
+                                   (open at https://ui.perfetto.dev)
 pytracer plugins list|targets NAME
 pytracer config show|validate
 pytracer doctor                    environment / config / BLAS checks
