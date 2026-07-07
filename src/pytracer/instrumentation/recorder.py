@@ -16,6 +16,8 @@ from pytracer.trace.writer import TraceWriter
 
 _active_recorder: Recorder | None = None
 
+_BIND_WITH_WRAPPED = object()  # sentinel: bind arguments against `wrapped`
+
 
 def get_active_recorder() -> Recorder | None:
     return _active_recorder
@@ -35,11 +37,15 @@ class Recorder:
         capture_backtrace: bool = True,
         mode: str = "summary",
         array_store=None,
+        taint_outputs: bool = False,
     ):
         self.writer = writer
         self.run_id = run_id
         self.mode = mode
         self.array_store = array_store
+        # When True (--instrument taint), outputs of traced calls are wrapped
+        # as TracedArray so the T3 protocol re-seeds at every known boundary.
+        self.taint_outputs = taint_outputs
         self.context = CallContext(capture_backtrace=capture_backtrace)
 
     # -- event emission -----------------------------------------------------
@@ -100,17 +106,19 @@ class Recorder:
         self.writer.write_event(event)
 
     @staticmethod
-    def _bind_arguments(wrapped, args, kwargs) -> dict[str, object]:
-        try:
-            sig = inspect.signature(wrapped)
-            bound = sig.bind(*args, **kwargs)
-            arguments = dict(bound.arguments)
-            arguments.pop("self", None)
-            return arguments
-        except (ValueError, TypeError):
-            named = {f"Arg{i}": v for i, v in enumerate(args)}
-            named.update(kwargs)
-            return named
+    def _bind_arguments(bind_with, args, kwargs) -> dict[str, object]:
+        if bind_with is not None:
+            try:
+                sig = inspect.signature(bind_with)
+                bound = sig.bind(*args, **kwargs)
+                arguments = dict(bound.arguments)
+                arguments.pop("self", None)
+                return arguments
+            except (ValueError, TypeError):
+                pass
+        named = {f"Arg{i}": v for i, v in enumerate(args)}
+        named.update(kwargs)
+        return named
 
     @staticmethod
     def _output_items(result: object) -> list[tuple[str, object]]:
@@ -131,7 +139,10 @@ class Recorder:
         kwargs,
         ufunc_method: str | None = None,
         inplace: bool = False,
+        bind_with=_BIND_WITH_WRAPPED,
     ):
+        if bind_with is _BIND_WITH_WRAPPED:
+            bind_with = wrapped
         ctx = self.context
         if ctx.inside():
             # Reentrant use of a traced function from inside pytracer itself
@@ -162,7 +173,7 @@ class Recorder:
                     source=source,
                     inplace=inplace,
                 )
-                for name, value in self._bind_arguments(wrapped, args, kwargs).items():
+                for name, value in self._bind_arguments(bind_with, args, kwargs).items():
                     self._emit(phase="input", arg_name=name, value=value, **common)
         except Exception:
             # Never let recording break the traced call: run it untraced.
@@ -191,4 +202,11 @@ class Recorder:
                     self._emit(phase="output", arg_name=name, value=value, **common)
         except Exception:
             pass
+        if self.taint_outputs and tier != "t3":
+            try:
+                from pytracer.instrumentation.tracer_array import rewrap
+
+                result = rewrap(result)
+            except Exception:
+                pass
         return result
