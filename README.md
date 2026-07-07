@@ -98,7 +98,8 @@ pytracer run SCRIPT [opts] [-- script args]
     --plugins numpy scipy sklearn  plugin target sets
     --instrument hybrid|patch|monitor|taint
     --store-arrays auto|always|never
-    --alignment strict|callsite|fuzzy
+    --alignment strict|callsite|fuzzy (fuzzy = per-callsite LCS matching)
+    --native                       BLAS kernel census via LD_PRELOAD (T5)
     --continue-on-error
 pytracer analyze EXPERIMENT_DIR    (re)run alignment + aggregation
 pytracer report EXPERIMENT_DIR     (re)generate reports
@@ -149,6 +150,11 @@ output_dir = ".pytracer/runs"
 [analysis]
 alignment = "callsite"
 
+# Per-run environment for an external perturbation backend
+# ({run_index} and {run_id} are substituted per run):
+# [perturb.env]
+# VFC_BACKENDS = "libinterflop_mca.so --mode=mca --seed={run_index}"
+
 [report]
 formats = ["markdown", "html", "json"]
 ```
@@ -166,8 +172,11 @@ an **allowlisted** subset of the environment only (`OMP_*`, `VFC_*`,
   tainted data (taint is stripped by `np.asarray` at many C entry points —
   traced-call outputs are re-tainted to re-seed it).
 - Calls made inside C/Cython extensions are invisible to every Python
-  tier; the coverage report quantifies what was missed. A native BLAS
-  census tier is planned — see `PYTRACER2_PLAN.md`.
+  tier at the value level. `--native` (Linux + C compiler) adds a BLAS
+  kernel census via an LD_PRELOAD shim: it records which GEMM/GESV kernels
+  ran and their dimensions — including calls from Cython — but not operand
+  values. Both standard BLAS symbols and the prefixed ILP64 symbols of
+  numpy/scipy wheels are interposed.
 - Only the parent process is traced; joblib/multiprocessing workers are not.
 - The T4 monitor requires Python ≥ 3.12.
 

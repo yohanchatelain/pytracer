@@ -71,6 +71,15 @@ def render_markdown(data: dict) -> str:
         add("|---|---|")
         for entry in untraced[:15]:
             add(f"| `{entry['function']}` | {entry['calls']} |")
+    native = cov.get("native_kernels", {})
+    if native:
+        add("")
+        add("Native BLAS/LAPACK kernels observed (T5 census, all runs):")
+        add("")
+        add("| Kernel | Calls | Volume (m*n*k) |")
+        add("|---|---|---|")
+        for name, entry in sorted(native.items(), key=lambda kv: -kv[1]["volume"]):
+            add(f"| `{name}` | {entry['calls']} | {entry['volume']} |")
     for note in cov.get("notes", []):
         add(f"- {note}")
     add("")

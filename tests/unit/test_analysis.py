@@ -111,3 +111,46 @@ def test_top_unstable_ranks_amplifiers_first():
     result = aggregate(alignment)
     top = result.top_unstable()
     assert top[0].function == "numpy.noisy"
+
+
+def make_shaped_call(call_id, shape, occurrence=0, lineno=9):
+    call = make_call(call_id, qualname="dot", occurrence=occurrence, lineno=lineno)
+    call.inputs = {
+        "a": NumericSummary(dtype="float64", shape=shape, size=1, mean=1.0)
+    }
+    return call
+
+
+def test_fuzzy_alignment_localizes_insertion():
+    """Run B has one extra call (different shape) inserted at the same
+    callsite. Callsite mode misaligns everything after the insertion;
+    fuzzy matches the common subsequence and reports one extra call."""
+    shapes_a = [(2,), (3,), (4,)]
+    shapes_b = [(2,), (9, 9), (3,), (4,)]  # (9, 9) inserted
+    run_a = [make_shaped_call(i, s, occurrence=i) for i, s in enumerate(shapes_a)]
+    run_b = [make_shaped_call(i, s, occurrence=i) for i, s in enumerate(shapes_b)]
+
+    # callsite mode: occurrences 1 and 2 pair mismatched shapes silently
+    cs = align(["A", "B"], [run_a, run_b], mode="callsite")
+    mismatched = [
+        g for g in cs.matched
+        if g.calls[0].inputs["a"].shape != g.calls[1].inputs["a"].shape
+    ]
+    assert mismatched  # the documented cascade
+
+    # fuzzy mode: all three common calls pair correctly, one extra reported
+    fz = align(["A", "B"], [run_a, run_b], mode="fuzzy")
+    complete = fz.matched
+    assert len(complete) == 3
+    for g in complete:
+        assert g.calls[0].inputs["a"].shape == g.calls[1].inputs["a"].shape
+    (extra,) = fz.divergent
+    assert extra.calls[0] is None  # present only in run B
+    assert extra.calls[1].inputs["a"].shape == (9, 9)
+
+
+def test_fuzzy_alignment_identical_runs():
+    runs = [[make_call(0), make_call(1, occurrence=1)] for _ in range(3)]
+    alignment = align(["r0", "r1", "r2"], runs, mode="fuzzy")
+    assert len(alignment.groups) == 2
+    assert all(g.complete for g in alignment.groups)

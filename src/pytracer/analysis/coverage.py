@@ -13,6 +13,7 @@ from collections import Counter
 from pathlib import Path
 
 from pytracer.instrumentation.monitor import MONITOR_FILENAME
+from pytracer.instrumentation.native import NATIVE_LOG_FILENAME, parse_native_log
 from pytracer.trace.reader import CallRecord
 
 _SUGGESTION_MODULE_PREFIXES = ("numpy", "scipy", "sklearn", "pandas", "torch", "jax")
@@ -43,6 +44,14 @@ def build_coverage(
             for name, count in data.get("c_calls", {}).items():
                 c_calls[name] += count
 
+    native_kernels: dict[str, dict] = {}
+    if runs_dir.is_dir():
+        for run_dir in sorted(runs_dir.iterdir()):
+            for name, entry in parse_native_log(run_dir / NATIVE_LOG_FILENAME).items():
+                agg = native_kernels.setdefault(name, {"calls": 0, "volume": 0})
+                agg["calls"] += entry["calls"]
+                agg["volume"] += entry["volume"]
+
     untraced = [
         {"function": name, "calls": count}
         for name, count in c_calls.most_common()
@@ -53,6 +62,7 @@ def build_coverage(
 
     return {
         "calls_per_tier": dict(events_per_tier),
+        "native_kernels": native_kernels,
         "traced_functions": sorted(traced_functions),
         "targets_configured": target_specs,
         "monitor_available": monitor_available,

@@ -87,6 +87,17 @@ def run_experiment(
     experiment_id, experiment_dir = create_experiment_dir(config.storage.output_dir, config)
     result = ExperimentResult(experiment_id=experiment_id, experiment_dir=experiment_dir)
 
+    native_shim = None
+    native_libs: list[str] = []
+    if config.trace.native_census:
+        from pytracer.instrumentation.native import ensure_shim, find_real_blas_libs
+
+        native_shim, reason = ensure_shim()
+        if native_shim is None:
+            result.warnings.append(f"native census disabled: {reason}")
+        else:
+            native_libs = find_real_blas_libs()
+
     (experiment_dir / "experiment.json").write_text(
         json.dumps(
             {
@@ -125,6 +136,16 @@ def run_experiment(
 
         env = dict(os.environ)
         env["PYTRACER_RUN_ID"] = run_id
+        if native_shim is not None:
+            preload = str(native_shim)
+            if env.get("LD_PRELOAD"):
+                preload = f"{preload}:{env['LD_PRELOAD']}"
+            env["LD_PRELOAD"] = preload
+            env["PYTRACER_NATIVE_LOG"] = str(run_dir / "native_kernels.log")
+            if native_libs:
+                env["PYTRACER_NATIVE_REAL_LIBS"] = ":".join(native_libs)
+        for key, template in config.perturb.env.items():
+            env[key] = template.format(run_index=k, run_id=run_id)
         if env_overrides:
             env.update(env_overrides)
 

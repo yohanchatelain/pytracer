@@ -68,6 +68,16 @@ def run_checks(directory: str | Path | None = None) -> list[dict]:
         except Exception as e:
             checks.append(_check("blas", WARN, f"could not inspect numpy BLAS: {e}"))
 
+    import shutil as _shutil
+
+    cc = _shutil.which("cc") or _shutil.which("gcc")
+    if sys.platform == "linux" and cc:
+        checks.append(_check("native", OK, f"C compiler for native census: {cc}"))
+    else:
+        checks.append(
+            _check("native", WARN, "native census unavailable (needs Linux + cc/gcc)")
+        )
+
     if os.access(base, os.W_OK):
         checks.append(_check("writable", OK, f"{base} is writable"))
     else:

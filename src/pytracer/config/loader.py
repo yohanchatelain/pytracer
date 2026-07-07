@@ -32,6 +32,11 @@ output_dir = ".pytracer/runs"
 [analysis]
 alignment = "callsite"          # strict | callsite | fuzzy
 
+# Per-run environment for an external perturbation backend; values may use
+# {run_index} and {run_id}. Example:
+# [perturb.env]
+# VFC_BACKENDS = "libinterflop_mca.so --mode=mca --seed={run_index}"
+
 [report]
 formats = ["markdown", "html", "json"]
 """
