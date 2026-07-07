@@ -1,0 +1,9 @@
+[trace]
+plugins = ["numpy", "scipy"]
+store_arrays = "auto"
+
+[analysis]
+alignment = "callsite"
+
+[perturb.env]
+VFC_BACKENDS = "libinterflop_mca.so --mode=mca --precision-binary64=53 --seed={run_index}"

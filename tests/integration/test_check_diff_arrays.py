@@ -44,9 +44,9 @@ def test_element_wise_sig_pipeline(workdir):
     assert proc.returncode == 0, proc.stderr
     (exp,) = experiment_dirs(workdir)
 
-    # arrays stored per run
+    # arrays stored per run (backend-agnostic: .npy files or .zarr dirs)
     for run_dir in sorted((exp / "runs").iterdir()):
-        stored = list((run_dir / "arrays").glob("*.npy"))
+        stored = list((run_dir / "arrays").iterdir())
         assert stored, f"no arrays stored in {run_dir}"
 
     functions = json.loads((exp / "analysis" / "function_summary.json").read_text())
