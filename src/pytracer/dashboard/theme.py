@@ -83,6 +83,37 @@ HEATMAP_SCALES = {
 
 FONT_FAMILY = 'system-ui, -apple-system, "Segoe UI", sans-serif'
 
+# Traffic-light severity for significant bits: red (0) -> yellow (float32
+# precision, 24) -> green (exact, 53). Color is always redundant with a
+# printed value, so the red/green axis never carries meaning alone.
+_SEVERITY_STOPS = [
+    (0.0, (208, 59, 59)),     # critical red
+    (FLOAT32_BITS, (250, 178, 25)),   # warning yellow
+    (SIG_CAP_BITS, (12, 163, 12)),    # good green
+]
+
+UNKNOWN_GRAY = "#c3c2b7"
+
+
+def sig_to_color(sig: float | None) -> str:
+    """Map significant bits to the red-yellow-green severity ramp."""
+    if sig is None:
+        return UNKNOWN_GRAY
+    s = max(0.0, min(SIG_CAP_BITS, float(sig)))
+    for (x0, c0), (x1, c1) in zip(_SEVERITY_STOPS, _SEVERITY_STOPS[1:], strict=False):
+        if s <= x1:
+            t = 0.0 if x1 == x0 else (s - x0) / (x1 - x0)
+            r, g, b = (round(a + (b_ - a) * t)
+                       for a, b_ in zip(c0, c1, strict=True))
+            return f"rgb({r},{g},{b})"
+    return f"rgb{_SEVERITY_STOPS[-1][1]}"
+
+
+#: Same ramp as a plotly colorscale (for the colorbar).
+SEVERITY_COLORSCALE = [
+    [x / SIG_CAP_BITS, f"rgb({r},{g},{b})"] for x, (r, g, b) in _SEVERITY_STOPS
+]
+
 
 def make_template():
     """Plotly template shared by every dashboard figure."""

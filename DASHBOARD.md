@@ -68,6 +68,24 @@ aligned-runs data model (see the mapping table at the end).
   - **Source context**: the calling file with ±7 lines and the callsite
     highlighted (successor of the pytracer 1 Ace-editor modal).
 
+### Call graph tab
+
+- **Data-flow graph of the traced program**: nodes are functions (plus a
+  synthetic script root), arrows point the way outputs flow (an edge
+  A → B means B was called under A and its outputs surfaced there).
+- **Traffic-light coloring by worst cross-run output significance**
+  (sig(mean) proxy): red = digits destroyed, yellow ≈ float32 precision
+  (24 bits), green = exact (53 bits); gray = nothing measurable. The
+  value is printed inside every node so the red/green axis never carries
+  meaning alone (colorblind-safe by redundancy), with a labeled colorbar.
+- Edges are colored by the worst output significance produced under that
+  caller and their thickness scales with call count; hovering an edge
+  shows caller → callee, call-site count, and the worst bits.
+- Node hover: aligned call groups, tier, min/median output sig, raised
+  exceptions. **Clicking a node opens that function in the Explorer.**
+- Layout is a layered left-to-right DAG (longest-path levels, barycenter
+  ordering); recursion collapses onto the node, cycles are guarded.
+
 ### Call timeline tab
 
 - Per-run Gantt of traced call spans from monotonic capture timestamps
@@ -135,6 +153,7 @@ optional and a missing `dash` raises a clean `PytracerError`.
 | hover stats (shape, norms, cond, min/max) | per-run summaries table (norms, counts, fingerprint) + per-run mean chart |
 | source line + Ace editor modal | inline source context with highlighted callsite |
 | callgraph Gantt | per-run call-span timeline (+ Perfetto export) |
+| callgraph module (never shipped a sig-colored graph view) | Call graph tab: output-flow arrows, red→yellow→green by significant bits |
 | dump timeline/heatmap JSON | timeline CSV download |
 | object values as ★ | exceptions ✕ / divergent groups ★ |
 

@@ -312,6 +312,183 @@ def runs_line_figure(detail_rows: list[dict], arg: str):
     return fig
 
 
+# --------------------------------------------------------------- call graph
+
+def _graph_layout(root: str, nodes: list[str],
+                  edges: list[tuple[str, str]]) -> dict[str, tuple[float, float]]:
+    """Layered left-to-right DAG layout (longest path + barycenter ordering)."""
+    children: dict[str, list[str]] = {}
+    parents: dict[str, list[str]] = {}
+    for a, b in edges:
+        children.setdefault(a, []).append(b)
+        parents.setdefault(b, []).append(a)
+
+    level: dict[str, int] = {root: 0}
+
+    def assign(name: str, stack: frozenset) -> int:
+        if name in level:
+            return level[name]
+        if name in stack:  # cycle guard
+            return 0
+        ps = parents.get(name, [])
+        depth = 1 + max(
+            (assign(p, stack | {name}) for p in ps), default=0
+        ) if ps else 1
+        level[name] = depth
+        return depth
+
+    for name in nodes:
+        assign(name, frozenset())
+
+    by_level: dict[int, list[str]] = {}
+    for name in nodes:
+        by_level.setdefault(level[name], []).append(name)
+    for names in by_level.values():
+        names.sort()
+
+    pos: dict[str, tuple[float, float]] = {}
+    for _ in range(2):  # barycenter sweeps
+        for depth in sorted(by_level):
+            names = by_level[depth]
+            if pos:
+                names.sort(key=lambda n: (
+                    sum(pos[p][1] for p in parents.get(n, []) if p in pos)
+                    / max(1, len([p for p in parents.get(n, []) if p in pos]))
+                    if any(p in pos for p in parents.get(n, [])) else 0.0,
+                    n,
+                ))
+            n = len(names)
+            for i, name in enumerate(names):
+                pos[name] = (float(depth), i - (n - 1) / 2.0)
+    return pos
+
+
+def callgraph_figure(graph: dict):
+    """Nodes are functions, arrows are outputs flowing to the caller's frame;
+    color is worst output significance (red = bad, yellow = float32,
+    green = exact). The value is printed on every node, so color never
+    carries meaning alone."""
+    import plotly.graph_objects as go
+
+    nodes, edges = graph["nodes"], graph["edges"]
+    if not nodes:
+        return empty_figure("No traced calls to draw.")
+    root = graph["root"]
+    names = [root, *nodes.keys()]
+    pos = _graph_layout(root, names, list(edges))
+
+    max_count = max((e["count"] for e in edges.values()), default=1)
+    annotations = []
+    edge_hover_x, edge_hover_y, edge_hover_text = [], [], []
+    for (a, b), edge in edges.items():
+        x0, y0 = pos[a]
+        x1, y1 = pos[b]
+        color = theme.sig_to_color(edge["min_sig"])
+        width = 1.2 + 2.4 * (edge["count"] / max_count)
+        annotations.append({
+            "x": x1, "y": y1, "ax": x0, "ay": y0,
+            "xref": "x", "yref": "y", "axref": "x", "ayref": "y",
+            "showarrow": True, "arrowhead": 3, "arrowsize": 1.1,
+            "arrowwidth": width, "arrowcolor": color,
+            "standoff": 26, "startstandoff": 26,
+            "text": "",
+        })
+        edge_hover_x.append((x0 + x1) / 2)
+        edge_hover_y.append((y0 + y1) / 2)
+        sig_txt = (f"{edge['min_sig']:.1f} significant bits (worst output)"
+                   if edge["min_sig"] is not None else "no cross-run measure")
+        edge_hover_text.append(
+            f"<b>{a} → {b}</b><br>{edge['count']} call site(s) · {sig_txt}")
+
+    node_x, node_y, node_text, node_color, node_size = [], [], [], [], []
+    node_custom, node_hover = [], []
+    for name in names:
+        x, y = pos[name]
+        node_x.append(x)
+        node_y.append(y)
+        if name == root:
+            info = None
+            label = graph.get("root_label", root)
+            node_text.append(f"<b>{label}</b>")
+            node_color.append(theme.UNKNOWN_GRAY)
+            node_size.append(30)
+            node_custom.append("")
+            node_hover.append(f"<b>{label}</b><br>traced script (root)")
+            continue
+        info = nodes[name]
+        short = name.split(".", 1)[1] if "." in name else name
+        sig = info["min_sig"]
+        sig_label = f"{sig:.1f} b" if sig is not None else "–"
+        node_text.append(f"<b>{short}</b><br>{sig_label}")
+        node_color.append(theme.sig_to_color(sig))
+        node_size.append(24 + 10 * (info["calls"] / max(
+            n["calls"] for n in nodes.values())))
+        node_custom.append(name)
+        median = info["median_sig"]
+        node_hover.append(
+            f"<b>{name}</b><br>"
+            f"{info['calls']} aligned call group(s) · tier {','.join(info['tiers'])}"
+            f"<br>min output sig: "
+            + (f"{sig:.2f} bits" if sig is not None else "n/a")
+            + (f" · median: {median:.2f} bits" if median is not None else "")
+            + (f"<br>⚠ {info['exceptions']} call(s) raised"
+               if info["exceptions"] else ""))
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(  # invisible edge-midpoint hover targets
+        x=edge_hover_x, y=edge_hover_y, mode="markers",
+        marker={"size": 22, "color": "rgba(0,0,0,0)"},
+        hovertemplate="%{text}<extra></extra>", text=edge_hover_text,
+        showlegend=False,
+    ))
+    fig.add_trace(go.Scatter(
+        x=node_x, y=node_y, mode="markers+text",
+        text=node_text, textposition="middle center",
+        textfont={"size": 10.5, "color": theme.INK},
+        marker={
+            "size": node_size,
+            "color": node_color,
+            "opacity": 0.28,
+            "line": {"color": node_color, "width": 2},
+            "symbol": "circle",
+        },
+        customdata=node_custom,
+        hovertemplate="%{hovertext}<extra></extra>", hovertext=node_hover,
+        showlegend=False,
+    ))
+    fig.add_trace(go.Scatter(  # colorbar carrier
+        x=[None], y=[None], mode="markers",
+        marker={
+            "colorscale": theme.SEVERITY_COLORSCALE,
+            "cmin": 0, "cmax": theme.SIG_CAP_BITS, "color": [0],
+            "showscale": True,
+            "colorbar": {
+                "title": {"text": "significant bits", "side": "right"},
+                "thickness": 12, "outlinewidth": 0, "len": 0.7,
+                "tickvals": [0, 10, theme.FLOAT32_BITS, 40, theme.SIG_CAP_BITS],
+                "ticktext": ["0", "10", "24 (float32)", "40", "53 (exact)"],
+            },
+        },
+        hoverinfo="skip", showlegend=False,
+    ))
+
+    xs = [p[0] for p in pos.values()]
+    ys = [p[1] for p in pos.values()]
+    fig.update_layout(
+        template=template(),
+        annotations=annotations,
+        height=max(420, 130 + 90 * (max(ys) - min(ys) + 1)),
+        xaxis={"visible": False,
+               "range": [min(xs) - 0.5, max(xs) + 0.55]},
+        yaxis={"visible": False,
+               "range": [min(ys) - 0.6, max(ys) + 0.6]},
+        hovermode="closest",
+        clickmode="event",
+        margin={"l": 16, "r": 16, "t": 24, "b": 16},
+    )
+    return fig
+
+
 # -------------------------------------------------------------------- gantt
 
 def gantt_figure(spans: list[dict], total: int, run_id: str):

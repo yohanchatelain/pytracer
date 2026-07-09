@@ -322,6 +322,26 @@ def explorer_tab(data: ExperimentData):
     ], className="tab-body")
 
 
+def graph_tab(data: ExperimentData):
+    from dash import dcc, html
+
+    return html.Div([
+        html.Div(dcc.Graph(
+            id="callgraph-graph",
+            figure=figures.callgraph_figure(data.call_graph()),
+            config={"displayModeBar": False},
+        ), className="card"),
+        html.P("Nodes are traced functions; arrows point the way outputs "
+               "flow (callee → shown under its caller). Color and the "
+               "printed value are the worst cross-run output significance "
+               "(sig(mean) proxy): red = digits lost, yellow ≈ float32, "
+               "green = exact. Gray = nothing measurable (inputs only, or "
+               "a single run). Arrow thickness scales with call count. "
+               "Click a node to open it in the Explorer.",
+               className="hint"),
+    ], className="tab-body")
+
+
 def gantt_tab(data: ExperimentData):
     from dash import dcc, html
 
@@ -439,6 +459,9 @@ def build_layout(data: ExperimentData):
                 dcc.Tab(label="Explorer", value="tab-explorer",
                         className="pt-tab", selected_className="pt-tab--active",
                         children=explorer_tab(data)),
+                dcc.Tab(label="Call graph", value="tab-graph",
+                        className="pt-tab", selected_className="pt-tab--active",
+                        children=graph_tab(data)),
                 dcc.Tab(label="Call timeline", value="tab-gantt",
                         className="pt-tab", selected_className="pt-tab--active",
                         children=gantt_tab(data)),
