@@ -117,6 +117,36 @@ def test_dashboard_figures(experiment):
     assert fig.data
 
 
+def test_call_graph(experiment):
+    from pytracer.dashboard.data import ExperimentData
+
+    data = ExperimentData(experiment)
+    graph = data.call_graph()
+    assert graph["nodes"], "traced functions should appear as nodes"
+    assert "numpy.sum" in graph["nodes"]
+    node = graph["nodes"]["numpy.sum"]
+    assert node["calls"] >= 1
+    # every edge endpoint is a known node (or the synthetic root)
+    known = set(graph["nodes"]) | {graph["root"]}
+    assert all(a in known and b in known for a, b in graph["edges"])
+    # 2 runs -> cross-run output significance is measurable somewhere
+    assert any(n["min_sig"] is not None for n in graph["nodes"].values())
+
+
+@pytest.mark.skipif(importlib.util.find_spec("dash") is None, reason="dash not installed")
+def test_callgraph_figure(experiment):
+    from pytracer.dashboard import figures, theme
+    from pytracer.dashboard.data import ExperimentData
+
+    data = ExperimentData(experiment)
+    fig = figures.callgraph_figure(data.call_graph())
+    assert fig.layout.annotations, "edges should render as arrow annotations"
+    # severity ramp endpoints
+    assert theme.sig_to_color(0.0) == "rgb(208,59,59)"
+    assert theme.sig_to_color(53.0) == "rgb(12,163,12)"
+    assert theme.sig_to_color(None) == theme.UNKNOWN_GRAY
+
+
 def test_elementwise_sig_array():
     import numpy as np
 

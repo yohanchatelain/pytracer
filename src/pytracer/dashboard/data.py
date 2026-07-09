@@ -172,6 +172,87 @@ class ExperimentData:
         finite = sig[np.isfinite(sig)]
         return float(finite.min()) if finite.size else None
 
+    # ------------------------------------------------------------- call graph
+
+    ROOT = "<script>"
+
+    def call_graph(self) -> dict:
+        """Caller -> callee graph with output significance per node and edge.
+
+        Nodes are functions (plus a synthetic script root); an edge A -> B
+        means B was called while A was on the traced stack, and carries the
+        worst output significance B produced under A.
+        """
+        # per-run call_id -> function, for parent lookups
+        maps: list[dict[int, str]] = [dict() for _ in self.run_ids]
+        for group in self.alignment.groups:
+            for run_index, call in enumerate(group.calls):
+                if call is not None:
+                    maps[run_index][call.call_id] = call.function
+
+        # worst output sig per aligned group (proxy basis, always available)
+        group_out_sig: dict[int, float] = {}
+        for row in self.timeline_rows:
+            if row["phase"] != "output" or row["sig_proxy"] is None:
+                continue
+            gidx = row["gidx"]
+            current = group_out_sig.get(gidx)
+            if current is None or row["sig_proxy"] < current:
+                group_out_sig[gidx] = row["sig_proxy"]
+
+        nodes: dict[str, dict] = {}
+        edges: dict[tuple[str, str], dict] = {}
+        for gidx, group in enumerate(self.alignment.groups):
+            located = next(
+                ((i, c) for i, c in enumerate(group.calls) if c is not None), None
+            )
+            if located is None:
+                continue
+            run_index, call = located
+            function = call.function
+            parent = maps[run_index].get(call.parent_call_id, self.ROOT) \
+                if call.parent_call_id is not None else self.ROOT
+            sig = group_out_sig.get(gidx)
+
+            node = nodes.setdefault(function, {
+                "calls": 0, "sigs": [], "tiers": set(), "exceptions": 0,
+            })
+            node["calls"] += 1
+            node["tiers"].add(call.tier)
+            if call.exception:
+                node["exceptions"] += 1
+            if sig is not None:
+                node["sigs"].append(sig)
+
+            if parent != function:  # recursion collapses to the node itself
+                edge = edges.setdefault((parent, function),
+                                        {"count": 0, "sigs": []})
+                edge["count"] += 1
+                if sig is not None:
+                    edge["sigs"].append(sig)
+
+        out_nodes = {}
+        for function, node in nodes.items():
+            sigs = sorted(node["sigs"])
+            out_nodes[function] = {
+                "calls": node["calls"],
+                "min_sig": sigs[0] if sigs else None,
+                "median_sig": sigs[len(sigs) // 2] if sigs else None,
+                "tiers": sorted(node["tiers"]),
+                "exceptions": node["exceptions"],
+            }
+        out_edges = {}
+        for key, edge in edges.items():
+            out_edges[key] = {
+                "count": edge["count"],
+                "min_sig": min(edge["sigs"]) if edge["sigs"] else None,
+            }
+        script = Path(
+            self.report.get("experiment", {}).get("script", "") or self.ROOT
+        ).name
+        return {"nodes": out_nodes, "edges": out_edges,
+                "root": self.ROOT, "root_label": script}
+
     # ------------------------------------------------------------- drill-down
 
     def group_calls(self, gidx: int) -> list[CallRecord | None]:
