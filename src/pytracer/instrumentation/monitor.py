@@ -24,8 +24,9 @@ class Monitor:
     def __init__(self, scope_dir: str | Path, run_dir: str | Path):
         self.scope_dir = str(Path(scope_dir).resolve())
         self.run_dir = Path(run_dir)
-        self.line_counts: Counter[str] = Counter()
+        self.line_counts: Counter[tuple[str, int]] = Counter()
         self.c_calls: Counter[str] = Counter()
+        self._callable_names: dict[object, str] = {}
         self.active = False
         self.available = hasattr(sys, "monitoring")
         self._tool_id = None
@@ -51,7 +52,7 @@ class Monitor:
         def on_line(code, line_number):
             if not self._in_scope(code.co_filename):
                 return mon.DISABLE
-            self.line_counts[f"{code.co_filename}:{line_number}"] += 1
+            self.line_counts[(code.co_filename, line_number)] += 1
             return None
 
         def on_call(code, instruction_offset, callable_obj, arg0):
@@ -59,11 +60,21 @@ class Monitor:
                 return mon.DISABLE
             if hasattr(callable_obj, "__code__"):
                 return None  # Python function: structure comes from wrappers
-            mod = getattr(callable_obj, "__module__", None) or ""
-            name = getattr(callable_obj, "__qualname__", None) or getattr(
-                callable_obj, "__name__", repr(type(callable_obj))
-            )
-            self.c_calls[f"{mod}.{name}" if mod else name] += 1
+            try:
+                function = self._callable_names.get(callable_obj)
+            except TypeError:  # rare unhashable callable
+                function = None
+            if function is None:
+                mod = getattr(callable_obj, "__module__", None) or ""
+                name = getattr(callable_obj, "__qualname__", None) or getattr(
+                    callable_obj, "__name__", repr(type(callable_obj))
+                )
+                function = f"{mod}.{name}" if mod else name
+                try:
+                    self._callable_names[callable_obj] = function
+                except TypeError:
+                    pass
+            self.c_calls[function] += 1
             return None
 
         mon.register_callback(self._tool_id, mon.events.LINE, on_line)
@@ -84,7 +95,10 @@ class Monitor:
     def _write(self) -> None:
         payload = {
             "available": self.available,
-            "line_counts": dict(self.line_counts),
+            "line_counts": {
+                f"{filename}:{line_number}": count
+                for (filename, line_number), count in self.line_counts.items()
+            },
             "c_calls": dict(self.c_calls),
         }
         (self.run_dir / MONITOR_FILENAME).write_text(json.dumps(payload, indent=2))

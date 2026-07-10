@@ -70,9 +70,10 @@ class Recorder:
             return None
         return summarize_value(value)
 
-    def _emit(
+    def _make_event(
         self,
         *,
+        event_id: int,
         call_id: int,
         parent: int | None,
         occurrence: int,
@@ -87,21 +88,27 @@ class Recorder:
         inplace: bool = False,
         note: str | None = None,
         with_payload: bool = True,
-    ) -> None:
+    ) -> TraceEvent:
         summary = self._summary(value) if with_payload else None
         payload_ref = None
         if with_payload and self.array_store is not None and phase in ("input", "output"):
-            payload_ref = self.array_store.maybe_store(call_id, phase, arg_name, value)
+            payload_ref = self.array_store.maybe_store(
+                call_id,
+                phase,
+                arg_name,
+                value,
+                fingerprint=summary.fingerprint if summary is not None else None,
+            )
         if payload_ref is not None:
             payload_kind = "array_ref"
         elif summary is not None:
             payload_kind = "summary"
         else:
             payload_kind = "none"
-        event = TraceEvent(
+        return TraceEvent(
             schema_version=SCHEMA_VERSION,
             run_id=self.run_id,
-            event_id=self.context.next_event_id(),
+            event_id=event_id,
             call_id=call_id,
             parent_call_id=parent,
             occurrence=occurrence,
@@ -119,7 +126,26 @@ class Recorder:
             note=note,
             ts_ns=time.monotonic_ns(),
         )
+
+    def _emit(self, **kwargs) -> None:
+        event = self._make_event(event_id=self.context.next_event_id(), **kwargs)
         self.writer.write_event(event)
+
+    def _emit_items(self, items, *, phase: str, **common) -> None:
+        """Summarize and write one call phase as a single event batch."""
+        items = list(items)
+        event_ids = self.context.next_event_ids(len(items))
+        events = [
+            self._make_event(
+                event_id=event_id,
+                phase=phase,
+                arg_name=name,
+                value=value,
+                **common,
+            )
+            for event_id, (name, value) in zip(event_ids, items, strict=True)
+        ]
+        self.writer.write_events(events)
 
     @staticmethod
     def _bind_arguments(bind_with, args, kwargs) -> dict[str, object]:
@@ -175,8 +201,7 @@ class Recorder:
                     source.file if source else None,
                     source.lineno if source else None,
                 )
-                occurrence = ctx.next_occurrence(callsite_key)
-                call_id = ctx.next_call_id()
+                call_id, occurrence = ctx.next_call(callsite_key)
                 parent = ctx.current_parent()
                 common = dict(
                     call_id=call_id,
@@ -189,8 +214,11 @@ class Recorder:
                     source=source,
                     inplace=inplace,
                 )
-                for name, value in self._bind_arguments(bind_with, args, kwargs).items():
-                    self._emit(phase="input", arg_name=name, value=value, **common)
+                self._emit_items(
+                    self._bind_arguments(bind_with, args, kwargs).items(),
+                    phase="input",
+                    **common,
+                )
         except Exception:
             # Never let recording break the traced call: run it untraced.
             return wrapped(*args, **kwargs)
@@ -214,8 +242,7 @@ class Recorder:
 
         try:
             with ctx.guard():
-                for name, value in self._output_items(result):
-                    self._emit(phase="output", arg_name=name, value=value, **common)
+                self._emit_items(self._output_items(result), phase="output", **common)
         except Exception:
             pass
         if self.taint_outputs and tier != "t3":

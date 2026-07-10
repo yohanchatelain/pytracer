@@ -41,6 +41,14 @@ def test_context_occurrences_independent_per_key():
     assert ctx.next_occurrence(("b",)) == 0
 
 
+def test_context_batch_reservations_are_consecutive():
+    ctx = CallContext()
+    assert ctx.next_event_ids(3) == [0, 1, 2]
+    assert ctx.next_event_id() == 3
+    assert ctx.next_call(("a",)) == (0, 0)
+    assert ctx.next_call(("a",)) == (1, 1)
+
+
 def test_context_caller_source_points_here():
     ctx = CallContext()
     source = ctx.caller_source()
@@ -89,6 +97,15 @@ def test_writer_after_close_is_noop(tmp_path):
     writer.close()
     writer.write_event(make_event())  # must not raise
     writer.close()  # idempotent
+
+
+def test_writer_batch_roundtrip(tmp_path):
+    writer = TraceWriter(tmp_path)
+    writer.write_events(make_event(event_id=i, call_id=i) for i in range(5))
+    writer.close()
+    events, truncated = iter_events(writer.path)
+    assert not truncated
+    assert [event.event_id for event in events] == list(range(5))
 
 
 def test_decorator_passthrough_without_recorder():

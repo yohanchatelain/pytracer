@@ -15,9 +15,23 @@ def test_scalar_float_and_bool():
     assert summarize_value(True).mean == 1.0
 
 
+def test_scalar_nonfinite_and_subnormal_counts():
+    assert summarize_value(float("nan")).nan_count == 1
+    assert summarize_value(float("inf")).inf_count == 1
+    tiny = np.finfo(np.float64).tiny
+    assert summarize_value(tiny / 2).subnormal_count == 1
+
+
+def test_numpy_scalar_preserves_dtype():
+    s = summarize_value(np.float32(1.5))
+    assert s.dtype == "float32"
+    assert s.shape == () and s.mean == 1.5 and s.std == 0.0
+
+
 def test_complex_uses_abs():
     s = summarize_value(3 + 4j)
     assert s.mean == 5.0
+    assert s.l2_norm == 5.0 and s.linf_norm == 5.0
 
 
 def test_array_stats():

@@ -18,29 +18,118 @@
  */
 #define _GNU_SOURCE
 #include <dlfcn.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <pthread.h>
 #include <stddef.h>
+#include <stdatomic.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
-static FILE *log_file = NULL;
-static int log_failed = 0;
-static pthread_mutex_t log_lock = PTHREAD_MUTEX_INITIALIZER;
+#define LOG_BUFFER_SIZE 65536
+
+struct log_buffer {
+    size_t used;
+    char data[LOG_BUFFER_SIZE];
+};
+
+static int log_fd = -1;
+static _Atomic int log_failed = 0;
+static int log_key_ready = 0;
+static pthread_key_t log_key;
+static pthread_once_t log_once = PTHREAD_ONCE_INIT;
+
+static void write_all(const char *data, size_t size) {
+    while (size > 0 && log_fd >= 0) {
+        ssize_t written = write(log_fd, data, size);
+        if (written > 0) {
+            data += written;
+            size -= (size_t)written;
+        } else if (written < 0 && errno == EINTR) {
+            continue;
+        } else {
+            log_failed = 1;
+            return;
+        }
+    }
+}
+
+static void flush_buffer(void *value) {
+    struct log_buffer *buffer = (struct log_buffer *)value;
+    if (buffer && buffer->used > 0) {
+        write_all(buffer->data, buffer->used);
+        buffer->used = 0;
+    }
+}
+
+static void destroy_buffer(void *value) {
+    flush_buffer(value);
+    free(value);
+}
+
+static void close_log(void) {
+    if (log_key_ready) {
+        struct log_buffer *buffer = pthread_getspecific(log_key);
+        if (buffer) {
+            flush_buffer(buffer);
+            pthread_setspecific(log_key, NULL);
+            free(buffer);
+        }
+    }
+    if (log_fd >= 0) {
+        close(log_fd);
+        log_fd = -1;
+    }
+}
+
+static void init_log(void) {
+    const char *path = getenv("PYTRACER_NATIVE_LOG");
+    if (!path) {
+        log_failed = 1;
+        return;
+    }
+    log_fd = open(path, O_CREAT | O_WRONLY | O_APPEND, 0666);
+    if (log_fd < 0 || pthread_key_create(&log_key, destroy_buffer) != 0) {
+        if (log_fd >= 0) close(log_fd);
+        log_fd = -1;
+        log_failed = 1;
+        return;
+    }
+    log_key_ready = 1;
+    atexit(close_log);
+}
+
+static struct log_buffer *get_log_buffer(void) {
+    struct log_buffer *buffer = pthread_getspecific(log_key);
+    if (!buffer) {
+        buffer = (struct log_buffer *)calloc(1, sizeof(*buffer));
+        if (!buffer || pthread_setspecific(log_key, buffer) != 0) {
+            free(buffer);
+            log_failed = 1;
+            return NULL;
+        }
+    }
+    return buffer;
+}
 
 static void log_call(const char *name, long long m, long long n, long long k) {
-    pthread_mutex_lock(&log_lock);
-    if (!log_file && !log_failed) {
-        const char *path = getenv("PYTRACER_NATIVE_LOG");
-        if (path) log_file = fopen(path, "a");
-        if (!log_file) log_failed = 1;
-    }
-    if (log_file) {
-        fprintf(log_file, "%s %lld %lld %lld\n", name, m, n, k);
-        fflush(log_file);
-    }
-    pthread_mutex_unlock(&log_lock);
+    pthread_once(&log_once, init_log);
+    if (log_failed || log_fd < 0) return;
+
+    char line[128];
+    int length = snprintf(line, sizeof(line), "%s %lld %lld %lld\n", name, m, n, k);
+    if (length <= 0) return;
+    size_t size = (size_t)length;
+    if (size >= sizeof(line)) size = sizeof(line) - 1;
+
+    struct log_buffer *buffer = get_log_buffer();
+    if (!buffer) return;
+    if (buffer->used + size > LOG_BUFFER_SIZE) flush_buffer(buffer);
+    memcpy(buffer->data + buffer->used, line, size);
+    buffer->used += size;
 }
 
 /* Resolve the real symbol. RTLD_NEXT fails when the real BLAS was loaded

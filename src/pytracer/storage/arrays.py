@@ -27,6 +27,8 @@ from pathlib import Path
 
 import numpy as np
 
+from pytracer.trace.summary import MAX_FINGERPRINT_BYTES, array_fingerprint
+
 ARRAYS_DIRNAME = "arrays"
 DEFAULT_THRESHOLD = 100_000  # elements; float64 -> 800 KB per array
 
@@ -56,6 +58,8 @@ class ArrayStore:
         self._dir = self.run_dir / ARRAYS_DIRNAME
         self.n_stored = 0
         self.n_skipped = 0
+        self.n_reused = 0
+        self._content_refs: dict[str, str] = {}
 
     def _eligible(self, value: object) -> bool:
         if not isinstance(value, np.ndarray):
@@ -68,14 +72,30 @@ class ArrayStore:
             return False
         return True
 
-    def maybe_store(self, call_id: int, phase: str, arg_name: str | None,
-                    value: object) -> str | None:
+    def maybe_store(
+        self,
+        call_id: int,
+        phase: str,
+        arg_name: str | None,
+        value: object,
+        *,
+        fingerprint: str | None = None,
+    ) -> str | None:
         """Store *value* if eligible; return the payload_ref (relative path)."""
         try:
             if not self._eligible(value):
                 if isinstance(value, np.ndarray):
                     self.n_skipped += 1
                 return None
+            # The summary fingerprint is over the complete payload below the
+            # byte limit. Reuse an existing immutable snapshot when contents
+            # repeat across calls; sampled large-array hashes are not safe for
+            # content addressing and are deliberately excluded.
+            if value.nbytes <= MAX_FINGERPRINT_BYTES:
+                fingerprint = fingerprint or array_fingerprint(value)
+                if fingerprint is not None and fingerprint in self._content_refs:
+                    self.n_reused += 1
+                    return self._content_refs[fingerprint]
             self._dir.mkdir(parents=True, exist_ok=True)
             safe_arg = _SANITIZE.sub("_", arg_name or "arg")
             stem = f"{call_id:06d}-{phase}-{safe_arg}"
@@ -88,7 +108,10 @@ class ArrayStore:
                 name = f"{stem}.npy"
                 np.save(self._dir / name, value, allow_pickle=False)
             self.n_stored += 1
-            return f"{ARRAYS_DIRNAME}/{name}"
+            payload_ref = f"{ARRAYS_DIRNAME}/{name}"
+            if fingerprint is not None and value.nbytes <= MAX_FINGERPRINT_BYTES:
+                self._content_refs[fingerprint] = payload_ref
+            return payload_ref
         except Exception:
             # Storage failure must never break the traced program.
             self.n_skipped += 1

@@ -1,12 +1,15 @@
 """Numeric summaries of traced values.
 
-Summaries never raise and never copy more than ``max_fingerprint_bytes`` of
-data. Non-numeric values summarize to None.
+Summaries never raise. Fingerprinting copies at most
+``max_fingerprint_bytes``; dtype conversion and non-finite filtering in the
+exact array summary may allocate larger temporary arrays. Non-numeric values
+summarize to None.
 """
 
 from __future__ import annotations
 
 import hashlib
+import math
 
 import numpy as np
 
@@ -19,7 +22,7 @@ def summarize_value(value: object) -> NumericSummary | None:
     """Summarize a scalar or NumPy array; return None for non-numeric values."""
     try:
         if isinstance(value, bool | int | float | complex | np.generic):
-            array = np.asarray(value)
+            return _summarize_scalar(value)
         elif isinstance(value, np.ndarray):
             array = value
         else:
@@ -30,6 +33,49 @@ def summarize_value(value: object) -> NumericSummary | None:
     except Exception:
         # A summary failure must never break the traced program.
         return None
+
+
+def _summarize_scalar(value: object) -> NumericSummary | None:
+    """Summarize one numeric scalar without invoking array reductions.
+
+    Scalar inputs and scalar return values are common in boundary tracing.
+    Sending them through ``np.mean``, ``np.std``, ``np.linalg.norm``, and the
+    counting reductions costs far more than the wrapped operation itself.
+    """
+    array = np.asarray(value)
+    if array.dtype == object or array.dtype.kind in "USVmM":
+        return None
+
+    summary = NumericSummary(dtype=str(array.dtype), shape=(), size=1)
+    item = array.item()
+    if array.dtype.kind == "c":
+        numeric = float(abs(item))
+        real_dtype = np.abs(array).dtype
+    elif array.dtype.kind == "b":
+        numeric = float(bool(item))
+        real_dtype = None
+    else:
+        numeric = float(item)
+        real_dtype = array.dtype if array.dtype.kind == "f" else None
+
+    summary.zero_count = int(numeric == 0.0)
+    if math.isnan(numeric):
+        summary.nan_count = 1
+    elif math.isinf(numeric):
+        summary.inf_count = 1
+    else:
+        if real_dtype is not None and numeric != 0.0:
+            summary.subnormal_count = int(abs(numeric) < np.finfo(real_dtype).tiny)
+        summary.mean = numeric
+        summary.std = 0.0
+        summary.min = numeric
+        summary.max = numeric
+        magnitude = abs(numeric)
+        summary.l2_norm = magnitude
+        summary.linf_norm = magnitude
+
+    summary.fingerprint = array_fingerprint(array)
+    return summary
 
 
 def _summarize_array(array: np.ndarray) -> NumericSummary:

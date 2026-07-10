@@ -35,6 +35,16 @@ def test_store_arg_name_sanitized(tmp_path):
     assert load_array(tmp_path, ref) is not None
 
 
+def test_store_reuses_identical_small_array_snapshot(tmp_path):
+    store = ArrayStore(tmp_path, mode="always", backend="npy")
+    a = np.arange(8.0)
+    first = store.maybe_store(1, "input", "x", a)
+    second = store.maybe_store(2, "input", "x", a.copy())
+    assert second == first
+    assert store.n_stored == 1 and store.n_reused == 1
+    assert len(list((tmp_path / "arrays").glob("*.npy"))) == 1
+
+
 def test_make_array_store_never():
     assert make_array_store("/tmp", "never") is None
 

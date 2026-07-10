@@ -36,6 +36,13 @@ class CallContext:
         with self._lock:
             return next(self._event_ids)
 
+    def next_event_ids(self, count: int) -> list[int]:
+        """Reserve *count* consecutive event ids under one lock."""
+        if count < 0:
+            raise ValueError("event id count must be non-negative")
+        with self._lock:
+            return [next(self._event_ids) for _ in range(count)]
+
     def next_call_id(self) -> int:
         with self._lock:
             return next(self._call_ids)
@@ -45,6 +52,14 @@ class CallContext:
             n = self._occurrences.get(callsite_key, 0)
             self._occurrences[callsite_key] = n + 1
             return n
+
+    def next_call(self, callsite_key: tuple) -> tuple[int, int]:
+        """Reserve a call id and its callsite occurrence under one lock."""
+        with self._lock:
+            call_id = next(self._call_ids)
+            occurrence = self._occurrences.get(callsite_key, 0)
+            self._occurrences[callsite_key] = occurrence + 1
+            return call_id, occurrence
 
     def current_parent(self) -> int | None:
         stack = _stack.get()

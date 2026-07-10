@@ -8,6 +8,7 @@ run finalization, never during capture.
 from __future__ import annotations
 
 import threading
+from collections.abc import Iterable
 from pathlib import Path
 
 import msgspec
@@ -31,13 +32,20 @@ class TraceWriter:
         self.n_events = 0
 
     def write_event(self, event: TraceEvent) -> None:
-        line = self._encoder.encode(event) + b"\n"
+        self.write_events((event,))
+
+    def write_events(self, events: Iterable[TraceEvent]) -> None:
+        """Encode and append a batch with one lock acquisition and write."""
+        batch = tuple(events)
+        if not batch:
+            return
+        payload = b"".join(self._encoder.encode(event) + b"\n" for event in batch)
         with self._lock:
             if self._closed:
                 return
-            self._fo.write(line)
-            self.n_events += 1
-            self._pending += 1
+            self._fo.write(payload)
+            self.n_events += len(batch)
+            self._pending += len(batch)
             if self._pending >= FLUSH_EVERY:
                 self._fo.flush()
                 self._pending = 0

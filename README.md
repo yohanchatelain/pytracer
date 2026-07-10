@@ -181,20 +181,32 @@ an **allowlisted** subset of the environment only (`OMP_*`, `VFC_*`,
 
 ## Overhead
 
-Measured with `python benchmarks/bench.py` (Python 3.13, numpy 2.5,
-worst-case microbenchmarks where the traced operation itself is ~2 µs;
-real workloads with meaningful compute per call sit far below these ratios):
+Measure the local installation with:
 
-| Workload | Tier | Overhead | Throughput |
+```bash
+python benchmarks/bench.py --iterations 2000 --repeats 5 --markdown
+```
+
+The benchmark reports T1, T2, T3, T4/hybrid, metadata-only, and the default
+array-storage path separately. It uses repeated medians and reports artifact
+file count so filesystem costs cannot be hidden. Representative Python 3.12 /
+NumPy 2.5 results on a development host are:
+
+| Workload | Mode | Overhead | Throughput |
 |---|---|---|---|
-| 20k tiny `numpy.sum` calls | T1 | ~110x (~190 µs/call) | ~10k events/s |
-| 2M-element `numpy.sum` calls | T1 | ~28x | summary stats dominate |
-| operator loop under taint | T3 | ~300x | drill-down tier by design |
+| tiny `numpy.sum` calls | T1 summary | ~80x | ~11.5k events/s |
+| tiny `numpy.sum` calls | T1 metadata | ~18x | ~50k events/s |
+| 2M-element `numpy.sum` calls | T1 summary | ~28x | summary passes dominate |
+| operator loop under taint | T3 summary | ~250x | ~12k events/s |
+| operator loop under taint | T3 metadata | ~40x | ~70k events/s |
 
 The per-call cost is the summaries (mean/std/min/max/norms/fingerprint × 2
-events) — the measurements *are* the product. Use targeted tracing for hot
-loops, `mode = "metadata"` to skip summaries entirely, and T3 taint only to
-drill into a region T1/T2 already localized.
+events) — the measurements *are* the product. Scalar summaries use a direct
+path, events from one call phase are batch-written, and repeated small array
+payloads are content-deduplicated. Use targeted tracing for hot loops,
+`mode = "metadata"` to skip summaries entirely, and T3 taint only to drill
+into a region T1/T2 already localized. Exact ratios remain hardware- and
+workload-dependent.
 
 ## Verificarlo / stochastic arithmetic
 
