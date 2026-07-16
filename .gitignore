@@ -12,3 +12,12 @@ __pycache__/
 *.egg-info/
 .coverage
 .coverage.*
+.venv-paper/
+paper/main.pdf
+paper/main.aux
+paper/main.bbl
+paper/main.blg
+paper/main.out
+paper/main.fls
+paper/main.toc
+paper/main.fdb_latexmk
