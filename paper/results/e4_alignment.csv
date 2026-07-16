@@ -1,0 +1,7 @@
+workload,strategy,runs,total_call_groups,matched_call_groups,divergent_call_groups,matched_fraction,truncated_runs,outcome
+random branch,strict,20,,0,,0.0,,aborts
+random branch,callsite,20,7,3,4,0.429,0,ok
+random branch,fuzzy,20,7,3,4,0.429,0,ok
+random-length loop,strict,20,,0,,0.0,,aborts
+random-length loop,callsite,20,25,9,16,0.36,0,ok
+random-length loop,fuzzy,20,25,9,16,0.36,0,ok

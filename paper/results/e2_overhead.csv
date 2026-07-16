@@ -1,0 +1,6 @@
+workload,tier,iterations,baseline_s,traced_s,overhead_x,events,events_per_s,bytes_per_event,spread_s
+20k tiny numpy.sum calls,T1,20000,0.0363,3.8253,105.5,40000,10457,483,0.1992
+2M-element numpy.sum calls,T1,20000,0.0871,4.0798,46.9,200,49,510,0.3241
+20k tiny numpy.sum calls,T2,20000,0.0371,4.1893,113.0,100000,23870,432,0.2588
+operator loop (x*a+b),T3,5000,0.0083,2.6587,320.7,30000,11284,559,0.144
+end-to-end simple_numpy.py,T4,1,0.0935,0.6762,7.2,,,,
