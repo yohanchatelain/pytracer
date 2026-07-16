@@ -7,7 +7,6 @@ from the measured results.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from common import PAPER, read_csv
 
@@ -232,9 +231,9 @@ def macros() -> None:
     lines = [
         m("nPathologies", len(e1)),
         m("nDetected", n_detected),
-        m("ovTinyT1", e2[("20k tiny numpy.sum calls", "T1")]["overhead_x"]),
-        m("ovLargeT1", e2[("2M-element numpy.sum calls", "T1")]["overhead_x"]),
-        m("ovTinyT2", e2[("20k tiny numpy.sum calls", "T2")]["overhead_x"]),
+        m("ovTinyPatch", e2[("20k tiny numpy.sum calls", "T1")]["overhead_x"]),
+        m("ovLargePatch", e2[("2M-element numpy.sum calls", "T1")]["overhead_x"]),
+        m("ovTinyUfunc", e2[("20k tiny numpy.sum calls", "T2")]["overhead_x"]),
         m("ovTaint", e2[("operator loop (x*a+b)", "T3")]["overhead_x"]),
         m("ovMonitor", e2[("end-to-end simple_numpy.py", "T4")]["overhead_x"]),
         m("permSummaryBits", perm["summary_sig_bits"]),

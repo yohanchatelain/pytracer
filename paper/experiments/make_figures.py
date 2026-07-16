@@ -12,9 +12,8 @@ import matplotlib
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
-from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
-
 from common import PAPER, read_csv
+from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 
 FIGURES = PAPER / "figures"
 
@@ -173,7 +172,7 @@ def fig_overhead() -> None:
 
     fig, ax = plt.subplots(figsize=(5.4, 2.7))
     bars = ax.bar(range(len(rows)), values, width=0.55, color=BLUE, zorder=2)
-    for bar, v in zip(bars, values):
+    for bar, v in zip(bars, values, strict=True):
         ax.text(bar.get_x() + bar.get_width() / 2, v * 1.12,
                 f"{v:.0f}×", ha="center", fontsize=8, color=INK)
     ax.set_yscale("log")

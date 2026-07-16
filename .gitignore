@@ -13,7 +13,6 @@ __pycache__/
 .coverage
 .coverage.*
 .venv-paper/
-paper/main.pdf
 paper/main.aux
 paper/main.bbl
 paper/main.blg

@@ -1,2 +1,100 @@
-% intro — filled in during prose pass
 \section{Introduction}
+\label{sec:intro}
+
+Python is the dominant orchestration language of computational science,
+but the arithmetic it orchestrates is opaque. A call to
+\texttt{numpy.linalg.solve} descends through C dispatch into LAPACK; a
+scikit-learn \texttt{fit} runs Cython loops that call BLAS kernels no
+Python-level tool ever sees. When results carry fewer correct digits than
+their fifteen printed decimals suggest --- because of catastrophic
+cancellation, ill-conditioning, or the accumulation of rounding error ---
+nothing in the standard workflow reveals it. Studies of production
+scientific pipelines have shown that such silent variability is large
+enough to change scientific conclusions, for example in neuroimaging,
+where perturbations on the order of machine error propagate to
+qualitatively different brain-network statistics~\citep{kiar2021comparing}.
+
+Stochastic arithmetic gives an empirical handle on the problem: run the
+program several times while randomizing the rounding of floating-point
+operations (Monte Carlo Arithmetic~\citep{parker1997monte}, implemented by
+tools such as Verificarlo~\citep{denis2016verificarlo} and
+Verrou~\citep{fevotte2017verrou}), and the spread of results across runs
+estimates the number of significant digits~\citep{sohier2021confidence}.
+But the perturbation engine answers only \emph{whether} the final output
+is stable. The question users actually have is \emph{where} instability
+originates: which function destroys precision, which merely propagates
+noisy inputs, and which changed the control flow of the program.
+
+PyTracer~\citep{chatelain2023pytracer} pioneered answering that question
+for Python: it instrumented modules at import time, recorded the inputs
+and outputs of targeted functions across perturbed runs, and visualized
+per-call significant digits. Its architecture --- trace, parse, visualize
+--- was sound, but a detailed technical review of the implementation
+identified structural problems: a global monkey-patch of
+\texttt{builtins.type} and \texttt{isinstance} that changed the semantics
+of every library in the traced process; silent trace truncation when runs
+diverged; trace files read back through \texttt{dill} pickles and
+\texttt{eval}; error handling in which recoverable conditions terminated
+the traced application while data-integrity failures were silently
+swallowed; and a packaging setup pinned to a 2021 stack with no declared
+dependencies. In Section~\ref{sec:eval-v1} we show experimentally that the
+original PyTracer can no longer trace even a three-line NumPy program on
+any currently supported Python interpreter.
+
+This paper presents \pyt{}, a clean-slate rewrite, and an experimental
+evaluation of its claims. Two design principles distinguish it from both
+its predecessor and other dynamic analyses:
+
+\begin{description}
+\item[Coverage honesty.] No single interception mechanism can observe all
+numerical work in a Python process (Section~\ref{sec:design-problem}), so
+\pyt{} composes five instrumentation tiers, each with an explicit
+contract of what it sees, what it is blind to, and what it costs. The
+uninstrumented remainder is not ignored: a runtime monitor censuses the C
+callables that executed without a wrapper, and an \texttt{LD\_PRELOAD}
+shim censuses the BLAS kernels invoked from compiled code. Every report
+states what fraction of the numerical work was observed. Absence of an
+instability signal is never presented as evidence of stability.
+\item[Metric honesty.] The cheap cross-run statistic --- the stability of
+an argument's mean, $\sig(\mathrm{mean})$ --- is an optimistic proxy:
+element permutations across runs are nearly invisible to it
+(Section~\ref{sec:eval-basis} measures a \permOptimismBits{}-bit gap on an
+adversarial workload). \pyt{} computes true element-wise significant
+digits from stored array payloads whenever possible and labels every
+metric row with its basis, so the proxy can never masquerade as the
+measurement.
+\end{description}
+
+\noindent This paper makes the following contributions:
+\begin{itemize}
+\item a tiered instrumentation architecture for Python numerical tracing
+  --- boundary patching, ufunc proxies, tainted tracer arrays, a
+  PEP\,669 runtime monitor, and a native BLAS census --- with declared,
+  measured contracts (Section~\ref{sec:design});
+\item digit-loss \emph{attribution}: per aligned call, the amplification
+  metric $\mathrm{amp} = \sig_{\min}(\text{inputs}) -
+  \sig_{\min}(\text{outputs})$ separates functions that destroy precision
+  from functions that merely receive noisy inputs
+  (Section~\ref{sec:design-metrics});
+\item a numerical-CI workflow: \texttt{pytracer check} gates on
+  significance thresholds with a nonzero exit code, and \texttt{pytracer
+  diff} compares two experiments to catch numerical regressions across
+  library or precision changes (Section~\ref{sec:eval-case});
+\item an eight-part experiment campaign, fully scripted and regenerated
+  from raw measurements: detection efficacy on a gallery of
+  \nPathologies{} classical pathologies (\nDetected{}/\nPathologies{}
+  detected and correctly ranked), per-tier overhead, coverage accounting,
+  alignment robustness under control-flow divergence, the summary-proxy
+  gap, an end-to-end scikit-learn case study, storage and crash-safety,
+  and a head-to-head installability comparison with PyTracer\,1
+  (Section~\ref{sec:eval}).
+\end{itemize}
+
+\pyt{} deliberately does \emph{not} perturb arithmetic. It is the
+observability layer above perturbation engines such as Verificarlo,
+Verrou, or a fuzzy libmath environment: they create the variability;
+\pyt{} localizes and attributes it. The same separation makes \pyt{}
+noise-model agnostic --- the experiments in this paper use random input
+perturbation, and the identical workflow under a Monte Carlo Arithmetic
+backend measures true floating-point instability
+(Section~\ref{sec:eval-setup}).
