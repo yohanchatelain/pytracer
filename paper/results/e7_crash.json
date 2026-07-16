@@ -1,0 +1,16 @@
+{
+ "run_exit_code": 0,
+ "analyze_exit_code": 0,
+ "runs_completed": [
+  "run-000",
+  "run-001",
+  "run-002"
+ ],
+ "runs_killed": [
+  "run-003",
+  "run-004",
+  "run-005"
+ ],
+ "killed_runs_have_jsonl": true,
+ "alignment_runs": 6
+}
