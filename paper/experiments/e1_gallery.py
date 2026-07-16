@@ -10,9 +10,16 @@ from __future__ import annotations
 
 import shutil
 
-from common import (EXAMPLES, function_summary, latest_experiment,
-                    load_analysis, main_guard, run_pytracer, scratch_with,
-                    write_csv)
+from common import (
+    EXAMPLES,
+    function_summary,
+    latest_experiment,
+    load_analysis,
+    main_guard,
+    run_pytracer,
+    scratch_with,
+    write_csv,
+)
 
 # (script, unstable function, stable function, min gap asserted by CI)
 GALLERY = [

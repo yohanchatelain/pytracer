@@ -15,8 +15,15 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from common import (function_summary, latest_experiment, load_analysis,
-                    main_guard, run_pytracer, scratch_with, write_csv)
+from common import (
+    function_summary,
+    latest_experiment,
+    load_analysis,
+    main_guard,
+    run_pytracer,
+    scratch_with,
+    write_csv,
+)
 
 WORKLOADS = Path(__file__).resolve().parent / "workloads"
 SCRIPT = WORKLOADS / "sklearn_pipeline.py"

@@ -11,9 +11,7 @@ from __future__ import annotations
 import json
 import statistics
 import subprocess
-import sys
 import time
-from pathlib import Path
 
 from common import PROGRAMS, REPO, VENV_PY, main_guard, scratch_with, write_csv
 
