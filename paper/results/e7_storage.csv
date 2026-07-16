@@ -1,0 +1,11 @@
+workload,run,jsonl_bytes,parquet_bytes,arrays_bytes
+linear solve (few calls),run-000,8528,10744,7005
+linear solve (few calls),run-001,8520,10744,7025
+linear solve (few calls),run-002,8530,10741,7003
+linear solve (few calls),run-003,8520,10743,7013
+linear solve (few calls),run-004,8516,10745,6999
+2k-call loop,run-000,7060918,161530,4064000
+2k-call loop,run-001,7060918,161407,4012000
+2k-call loop,run-002,7056918,161409,4036000
+2k-call loop,run-003,7056918,161446,4072000
+2k-call loop,run-004,7052918,161344,4156000

@@ -1,0 +1,5 @@
+python,install_ok,install_error,bare_import_ok,bare_import_error,import_ok,import_error,cli_ok,cli_error,trace_ok,trace_error,parse_ok,parse_error
+3.10,True,,False,PYTRACER_CONFIG does not exist,True,,True,,False,AttributeError: module 'numpy.lib.format' has no attribute '_MAX_HEADER_SIZE',False,skipped: trace failed
+3.11,True,,False,PYTRACER_CONFIG does not exist,True,,True,,False,TypeError: type '_Type' is not subscriptable,False,skipped: trace failed
+3.12,True,,False,PYTRACER_CONFIG does not exist,True,,True,,False,TypeError: type '_Type' is not subscriptable,False,skipped: trace failed
+3.13,True,,False,PYTRACER_CONFIG does not exist,True,,True,,False,TypeError: type '_Type' is not subscriptable,False,skipped: trace failed
