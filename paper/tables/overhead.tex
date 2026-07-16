@@ -1,0 +1,11 @@
+\begin{tabular}{llrrrr}
+\toprule
+Workload & Tier & Overhead & Events & Events/s & B/event \\
+\midrule
+20k tiny numpy.sum calls & T1 & 105.5$\times$ & 40,000 & 10,457 & 483 \\
+2M-element numpy.sum calls & T1 & 46.9$\times$ & 200 & 49 & 510 \\
+20k tiny numpy.sum calls & T2 & 113.0$\times$ & 100,000 & 23,870 & 432 \\
+operator loop (x*a+b) & T3 & 320.7$\times$ & 30,000 & 11,284 & 559 \\
+end-to-end simple\_numpy.py & T4 & 7.2$\times$ & -- & -- & -- \\
+\bottomrule
+\end{tabular}

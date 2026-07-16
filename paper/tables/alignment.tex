@@ -1,0 +1,12 @@
+\begin{tabular}{llrrrl}
+\toprule
+Workload & Strategy & Call groups & Matched & Divergent & Outcome \\
+\midrule
+random branch & strict & -- & -- & -- & aborts \\
+ & callsite & 7 & 3 & 4 & ok \\
+ & fuzzy & 7 & 3 & 4 & ok \\
+random-length loop & strict & -- & -- & -- & aborts \\
+ & callsite & 25 & 9 & 16 & ok \\
+ & fuzzy & 25 & 9 & 16 & ok \\
+\bottomrule
+\end{tabular}
