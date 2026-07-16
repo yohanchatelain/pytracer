@@ -2,6 +2,7 @@
 
 import subprocess
 import sys
+from pathlib import Path
 
 
 def test_import_creates_nothing_and_needs_nothing(tmp_path):
@@ -10,7 +11,8 @@ def test_import_creates_nothing_and_needs_nothing(tmp_path):
         "print(pytracer.__version__); "
         "print(sorted(os.listdir()))"
     )
-    env = {"PATH": "/usr/bin:/bin", "HOME": str(tmp_path)}
+    src_root = Path(__file__).resolve().parents[2] / "src"
+    env = {"PATH": "/usr/bin:/bin", "HOME": str(tmp_path), "PYTHONPATH": str(src_root)}
     proc = subprocess.run(
         [sys.executable, "-c", code],
         cwd=tmp_path,
