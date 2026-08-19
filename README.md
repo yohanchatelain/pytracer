@@ -35,7 +35,7 @@ uv venv
 source .venv/bin/activate
 
 # Install pytracer in editable mode with all extras
-uv pip install -e ".[dev,arrays,sig,gui]"
+uv pip install -e ".[all]"
 ```
 
 ### 2. Run Tracing & Generate Report
@@ -162,8 +162,8 @@ Measured with `uv run python benchmarks/bench.py`:
 ## Development
 
 ```bash
-# Install development dependencies with uv
-uv pip install -e ".[dev,arrays,sig,gui]"
+# Install all dependencies with uv
+uv pip install -e ".[all]"
 
 # Run code linter
 uv run ruff check src tests
