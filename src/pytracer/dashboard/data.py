@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -258,9 +259,9 @@ class ExperimentData:
     def group_calls(self, gidx: int) -> list[CallRecord | None]:
         return self.alignment.groups[gidx].calls
 
-    def group_detail(self, gidx: int, phase: str, arg: str) -> list[dict]:
+    def group_detail(self, gidx: int, phase: str, arg: str) -> list[dict[str, Any]]:
         """Per-run summary statistics for one argument of one aligned call."""
-        rows = []
+        rows: list[dict[str, Any]] = []
         for run_id, call in zip(self.run_ids, self.group_calls(gidx), strict=True):
             if call is None:
                 rows.append({"run": run_id, "status": "missing (divergent)"})
@@ -297,18 +298,19 @@ class ExperimentData:
         calls = self.group_calls(gidx)
         if all(c is not None for c in calls):
             refs = [
-                (c.input_refs if phase == "input" else c.output_refs).get(arg)
+                (c.input_refs if phase == "input" else c.output_refs).get(arg)  # type: ignore[union-attr]
                 for c in calls
+                if c is not None
             ]
-            if all(refs):
+            if len(refs) == len(calls) and all(refs):
                 arrays = [
-                    load_array(d, r)
+                    load_array(d, str(r))
                     for d, r in zip(self.run_dirs, refs, strict=True)
                 ]
-                shapes = {a.shape for a in arrays if a is not None}
-                if not any(a is None for a in arrays) and len(shapes) == 1:
+                valid_arrays = [a for a in arrays if a is not None]
+                if len(valid_arrays) == len(arrays) and len({a.shape for a in valid_arrays}) == 1:
                     stack = np.stack([
-                        np.abs(a) if a.dtype.kind == "c" else a for a in arrays
+                        np.abs(a) if a.dtype.kind == "c" else a for a in valid_arrays
                     ]).astype(np.float64, copy=False)
                     result = (elementwise_sig_array(stack), stack)
         self._element_cache[key] = result
