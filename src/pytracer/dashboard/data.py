@@ -408,3 +408,91 @@ class ExperimentData:
         out.sort(key=lambda s: s["start_us"])
         self._spans_cache[run_id] = (out, total)
         return out, total
+
+    # -------------------------------------------------------- condition numbers
+
+    def matrix_condition_summary(self, gidx: int, phase: str, arg: str) -> dict[str, Any] | None:
+        """Compute condition number statistics for 2D matrix arrays across runs."""
+        loaded = self.element_stack(gidx, phase, arg)
+        if loaded is None:
+            return None
+        _, stack = loaded
+        if stack.ndim != 3:  # (n_runs, rows, cols)
+            return None
+        conds: list[float] = []
+        for mat in stack:
+            try:
+                s = np.linalg.svd(mat, compute_uv=False)
+                if len(s) > 0 and s[-1] > 0:
+                    conds.append(float(s[0] / s[-1]))
+                elif len(s) > 0:
+                    conds.append(float("inf"))
+            except Exception:
+                continue
+        if not conds:
+            return None
+        finite_conds = [c for c in conds if math.isfinite(c)]
+        if not finite_conds:
+            return {
+                "cond_min": float("inf"),
+                "cond_median": float("inf"),
+                "cond_max": float("inf"),
+                "log10_cond": float("inf"),
+                "is_ill_conditioned": True,
+            }
+        cond_min = min(finite_conds)
+        cond_max = max(finite_conds)
+        cond_median = float(np.median(finite_conds))
+        log10_cond = math.log10(cond_median) if cond_median > 0 else 0.0
+        return {
+            "cond_min": cond_min,
+            "cond_median": cond_median,
+            "cond_max": cond_max,
+            "log10_cond": log10_cond,
+            "is_ill_conditioned": log10_cond >= 8.0 or len(finite_conds) < len(conds),
+        }
+
+    # ------------------------------------------------------------- A/B comparison
+
+    def diff_with(self, other: ExperimentData) -> list[dict[str, Any]]:
+        """Compare function-level stability between self (A) and other (B)."""
+        fns_a = {f["function"]: f for f in self.report.get("functions", [])}
+        fns_b = {f["function"]: f for f in other.report.get("functions", [])}
+        all_fns = sorted(set(fns_a.keys()) | set(fns_b.keys()))
+
+        rows: list[dict[str, Any]] = []
+        for fn in all_fns:
+            fa = fns_a.get(fn)
+            fb = fns_b.get(fn)
+            sig_a = fa.get("min_output_sig_bits") if fa else None
+            sig_b = fb.get("min_output_sig_bits") if fb else None
+            amp_a = fa.get("max_amplification_bits") if fa else None
+            amp_b = fb.get("max_amplification_bits") if fb else None
+
+            delta_sig: float | None = None
+            if sig_a is not None and sig_b is not None:
+                delta_sig = round(sig_b - sig_a, 2)
+                if delta_sig < -3.0:
+                    status = "regression"
+                elif delta_sig > 3.0:
+                    status = "improvement"
+                else:
+                    status = "stable"
+            elif sig_a is None and sig_b is not None:
+                status = "new"
+            elif sig_a is not None and sig_b is None:
+                status = "removed"
+            else:
+                status = "unmeasured"
+
+            rows.append({
+                "function": fn,
+                "sig_a": sig_a,
+                "sig_b": sig_b,
+                "delta_sig": delta_sig,
+                "amp_a": amp_a,
+                "amp_b": amp_b,
+                "status": status,
+            })
+        return rows
+

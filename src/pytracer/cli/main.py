@@ -108,6 +108,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_dash = sub.add_parser("dashboard", help="interactive dashboard (needs [gui] extra)")
     p_dash.add_argument("experiment_dir")
+    p_dash.add_argument(
+        "--compare", default=None, help="second experiment directory for A/B comparison"
+    )
     p_dash.add_argument("--host", default="127.0.0.1")
     p_dash.add_argument("--port", type=int, default=8050)
     p_dash.add_argument("--debug", action="store_true")
@@ -383,7 +386,13 @@ def cmd_dashboard(args) -> int:
     from pytracer.dashboard.app import run_dashboard
 
     print(f"Dashboard: http://{args.host}:{args.port}/ (Ctrl-C to stop)")
-    run_dashboard(args.experiment_dir, host=args.host, port=args.port, debug=args.debug)
+    run_dashboard(
+        args.experiment_dir,
+        compare_dir=args.compare,
+        host=args.host,
+        port=args.port,
+        debug=args.debug,
+    )
     return 0
 
 

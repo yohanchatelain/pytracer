@@ -18,14 +18,8 @@ METRICS = {
     "inf_count": "Inf count (all runs)",
 }
 
-_TEMPLATE = None
-
-
-def template():
-    global _TEMPLATE
-    if _TEMPLATE is None:
-        _TEMPLATE = theme.make_template()
-    return _TEMPLATE
+def template(dark: bool = False):
+    return theme.make_template(dark=dark)
 
 
 def empty_figure(message: str):
@@ -582,3 +576,51 @@ def tier_coverage_figure(calls_per_tier: dict):
         showlegend=False,
     )
     return fig
+
+
+# --------------------------------------------------------------- A/B diff
+
+def diff_waterfall_figure(diff_rows: list[dict]):
+    """Horizontal delta bar chart comparing function significant bits between A and B."""
+    import plotly.graph_objects as go
+
+    rows = [r for r in diff_rows if r.get("delta_sig") is not None]
+    if not rows:
+        return empty_figure("No common measurable functions to compare.")
+    rows = sorted(rows, key=lambda r: r["delta_sig"])
+    colors = [
+        theme.STATUS["critical"] if r["delta_sig"] < -3.0
+        else theme.STATUS["good"] if r["delta_sig"] > 3.0
+        else theme.MUTED
+        for r in rows
+    ]
+    texts = [f"{r['delta_sig']:+.1f} b" for r in rows]
+    fig = go.Figure(go.Bar(
+        x=[r["delta_sig"] for r in rows],
+        y=[r["function"] for r in rows],
+        orientation="h",
+        marker={"color": colors, "cornerradius": 4},
+        width=0.55,
+        text=texts,
+        textposition="outside",
+        textfont={"color": theme.INK_SECONDARY, "size": 11},
+        cliponaxis=False,
+        customdata=[[r.get("sig_a") or 0, r.get("sig_b") or 0] for r in rows],
+        hovertemplate=(
+            "<b>%{y}</b><br>"
+            "Δ significance: <b>%{x:+.2f} bits</b><br>"
+            "Baseline (A): %{customdata[0]:.2f} b → Test (B): %{customdata[1]:.2f} b"
+            "<extra></extra>"
+        ),
+    ))
+    fig.add_vline(x=0, line_color=theme.BASELINE, line_width=1.5)
+    fig.update_layout(
+        template=template(),
+        title="Stability change (Δ significant bits = B − A)",
+        xaxis_title="Δ significant bits (positive = more stable, negative = regression)",
+        height=max(240, 100 + 38 * len(rows)),
+        yaxis={"autorange": "reversed"},
+        showlegend=False,
+    )
+    return fig
+

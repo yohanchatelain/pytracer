@@ -2,15 +2,15 @@
 
 :root {
   --surface: #ffffff;
-  --surface-raised: #fcfcfb;
-  --page: #f8f9fa;
+  --surface-raised: #f8fafc;
+  --page: #f1f5f9;
   --ink: #0f172a;
   --ink-2: #334155;
   --muted: #64748b;
   --grid: #e2e8f0;
   --baseline: #cbd5e1;
   --border: rgba(15, 23, 42, 0.08);
-  --border-strong: rgba(15, 23, 42, 0.14);
+  --border-strong: rgba(15, 23, 42, 0.16);
   
   --accent: #2563eb;
   --accent-light: #eff6ff;
@@ -45,6 +45,36 @@
   --transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+[data-theme="dark"] {
+  --surface: #1e293b;
+  --surface-raised: #0f172a;
+  --page: #0b1120;
+  --ink: #f8fafc;
+  --ink-2: #cbd5e1;
+  --muted: #94a3b8;
+  --grid: #334155;
+  --baseline: #475569;
+  --border: rgba(255, 255, 255, 0.10);
+  --border-strong: rgba(255, 255, 255, 0.18);
+
+  --accent: #3b82f6;
+  --accent-light: rgba(59, 130, 246, 0.15);
+  --accent-border: rgba(59, 130, 246, 0.35);
+  --accent-hover: #60a5fa;
+
+  --good-bg: rgba(22, 163, 74, 0.15);
+  --good-border: rgba(22, 163, 74, 0.35);
+
+  --warning-bg: rgba(217, 119, 6, 0.15);
+  --warning-border: rgba(217, 119, 6, 0.35);
+
+  --serious-bg: rgba(234, 88, 12, 0.15);
+  --serious-border: rgba(234, 88, 12, 0.35);
+
+  --critical-bg: rgba(220, 38, 38, 0.15);
+  --critical-border: rgba(220, 38, 38, 0.35);
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
 }
@@ -59,6 +89,7 @@ html, body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .pt-root {
@@ -136,7 +167,7 @@ html, body {
 .header-right {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.85rem;
   flex-wrap: wrap;
   min-width: 0;
 }
@@ -145,11 +176,11 @@ html, body {
   font-family: var(--mono);
   font-size: 0.8rem;
   font-weight: 500;
-  background: var(--page);
+  background: var(--surface-raised);
   border: 1px solid var(--grid);
   border-radius: var(--radius-sm);
   padding: 0.25rem 0.65rem;
-  max-width: 32rem;
+  max-width: 30rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -160,6 +191,26 @@ html, body {
   color: var(--muted);
   font-size: 0.78rem;
   font-weight: 500;
+}
+
+.theme-toggle-btn {
+  background: var(--surface-raised);
+  border: 1px solid var(--grid);
+  border-radius: var(--radius-sm);
+  color: var(--ink-2);
+  padding: 0.35rem 0.65rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: var(--transition);
+}
+
+.theme-toggle-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 /* ------------------------------------------------------------------ page */
@@ -173,7 +224,7 @@ html, body {
 
 .kpi-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
   gap: 0.85rem;
   margin-bottom: 1.25rem;
 }
@@ -375,6 +426,36 @@ input[type="checkbox"] {
   cursor: pointer;
 }
 
+.filter-pills {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.filter-pill {
+  background: var(--surface-raised);
+  border: 1px solid var(--grid);
+  border-radius: 9999px;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.filter-pill:hover {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
+.filter-pill--active {
+  background: var(--accent-light);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
 .mini-dropdown { min-width: 9.5rem; font-size: 0.82rem; }
 
 input[type="number"], input[type="text"] {
@@ -387,6 +468,10 @@ input[type="number"], input[type="text"] {
   color: var(--ink);
   width: 6rem;
   transition: var(--transition);
+}
+
+input[type="text"].search-input {
+  width: 14rem;
 }
 
 input[type="number"]:focus, input[type="text"]:focus {
@@ -418,11 +503,32 @@ input[type="number"]:focus, input[type="text"]:focus {
 
 /* Dash dropdown restyle */
 .Select-control {
+  background-color: var(--surface) !important;
   border: 1px solid var(--grid) !important;
   border-radius: var(--radius-sm) !important;
   font-size: 0.85rem;
   box-shadow: none !important;
   transition: var(--transition) !important;
+}
+
+.Select-menu-outer {
+  background-color: var(--surface) !important;
+  border: 1px solid var(--grid) !important;
+  color: var(--ink) !important;
+}
+
+.Select-option {
+  background-color: var(--surface) !important;
+  color: var(--ink) !important;
+}
+
+.Select-option.is-focused {
+  background-color: var(--accent-light) !important;
+  color: var(--accent) !important;
+}
+
+.Select-value-label {
+  color: var(--ink) !important;
 }
 
 .Select-control:hover, .is-focused > .Select-control {
@@ -476,6 +582,26 @@ input[type="number"]:focus, input[type="text"]:focus {
   font-size: 0.78rem;
 }
 
+.cond-badge {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  font-weight: 650;
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+}
+.cond-badge--critical {
+  background: var(--critical-bg);
+  border-color: var(--critical-border);
+  color: var(--critical);
+}
+.cond-badge--serious {
+  background: var(--serious-bg);
+  border-color: var(--serious-border);
+  color: var(--serious);
+}
+
 .code-path {
   font-family: var(--mono);
   font-size: 0.78rem;
@@ -515,6 +641,35 @@ input[type="number"]:focus, input[type="text"]:focus {
   color: #64748b;
   user-select: none;
   margin-right: 0.5rem;
+}
+
+/* ------------------------------------------------------------ diff badges */
+
+.diff-badge {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 0.78rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--radius-sm);
+  display: inline-block;
+}
+
+.diff-regress {
+  background: var(--critical-bg);
+  color: var(--critical);
+  border: 1px solid var(--critical-border);
+}
+
+.diff-improve {
+  background: var(--good-bg);
+  color: var(--good);
+  border: 1px solid var(--good-border);
+}
+
+.diff-neutral {
+  background: var(--surface-raised);
+  color: var(--muted);
+  border: 1px solid var(--grid);
 }
 
 /* ---------------------------------------------------------------- tables */

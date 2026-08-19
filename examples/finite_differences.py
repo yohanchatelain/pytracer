@@ -24,7 +24,7 @@ EPS = np.finfo(np.float64).eps
 
 @pytracer.trace_function
 def forward_diff_tiny_h(x):
-    h = 1e-13  # far below sqrt(eps): cancellation dominates
+    h = 1e-15  # far below sqrt(eps): cancellation dominates
     return (math.sin(x + h) - math.sin(x)) / h
 
 
