@@ -30,7 +30,7 @@ def _require_dash():
         ) from e
 
 
-def build_app(experiment_dir: str | Path):
+def build_app(experiment_dir: str | Path, compare_dir: str | Path | None = None):
     _require_dash()
     from dash import Dash
 
@@ -39,18 +39,21 @@ def build_app(experiment_dir: str | Path):
     from pytracer.dashboard.layout import build_layout
 
     data = ExperimentData(experiment_dir)
+    data_compare = ExperimentData(compare_dir) if compare_dir else None
     app = Dash(
         __name__,
-        title="Pytracer",
+        title="Pytracer · Numerical Variability Profiler",
         assets_folder=str(Path(__file__).parent / "assets"),
+        suppress_callback_exceptions=True,
     )
-    app.layout = build_layout(data)
+    app.layout = build_layout(data, data_compare)
     register_callbacks(app, data)
     return app
 
 
-def run_dashboard(experiment_dir: str | Path, host: str = "127.0.0.1",
-                  port: int = 8050, debug: bool = False) -> None:
-    app = build_app(experiment_dir)
+def run_dashboard(experiment_dir: str | Path, compare_dir: str | Path | None = None,
+                  host: str = "127.0.0.1", port: int = 8050, debug: bool = False) -> None:
+    app = build_app(experiment_dir, compare_dir=compare_dir)
     app.run(host=host, port=port, debug=debug)
+
 

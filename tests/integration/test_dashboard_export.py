@@ -179,3 +179,52 @@ def test_dashboard_without_dash_errors_cleanly(experiment, monkeypatch):
 
     with pytest.raises(PytracerError, match="gui"):
         build_app(experiment)
+
+
+@pytest.mark.skipif(importlib.util.find_spec("dash") is None, reason="dash not installed")
+def test_dashboard_compare_mode(experiment):
+    from pytracer.dashboard import figures
+    from pytracer.dashboard.app import build_app
+    from pytracer.dashboard.data import ExperimentData
+
+    app = build_app(experiment, compare_dir=experiment)
+    rendered = str(app.layout)
+    assert "tab-diff" in rendered
+    assert "Diff (A/B)" in rendered
+
+    data = ExperimentData(experiment)
+    diff_rows = data.diff_with(data)
+    assert diff_rows
+    assert all(r["status"] == "stable" for r in diff_rows)
+
+    fig = figures.diff_waterfall_figure(diff_rows)
+    assert fig is not None
+
+
+def test_matrix_condition_summary(experiment):
+    import numpy as np
+
+    from pytracer.dashboard.data import ExperimentData
+
+    data = ExperimentData(experiment)
+    # Test condition number computation with mock 2D matrices stack
+    hilbert = np.array([[1.0, 1 / 2, 1 / 3], [1 / 2, 1 / 3, 1 / 4], [1 / 3, 1 / 4, 1 / 5]])
+    stack = np.stack([hilbert, hilbert * 1.0001])
+    data._element_cache[(0, "input", "A")] = (np.array([53.0]), stack)
+    summary = data.matrix_condition_summary(0, "input", "A")
+    assert summary is not None
+    assert summary["cond_median"] > 100.0
+    assert summary["log10_cond"] > 2.0
+
+
+@pytest.mark.skipif(importlib.util.find_spec("plotly") is None, reason="plotly not installed")
+def test_theme_templates():
+    from pytracer.dashboard import theme
+
+    light = theme.make_template(dark=False)
+    dark = theme.make_template(dark=True)
+    assert light.layout.paper_bgcolor == theme.SURFACE
+    assert dark.layout.paper_bgcolor == theme.DARK_SURFACE
+    assert dark.layout.font.color == theme.DARK_INK
+
+

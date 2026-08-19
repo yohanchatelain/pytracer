@@ -115,43 +115,60 @@ SEVERITY_COLORSCALE = [
 ]
 
 
-def make_template():
-    """Plotly template shared by every dashboard figure."""
+DARK_SURFACE = "#1e293b"
+DARK_PAGE = "#0f172a"
+DARK_INK = "#f8fafc"
+DARK_INK_SECONDARY = "#cbd5e1"
+DARK_MUTED = "#94a3b8"
+DARK_GRID = "#334155"
+DARK_BASELINE = "#475569"
+DARK_BORDER = "rgba(255,255,255,0.12)"
+
+
+def make_template(dark: bool = False):
+    """Plotly template shared by every dashboard figure (light or dark)."""
     import plotly.graph_objects as go
 
+    surface = DARK_SURFACE if dark else SURFACE
+    ink = DARK_INK if dark else INK
+    ink_secondary = DARK_INK_SECONDARY if dark else INK_SECONDARY
+    muted = DARK_MUTED if dark else MUTED
+    grid = DARK_GRID if dark else GRID
+    baseline = DARK_BASELINE if dark else BASELINE
+
     axis = {
-        "gridcolor": GRID,
+        "gridcolor": grid,
         "gridwidth": 1,
-        "linecolor": BASELINE,
-        "zerolinecolor": BASELINE,
+        "linecolor": baseline,
+        "zerolinecolor": baseline,
         "ticks": "outside",
-        "tickcolor": BASELINE,
-        "tickfont": {"color": MUTED, "size": 11},
-        "title": {"font": {"color": INK_SECONDARY, "size": 12}},
+        "tickcolor": baseline,
+        "tickfont": {"color": muted, "size": 11},
+        "title": {"font": {"color": ink_secondary, "size": 12}},
         "automargin": True,
     }
     return go.layout.Template(
         layout=go.Layout(
-            paper_bgcolor=SURFACE,
-            plot_bgcolor=SURFACE,
-            font={"family": FONT_FAMILY, "color": INK, "size": 12},
+            paper_bgcolor=surface,
+            plot_bgcolor=surface,
+            font={"family": FONT_FAMILY, "color": ink, "size": 12},
             colorway=CATEGORICAL,
             xaxis=axis,
             yaxis=axis,
             margin={"l": 56, "r": 24, "t": 48, "b": 44},
-            title={"font": {"size": 14, "color": INK}, "x": 0, "xanchor": "left"},
+            title={"font": {"size": 14, "color": ink}, "x": 0, "xanchor": "left"},
             legend={
                 "orientation": "h",
                 "yanchor": "bottom",
                 "y": 1.02,
                 "xanchor": "left",
                 "x": 0,
-                "font": {"color": INK_SECONDARY, "size": 11},
+                "font": {"color": ink_secondary, "size": 11},
             },
             hoverlabel={
-                "bgcolor": "#ffffff",
-                "bordercolor": GRID,
-                "font": {"family": FONT_FAMILY, "color": INK, "size": 12},
+                "bgcolor": surface,
+                "bordercolor": grid,
+                "font": {"family": FONT_FAMILY, "color": ink, "size": 12},
             },
         )
     )

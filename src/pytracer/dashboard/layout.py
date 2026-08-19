@@ -1,9 +1,13 @@
-"""Dash layout: header, KPI row, and the five tabs."""
+"""Dash layout: header, KPI row, and the dashboard tabs."""
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from pytracer.dashboard import figures, theme
-from pytracer.dashboard.data import ExperimentData
+
+if TYPE_CHECKING:
+    from pytracer.dashboard.data import ExperimentData
 
 TABLE_STYLE = {
     "style_table": {"overflowX": "auto"},
@@ -67,25 +71,38 @@ def kpi(label, value, tone=None):
     ], className=classname)
 
 
-def header_bar(data: ExperimentData):
+def header_bar(data: ExperimentData, data_compare: ExperimentData | None = None):
     from dash import html
 
     experiment = data.report.get("experiment", {})
     alignment = data.report.get("alignment", {})
     script = experiment.get("script", "")
+
+    meta_parts = [
+        f"exp {experiment.get('experiment_id', '?')}",
+        f"{alignment.get('runs', '?')} runs",
+        f"mode: {alignment.get('alignment_mode', '?')}",
+        f"tier: {experiment.get('instrumentation', '?')}",
+    ]
+    if data_compare:
+        cmp_id = data_compare.report.get("experiment", {}).get("experiment_id", "B")
+        meta_parts.append(f"vs {cmp_id}")
+
     return html.Div([
         html.Div([
-            html.Span("Pytracer", className="brand"),
-            html.Span("numerical variability profiler", className="brand-sub"),
+            html.Img(src="/assets/logo.png", className="brand-logo", alt="Pytracer"),
+            html.Div([
+                html.Div([
+                    html.Span("Pytracer", className="brand"),
+                    html.Span("v2.0.0", className="brand-version"),
+                ], className="brand-title-row"),
+                html.Span("numerical variability profiler", className="brand-sub"),
+            ], className="brand-text"),
         ], className="brand-box"),
         html.Div([
             html.Code(script, className="script-chip") if script else None,
-            html.Span(
-                f"experiment {experiment.get('experiment_id', '?')} · "
-                f"{alignment.get('runs', '?')} runs · "
-                f"alignment: {alignment.get('alignment_mode', '?')} · "
-                f"instrumentation: {experiment.get('instrumentation', '?')}",
-                className="header-meta"),
+            html.Span(" · ".join(meta_parts), className="header-meta"),
+            html.Button("🌙 Dark", id="theme-toggle-btn", className="theme-toggle-btn"),
         ], className="header-right"),
     ], className="pt-header")
 
@@ -143,11 +160,12 @@ def overview_tab(data: ExperimentData, dash_table):
                 config={"displayModeBar": False},
             ), className="card half"),
             html.Div(dcc.Graph(
+                id="sig-overview-chart",
                 figure=figures.sig_overview_figure(functions),
                 config={"displayModeBar": False},
             ), className="card half"),
         ], className="row"),
-        html.P("Click a bar to open that function in the Explorer.",
+        html.P("Click a bar or table row to open that function in the Explorer.",
                className="hint"),
     ]
     if truncated:
@@ -314,11 +332,43 @@ def explorer_tab(data: ExperimentData):
         controls,
         html.Div(dcc.Graph(id="explorer-graph"), className="card"),
         html.P("Click any point to drill into that call: per-run statistics, "
-               "element-wise significance, and source context.",
+               "matrix condition number, element-wise significance, and source context.",
                className="hint"),
         note,
         dcc.Store(id="selected-point"),
         detail,
+    ], className="tab-body")
+
+
+def diff_tab(data_a: ExperimentData, data_b: ExperimentData, dash_table):
+    from dash import dcc, html
+
+    diff_rows = data_a.diff_with(data_b)
+    n_regress = sum(1 for r in diff_rows if r["status"] == "regression")
+    n_improve = sum(1 for r in diff_rows if r["status"] == "improvement")
+    n_stable = sum(1 for r in diff_rows if r["status"] == "stable")
+
+    columns = ["function", "status", "sig_a", "sig_b", "delta_sig", "amp_a", "amp_b"]
+
+    return html.Div([
+        html.Div([
+            kpi("regressions", n_regress, tone="critical" if n_regress else "good"),
+            kpi("improvements", n_improve, tone="good" if n_improve else None),
+            kpi("stable functions", n_stable, tone="good"),
+            kpi("total functions", len(diff_rows)),
+        ], className="kpi-row"),
+        html.Div([
+            html.Div(dcc.Graph(
+                id="diff-waterfall-graph",
+                figure=figures.diff_waterfall_figure(diff_rows),
+                config={"displayModeBar": False},
+            ), className="card"),
+        ]),
+        html.H3("Function-by-function comparison"),
+        html.Div(
+            data_table(dash_table, diff_rows, columns, "diff-table", page_size=15),
+            className="card",
+        ),
     ], className="tab-body")
 
 
@@ -369,6 +419,7 @@ def coverage_tab(data: ExperimentData, dash_table):
     coverage = data.report.get("coverage", {})
     children = [
         html.Div(dcc.Graph(
+            id="tier-coverage-graph",
             figure=figures.tier_coverage_figure(coverage.get("calls_per_tier", {})),
             config={"displayModeBar": False},
         ), className="card half"),
@@ -429,7 +480,7 @@ def runs_tab(data: ExperimentData, dash_table):
         html.H3("Runs"),
         html.Div(data_table(dash_table, rows,
                             ["run", "exit_code", "created_at", "python",
-                             "numpy", "platform", "error"],
+                              "numpy", "platform", "error"],
                             "runs-table"), className="card"),
         html.H3("Captured environment (allowlist only)"),
         html.Div(data_table(dash_table, env_rows, ["variable", "value"],
@@ -444,33 +495,47 @@ def runs_tab(data: ExperimentData, dash_table):
     ], className="tab-body")
 
 
-def build_layout(data: ExperimentData):
+def build_layout(data: ExperimentData, data_compare: ExperimentData | None = None):
     from dash import dash_table, dcc, html
 
+    tabs_children = [
+        dcc.Tab(label="Overview", value="tab-overview",
+                className="pt-tab", selected_className="pt-tab--active",
+                children=overview_tab(data, dash_table)),
+    ]
+
+    if data_compare is not None:
+        tabs_children.append(
+            dcc.Tab(label="Diff (A/B)", value="tab-diff",
+                    className="pt-tab", selected_className="pt-tab--active",
+                    children=diff_tab(data, data_compare, dash_table))
+        )
+
+    tabs_children.extend([
+        dcc.Tab(label="Explorer", value="tab-explorer",
+                className="pt-tab", selected_className="pt-tab--active",
+                children=explorer_tab(data)),
+        dcc.Tab(label="Call graph", value="tab-graph",
+                className="pt-tab", selected_className="pt-tab--active",
+                children=graph_tab(data)),
+        dcc.Tab(label="Call timeline", value="tab-gantt",
+                className="pt-tab", selected_className="pt-tab--active",
+                children=gantt_tab(data)),
+        dcc.Tab(label="Coverage", value="tab-coverage",
+                className="pt-tab", selected_className="pt-tab--active",
+                children=coverage_tab(data, dash_table)),
+        dcc.Tab(label="Runs", value="tab-runs",
+                className="pt-tab", selected_className="pt-tab--active",
+                children=runs_tab(data, dash_table)),
+    ])
+
     return html.Div([
-        header_bar(data),
+        dcc.Location(id="url", refresh=False),
+        dcc.Store(id="theme-store", data="light"),
+        header_bar(data, data_compare),
         html.Div([
             kpi_row(data),
             dcc.Tabs(id="tabs", value="tab-overview", className="pt-tabs",
-                     parent_className="pt-tabs-parent", children=[
-                dcc.Tab(label="Overview", value="tab-overview",
-                        className="pt-tab", selected_className="pt-tab--active",
-                        children=overview_tab(data, dash_table)),
-                dcc.Tab(label="Explorer", value="tab-explorer",
-                        className="pt-tab", selected_className="pt-tab--active",
-                        children=explorer_tab(data)),
-                dcc.Tab(label="Call graph", value="tab-graph",
-                        className="pt-tab", selected_className="pt-tab--active",
-                        children=graph_tab(data)),
-                dcc.Tab(label="Call timeline", value="tab-gantt",
-                        className="pt-tab", selected_className="pt-tab--active",
-                        children=gantt_tab(data)),
-                dcc.Tab(label="Coverage", value="tab-coverage",
-                        className="pt-tab", selected_className="pt-tab--active",
-                        children=coverage_tab(data, dash_table)),
-                dcc.Tab(label="Runs", value="tab-runs",
-                        className="pt-tab", selected_className="pt-tab--active",
-                        children=runs_tab(data, dash_table)),
-            ]),
+                     parent_className="pt-tabs-parent", children=tabs_children),
         ], className="page-body"),
-    ], className="pt-root")
+    ], id="pt-root-container", className="pt-root")

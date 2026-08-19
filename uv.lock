@@ -1194,6 +1194,18 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+all = [
+    { name = "dash" },
+    { name = "mypy" },
+    { name = "numcodecs" },
+    { name = "pandas" },
+    { name = "plotly" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "ruff" },
+    { name = "significantdigits" },
+    { name = "zarr" },
+]
 arrays = [
     { name = "numcodecs" },
     { name = "zarr" },
@@ -1215,24 +1227,34 @@ sig = [
 
 [package.metadata]
 requires-dist = [
+    { name = "dash", marker = "extra == 'all'", specifier = ">=2.17" },
     { name = "dash", marker = "extra == 'gui'", specifier = ">=2.17" },
     { name = "jinja2", specifier = ">=3.1" },
     { name = "msgspec", specifier = ">=0.18" },
+    { name = "mypy", marker = "extra == 'all'", specifier = ">=1.10" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10" },
+    { name = "numcodecs", marker = "extra == 'all'", specifier = ">=0.12" },
     { name = "numcodecs", marker = "extra == 'arrays'", specifier = ">=0.12" },
     { name = "numpy", specifier = ">=1.26" },
+    { name = "pandas", marker = "extra == 'all'", specifier = ">=2.1" },
     { name = "pandas", marker = "extra == 'gui'", specifier = ">=2.1" },
+    { name = "plotly", marker = "extra == 'all'", specifier = ">=5.22" },
     { name = "plotly", marker = "extra == 'gui'", specifier = ">=5.22" },
     { name = "pyarrow", specifier = ">=15" },
+    { name = "pytest", marker = "extra == 'all'", specifier = ">=8" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
+    { name = "pytest-cov", marker = "extra == 'all'", specifier = ">=5" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5" },
+    { name = "ruff", marker = "extra == 'all'", specifier = ">=0.6" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6" },
+    { name = "significantdigits", marker = "extra == 'all'", specifier = ">=0.2" },
     { name = "significantdigits", marker = "extra == 'sig'", specifier = ">=0.2" },
     { name = "tomli-w", specifier = ">=1.0" },
     { name = "wrapt", specifier = ">=1.16" },
+    { name = "zarr", marker = "extra == 'all'", specifier = ">=2.18" },
     { name = "zarr", marker = "extra == 'arrays'", specifier = ">=2.18" },
 ]
-provides-extras = ["arrays", "sig", "gui", "dev"]
+provides-extras = ["arrays", "sig", "gui", "dev", "all"]
 
 [[package]]
 name = "pyyaml"

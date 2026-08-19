@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import math
 
 import numpy as np
 
@@ -51,6 +52,37 @@ def register_callbacks(app, data: ExperimentData) -> None:
         return {"gidx": gidx, "phase": phase, "arg": arg,
                 "function": custom[3], "callsite": custom[6]}
 
+    # ---------------------------------------------------------------- theme
+
+    @app.callback(
+        Output("theme-store", "data"),
+        Output("theme-toggle-btn", "children"),
+        Output("pt-root-container", "data-theme"),
+        Input("theme-toggle-btn", "n_clicks"),
+        State("theme-store", "data"),
+        prevent_initial_call=True,
+    )
+    def toggle_theme(n_clicks, current_theme):
+        if not n_clicks:
+            raise PreventUpdate
+        new_theme = "dark" if current_theme != "dark" else "light"
+        btn_text = "☀️ Light" if new_theme == "dark" else "🌙 Dark"
+        return new_theme, btn_text, new_theme
+
+    # ------------------------------------------------------------- URL sync
+
+    @app.callback(
+        Output("url", "hash"),
+        Input("tabs", "value"),
+        Input("explorer-functions", "value"),
+        prevent_initial_call=True,
+    )
+    def update_url(tab, functions):
+        params = [f"tab={tab.replace('tab-', '')}"]
+        if functions and tab == "tab-explorer":
+            params.append(f"fn={','.join(functions[:3])}")
+        return "&".join(params)
+
     # ----------------------------------------------------------- drill-down
 
     @app.callback(
@@ -72,11 +104,25 @@ def register_callbacks(app, data: ExperimentData) -> None:
 
         gidx, phase, arg = selected["gidx"], selected["phase"], selected["arg"]
         group = data.alignment.groups[gidx]
-        title = html.Div([
+        title_items = [
             html.Span(selected["function"], className="detail-fn"),
             html.Span(f"{arg} ({phase})", className="detail-arg"),
             html.Span(selected.get("callsite", ""), className="detail-site"),
-        ])
+        ]
+
+        cond_summary = data.matrix_condition_summary(gidx, phase, arg)
+        if cond_summary:
+            cond_val = cond_summary["cond_median"]
+            if math.isfinite(cond_val):
+                cond_text = f"κ(A) ≈ {cond_val:.2e}"
+            else:
+                cond_text = "κ(A) = ∞ (singular)"
+            tone = "critical" if cond_summary["is_ill_conditioned"] else "good"
+            tag = "ill-conditioned" if cond_summary["is_ill_conditioned"] else "well-conditioned"
+            title_items.append(
+                html.Span(f"{cond_text} ({tag})", className=f"cond-badge cond-badge--{tone}")
+            )
+        title = html.Div(title_items, className="detail-title")
 
         detail_rows = data.group_detail(gidx, phase, arg)
         columns = [c for c in
@@ -213,14 +259,23 @@ def register_callbacks(app, data: ExperimentData) -> None:
         Output("explorer-functions", "value"),
         Input("amp-chart", "clickData"),
         Input("callgraph-graph", "clickData"),
+        Input("functions-table", "active_cell"),
+        State("functions-table", "data"),
         State("explorer-functions", "value"),
         prevent_initial_call=True,
     )
-    def open_in_explorer(amp_click, graph_click, current):
+    def open_in_explorer(amp_click, graph_click, active_cell, table_data, current):
         from dash import ctx
 
         if ctx.triggered_id == "amp-chart":
             function = (amp_click or {}).get("points", [{}])[0].get("y")
+        elif ctx.triggered_id == "functions-table":
+            if not active_cell or not table_data:
+                raise PreventUpdate
+            row_idx = active_cell.get("row")
+            if row_idx is None or row_idx >= len(table_data):
+                raise PreventUpdate
+            function = table_data[row_idx].get("function")
         else:
             point = (graph_click or {}).get("points", [{}])[0]
             function = point.get("customdata")
@@ -233,3 +288,4 @@ def register_callbacks(app, data: ExperimentData) -> None:
 
     # keep dcc import referenced (dash requires component registration)
     _ = dcc
+
