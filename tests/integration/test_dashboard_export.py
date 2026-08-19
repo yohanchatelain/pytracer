@@ -217,6 +217,7 @@ def test_matrix_condition_summary(experiment):
     assert summary["log10_cond"] > 2.0
 
 
+@pytest.mark.skipif(importlib.util.find_spec("plotly") is None, reason="plotly not installed")
 def test_theme_templates():
     from pytracer.dashboard import theme
 
@@ -225,4 +226,5 @@ def test_theme_templates():
     assert light.layout.paper_bgcolor == theme.SURFACE
     assert dark.layout.paper_bgcolor == theme.DARK_SURFACE
     assert dark.layout.font.color == theme.DARK_INK
+
 

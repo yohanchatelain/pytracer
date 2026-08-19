@@ -44,7 +44,10 @@ def exact_fsum(x):
 
 def main():
     rng = np.random.default_rng()  # unseeded: per-run shuffle only
-    x = np.random.default_rng(12345).standard_normal(20_000) * 1e8
+    x = np.concatenate([
+        np.array([1e14, -1e14]),
+        np.random.default_rng(12345).standard_normal(20_000) * 1e4,
+    ])
     rng.shuffle(x)  # same multiset every run, different order
 
     print(f"naive    {naive_running_sum(x):.17e}")
