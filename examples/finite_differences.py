@@ -36,7 +36,7 @@ def central_diff_optimal_h(x):
 
 def main():
     rng = np.random.default_rng()  # unseeded: per-run perturbation of x
-    x = 1.0 * (1.0 + rng.standard_normal() * 1e-12)
+    x = 1.0 * (1.0 + rng.standard_normal() * 1e-8)
     exact = math.cos(x)
 
     fwd = forward_diff_tiny_h(x)
