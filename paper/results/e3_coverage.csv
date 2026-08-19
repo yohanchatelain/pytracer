@@ -1,0 +1,11 @@
+workload,config,events_per_tier,traced_functions,untraced_callables,untraced_calls,native_kernels,native_kernel_calls
+numpy micro,patch,t1:3;t2:3,2,0,0,0,0
+numpy micro,hybrid,t1:3;t2:3,2,1,3,0,0
+numpy micro,hybrid+native,t1:3;t2:3,2,1,3,0,0
+linear solve,patch,t1:12,3,0,0,0,0
+linear solve,hybrid,t1:12,3,3,12,0,0
+linear solve,hybrid+native,t1:12,3,3,12,1,6
+sklearn pipeline,patch,t1:12;t2:105,5,0,0,0,0
+sklearn pipeline,hybrid,t1:12;t2:103,5,4,12,0,0
+sklearn pipeline,hybrid+native,t1:12;t2:109,5,4,12,1,3
+sklearn pipeline,hybrid+suggested,t1:15;t2:103,6,3,9,0,0

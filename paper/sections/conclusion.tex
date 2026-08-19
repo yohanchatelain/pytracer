@@ -1,0 +1,30 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+\pyt{} rebuilds Python numerical-variability profiling on two commitments
+its predecessor could not keep: say what you did not observe, and never
+let a proxy impersonate a measurement. The tiered instrumentation stack
+makes the transparency/specificity trade-off explicit and composable ---
+safe boundary patching and ufunc proxies by default, tainted tracer
+arrays and a native BLAS census when the question warrants them, and a
+PEP\,669 monitor that turns every blind spot into a reported census
+rather than silence. The experiments show the result is not just safer
+but more capable: \nDetected{}/\nPathologies{} classical pathologies
+detected and correctly attributed, control-flow-divergent runs aligned
+rather than silently truncated, a \permOptimismBits{}-bit proxy blind
+spot measured and closed by element-wise significance, a real PCA
+instability localized to \texttt{numpy.linalg.eigh} in an unannotated
+scikit-learn pipeline, and stability enforced as a CI property through
+\texttt{check} and \texttt{diff} --- all while the original PyTracer no
+longer traces a three-line program on any current interpreter.
+
+Three directions follow. Tracing currently observes the parent process
+only; a child-bootstrap hook would extend coverage to joblib and
+multiprocessing workers. The tier architecture invites backends beyond
+NumPy --- PyTorch's \texttt{\_\_torch\_function\_\_} and JAX's tracing
+machinery are natural T3 analogues. And the discovery loop would benefit
+from closing the last gap between census and wrapper: correlating T5
+kernel timestamps with the T4 call timeline to attribute native FLOPs to
+the exact Python call that triggered them. All code, experiment scripts,
+and the raw results behind every number in this paper are available in
+the \pyt{} repository.

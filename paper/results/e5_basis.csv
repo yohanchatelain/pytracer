@@ -1,0 +1,12 @@
+workload,function,summary_sig_bits,element_sig_bits,proxy_optimism_bits,summary_basis,element_basis
+permuted output,permuted_pipeline,52.75,1.89,50.86,summary,element
+permuted output,stable_pipeline,53.0,52.71,0.29,summary,element
+cancellation,naive_variance,1.0,0.0,1.0,summary,element
+cancellation,stable_variance,6.96,6.28,0.68,summary,element
+summation order,exact_fsum,52.96,52.96,0.0,summary,element
+summation order,naive_running_sum,47.3,48.92,-1.61,summary,element
+summation order,pairwise_sum,52.62,51.96,0.66,summary,element
+ill-conditioned solve,solve_hilbert,23.05,19.66,3.4,summary,element
+ill-conditioned solve,solve_well_conditioned,42.19,39.36,2.83,summary,element
+finite differences,central_diff_optimal_h,37.1,36.81,0.29,summary,summary
+finite differences,forward_diff_tiny_h,10.25,10.25,-0.0,summary,summary

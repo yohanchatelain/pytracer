@@ -1,0 +1,8 @@
+\begin{tabular}{lrrrr}
+\toprule
+Workload & JSONL & Parquet & Arrays & Parquet/JSONL \\
+\midrule
+linear solve (few calls) & 8\,KiB & 10\,KiB & 7\,KiB & 1.26$\times$ \\
+2k-call loop & 6.7\,MiB & 158\,KiB & 3.9\,MiB & 0.02$\times$ \\
+\bottomrule
+\end{tabular}

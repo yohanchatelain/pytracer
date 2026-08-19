@@ -1,212 +1,233 @@
-![pytracer log](images/template.png)
 # Pytracer
 
-Pytracer is a python tracer designed to assess the numerical quality of python
-codes. Pytracer automatically instruments python modules to trace the inputs and
-outputs of targeted modules' functions. Generated traces are then aggregated and
-visualized through a Plotly dashboard server.
+**Pytracer is a numerical variability profiler for Python scientific
+programs.** It runs your script several times under a stochastic-arithmetic
+or otherwise perturbed environment, records the inputs and outputs of
+selected numerical functions, aligns the runs, and tells you **which
+functions lose significant digits, amplify perturbations, or change control
+flow** — as a static report, machine-readable JSON, and Parquet tables.
 
-# Usage
+Pytracer does **not** perturb arithmetic itself. Pair it with a perturbation
+engine such as [Verificarlo](https://github.com/verificarlo/verificarlo),
+[Verrou](https://github.com/edf-hpc/verrou), or a fuzzy libmath environment.
+Pytracer is the observability layer: it localizes and attributes the
+variability those tools create.
 
-Pytracer is divided in three steps: trace, parse and visualize.
+> This is Pytracer 2, a clean-slate rewrite. It is not compatible with
+> Pytracer 1 traces, configuration, or CLI. Pytracer 1 is archived on the
+> `master` branch history.
 
-```bash
-usage: pytracer [-h] {trace,parse,visualize,info,clean} ...
-
-Pytracer
-
-optional arguments:
-  -h, --help            show this help message and exit
-
-pytracer modules:
-  {trace,parse,visualize,info,clean}
-                        pytracer modules
-    trace               trace functions
-    parse               parse traces
-    visualize           visualize traces
-    info                get info about current traces
-    clean               clean pytracer cache
-```
-
-The module "trace" takes as input the python application to trace with the
-option `--command`. The list of modules to trace must be added to the
-configuration file, section `modules_to_load.` The execution of the application
-will generate a pickle file that contains all inputs/outputs encountered, called
-a trace. Pytracer is designed to detect numerical instabilities and works under
-a stochastic arithmetic environment (see fuzzy). Therefore, the different
-executions of the targeted application under this environment should result in
-floating-point values that differ. The parse module attempts to gather these
-traces and compute statistics on the observed differences. The parse module
-converts a set of traces into a hfd5 file used for the visualization. Then the
-visualize module opens a dash server to visualize the traces on a browser and
-interact with them.
-
-## Trace module
-
-The trace module instruments modules in `config.modules_to_load`
-and execute the `module` application.
+## Quick start
 
 ```bash
-usage: pytracer trace [-h] --command ... [--dry-run] [--report {on,off,only}] [--report-file FILE]
+pip install -e ".[dev]"
 
-optional arguments:
-  -h, --help            show this help message and exit
-  --command ...         command to trace
-  --dry-run             Run the module wihtout tracing it
-  --report {on,off,only}
-                        Report call and memory usage
-  --report-file FILE    Write report to <FILE>
+pytracer init                          # optional: writes pytracer.toml
+pytracer run examples/cancellation.py --repeat 5
+open .pytracer/runs/latest/report/report.html
 ```
 
-The trace command creates a cache folder (`\__pytracercache\__`) that contains the traces.
+`examples/` is a gallery of classical numerical-accuracy pathologies —
+catastrophic cancellation (variance, quadratic formula, expm1/log1p,
+polynomial evaluation near a root), summation-order non-associativity,
+ill-conditioning (Hilbert matrix), and the finite-difference step-size
+dilemma — each pairing an unstable formulation with its stable fix. They
+double as pytracer's detection regression suite: CI asserts the unstable
+variant of every pathology loses significantly more bits than its stable
+twin. See `examples/README.md`.
 
-## Parse module
+Typical output:
 
-The parse module aggregates traces and produce a HDF5 file.
+```
+Pytracer run complete
+Runs: 5
+Call groups: 42 (matched: 42, divergent: 0)
+Top functions (sig(mean) bits | amplification bits | divergence):
+1. mymodule.naive_variance      sig:  3.1  amp: 41.2  div: 0.000
+2. numpy.linalg.solve           sig: 18.4  amp: 12.0  div: 0.000
+Report: .pytracer/runs/<experiment_id>/report/report.html
+```
+
+## How it works
+
+```
+instrumentation tiers → event stream → append-safe capture → Parquet
+        → call alignment → aggregation & digit-loss attribution → reports
+```
+
+- Each repetition is an **independent subprocess**; instrumentation is
+  installed before your script is imported.
+- Selected functions are wrapped (tier T1); NumPy **ufuncs** get a dedicated
+  proxy that intercepts `__call__`, `reduce`, `accumulate`, `outer`, and
+  `at` while keeping `isinstance(np.add, np.ufunc)` true (tier T2); on
+  Python 3.12+, `sys.monitoring` records a census of *untraced* C callables
+  and per-line execution counts for control-flow divergence (tier T4).
+- `--instrument taint` adds **tracer arrays** (tier T3): tainted values
+  (`pytracer.taint(x)`, plus outputs of traced calls) dispatch every NumPy
+  operation — including `a + b` and `a @ b` operator syntax and calls from
+  third-party code, immune to aliasing — through the array protocol.
+  High overhead, alters `type(x)` checks; the drill-down tool, not the
+  default.
+- Every event is schema-versioned. Capture is JSON-lines (crash-safe);
+  each run is also finalized to `events.parquet` for pandas/duckdb.
+- Runs are aligned **call-by-call** (module, function, callsite, occurrence)
+  and aggregated into per-function metrics, including **amplification**:
+  the bits of precision a call destroys between its inputs and outputs.
+
+### Coverage honesty
+
+The report always includes a coverage section: which tiers were active, how
+many calls each observed, and which numerical callables were *seen but not
+traced* (candidates for `--target`). Two structural blind spots are always
+stated: operator dispatch on ndarrays (`a + b`) and calls made inside
+compiled extensions. Absence of an instability signal is not evidence of
+stability.
+
+### Metric honesty
+
+Two significance bases, never conflated (`sig_basis` on every metric row):
+
+- **element**: element-wise significant digits across runs, computed from
+  arrays stored during capture (`store_arrays = "auto"`, the default,
+  stores numeric arrays up to `array_store_threshold` elements as .npy
+  payloads). This is the real measurement.
+- **summary**: `sig(mean)` — the cross-run stability of the argument's
+  mean, used when payloads were not stored. It is an *optimistic proxy*:
+  element permutations across runs are nearly invisible to it (a pinned
+  test demonstrates >40 proxy bits vs <8 element-wise bits).
+
+## CLI
+
+```
+pytracer init                      write a default pytracer.toml
+pytracer run SCRIPT [opts] [-- script args]
+    --repeat N                     independent runs (default 1)
+    --target PATH                  extra target, repeatable; globs allowed
+                                   (numpy.linalg.*, mymodule.solver)
+    --plugins numpy scipy sklearn  plugin target sets
+    --instrument hybrid|patch|monitor|taint
+    --store-arrays auto|always|never
+    --alignment strict|callsite|fuzzy (fuzzy = per-callsite LCS matching)
+    --native                       BLAS kernel census via LD_PRELOAD (T5)
+    --continue-on-error
+pytracer analyze EXPERIMENT_DIR    (re)run alignment + aggregation
+pytracer report EXPERIMENT_DIR     (re)generate reports
+pytracer check EXPERIMENT_DIR --min-sig-bits 20 --max-divergence 0.01
+                                   CI gate: nonzero exit on violations;
+                                   also reads ./pytracer-thresholds.toml
+pytracer diff EXPERIMENT_A EXPERIMENT_B [--fail-on-regression]
+                                   A/B comparison (library upgrades, flags)
+pytracer suggest-targets EXPERIMENT_DIR
+                                   propose --target entries from the T4 census
+pytracer dashboard EXPERIMENT_DIR  interactive dashboard (pip install pytracer[gui]);
+                                   overview, per-call explorer with element-wise
+                                   drill-down, call timeline, coverage, runs
+                                   (see DASHBOARD.md)
+pytracer export EXPERIMENT_DIR     Perfetto/Chrome-Tracing timeline
+                                   (open at https://ui.perfetto.dev)
+pytracer plugins list|targets NAME
+pytracer config show|validate
+pytracer doctor                    environment / config / BLAS checks
+pytracer clean                     delete pytracer-created experiment dirs
+```
+
+You can also instrument your own functions explicitly:
+
+```python
+import pytracer
+
+@pytracer.trace_function
+def solve_step(A, b):
+    ...
+```
+
+The decorator is a no-op outside `pytracer run`, so decorated code works
+everywhere.
+
+## Configuration
+
+`pytracer.toml` in the working directory (all keys optional; unknown keys
+are errors, not silently ignored):
+
+```toml
+[trace]
+plugins = ["numpy"]
+targets = []
+instrumentation = "hybrid"
+mode = "summary"
+capture_backtrace = true
+store_arrays = "auto"          # enables element-wise significant digits
+array_store_threshold = 100000
+array_backend = "auto"         # zarr (compressed) when installed, else npy
+
+[storage]
+output_dir = ".pytracer/runs"
+
+[analysis]
+alignment = "callsite"
+
+# Per-run environment for an external perturbation backend
+# ({run_index} and {run_id} are substituted per run):
+# [perturb.env]
+# VFC_BACKENDS = "libinterflop_mca.so --mode=mca --seed={run_index}"
+
+[report]
+formats = ["markdown", "html", "json"]
+```
+
+No environment variables are required. The captured run metadata includes
+an **allowlisted** subset of the environment only (`OMP_*`, `VFC_*`,
+`PATH`, …) — never the raw environment.
+
+## Overhead
+
+Measured with `python benchmarks/bench.py` (Python 3.13, numpy 2.5,
+worst-case microbenchmarks where the traced operation itself is ~2 µs;
+real workloads with meaningful compute per call sit far below these ratios):
+
+| Workload | Tier | Overhead | Throughput |
+|---|---|---|---|
+| 20k tiny `numpy.sum` calls | T1 | ~110x (~190 µs/call) | ~10k events/s |
+| 2M-element `numpy.sum` calls | T1 | ~28x | summary stats dominate |
+| operator loop under taint | T3 | ~300x | drill-down tier by design |
+
+The per-call cost is the summaries (mean/std/min/max/norms/fingerprint × 2
+events) — the measurements *are* the product. Use targeted tracing for hot
+loops, `mode = "metadata"` to skip summaries entirely, and T3 taint only to
+drill into a region T1/T2 already localized.
+
+## Verificarlo / stochastic arithmetic
+
+See `examples/verificarlo/` for the full workflow: a `pytracer.toml` that
+rotates the MCA seed per run via `[perturb.env]`, run inside a
+`verificarlo/fuzzy` container. Element-wise significant digits across those
+runs directly estimate the MCA significant bits of every traced value.
+
+## Limitations
+
+- Pytracer does not perturb arithmetic; identical deterministic runs will
+  (correctly) show zero variability.
+- In the default hybrid mode, attribute patching cannot see operator
+  dispatch (`a + b`); use `--instrument taint` to close that gap for
+  tainted data (taint is stripped by `np.asarray` at many C entry points —
+  traced-call outputs are re-tainted to re-seed it).
+- Calls made inside C/Cython extensions are invisible to every Python
+  tier at the value level. `--native` (Linux + C compiler) adds a BLAS
+  kernel census via an LD_PRELOAD shim: it records which GEMM/GESV kernels
+  ran and their dimensions — including calls from Cython — but not operand
+  values. Both standard BLAS symbols and the prefixed ILP64 symbols of
+  numpy/scipy wheels are interposed.
+- Only the parent process is traced; joblib/multiprocessing workers are not.
+- The T4 monitor requires Python ≥ 3.12.
+
+## Development
 
 ```bash
-usage: pytracer parse [-h] [--filename FILENAME | --directory DIRECTORY] [--format {pickle}] [--batch-size BATCH_SIZE] [--method {cnh,general}] [--online]
-
-optional arguments:
-  -h, --help            show this help message and exit
-  --filename FILENAME   only parse <filename>
-  --directory DIRECTORY
-                        parse all files in <directory>and merge them
-  --format {pickle}     format of traces (auto-detected by default)
-  --batch-size BATCH_SIZE
-                        Number of elements to process per batch. Increasing this number requires more memory RAM
-  --method {cnh,general}
-                        Method used to compute the significant digits: Centered Normal Hypothesis (CNH) or General (see significantdigits package)
-  --online              Do not bufferized parsing
+pip install -e ".[dev]"
+ruff check src tests
+pytest -q
 ```
 
-## Visualize module
-
-The visualize module opens the plotly dashboard server.
-
-```bash
-usage: pytracer visualize [-h] [--directory DIRECTORY] [--debug] --filename FILENAME --callgraph CALLGRAPH [--host HOST] [--threaded [THREADED]]
-
-optional arguments:
-  -h, --help            show this help message and exit
-  --directory DIRECTORY
-                        directory with traces
-  --debug               run dash server in debug mode
-  --filename FILENAME   file to visualize
-  --callgraph CALLGRAPH
-                        Call graph file
-  --host HOST           IP to run on
-  --threaded [THREADED]
-                        Multithreading yes/no
-```
-
-This command produces the following output:
-
-```bash
-Dash is running on http://127.0.0.1:8050/
-
- * Serving Flask app "pytracer.gui.app" (lazy loading)
- * Environment: production
-   WARNING: This is a development server. Do not use it in a production deployment.
-   Use a production WSGI server instead.
- * Debug mode: off
- * Running on http://127.0.0.1:8050/ (Press CTRL+C to quit)
-```
-
-You must open the address in a browser to see the trace.
-
-## Info module
-
-The info module list the available traces and aggregation files.
-
-```bash
-usage: pytracer info [-h] [--directory DIRECTORY] [--trace] [--aggregation]
-
-optional arguments:
-  -h, --help            show this help message and exit
-  --directory DIRECTORY
-                        Directory to get information from
-  --trace               Print traces information
-  --aggregation         Print aggregations information
-```
-
-Here an example:
-
-```bash
-========== Traces ==========
-
-           Date:        Mon Nov  1 12:24:20 2021
-           Name:        211101122420.494927.pkl
-           Path:        /Work/pytracer/.__pytracercache__/traces/211101122420.494927.pkl
-           Size:        435.8KB
-           Args:        Namespace(command=['pytracer/test/internal/test_basic.py', '--test2', '1'], 
-                                  dry_run=False, pytracer_module='trace', report='OFF', report_file='')
-     ReportName:        None
-     ReportPath:        None
-PytracerLogName:        pytracer.log.494927
-PytracerLogPath:        /home/yohan/Work/pytracer/pytracer.log.494927
-
-           Date:        Mon Nov  1 12:49:51 2021
-           Name:        211101124951.500061.pkl
-           Path:        /Work/pytracer/.__pytracercache__/traces/211101124951.500061.pkl
-           Size:        435.8KB
-           Args:        Namespace(command=['pytracer/test/internal/test_basic.py', '--test2', '1'], 
-                                  dry_run=False, pytracer_module='trace', report='OFF', report_file='')
-     ReportName:        None
-     ReportPath:        None
-PytracerLogName:        pytracer.log.500061
-PytracerLogPath:        /Work/pytracer/pytracer.log.500061
-
-========== Aggregation ==========
-
-           Date:        Mon Nov  1 12:24:30 2021
-           Name:        stats.495010.h5
-           Path:        /Work/pytracer/.__pytracercache__/stats/stats.495010.h5
-           Size:        5.6MB
-           Args:        Namespace(batch_size=5, directory='.__pytracercache__/traces', filename=None, format=None, 
-                                  method='cnh', online=False, pytracer_module='parse')
-         Traces:        ['/Work/pytracer/.__pytracercache__/traces/211101122420.494927.pkl',
-                         '/Work/pytracer/.__pytracercache__/traces/211101124951.500061.pkl']
-  CallgraphName:        callgraph.495010.pkl
-  CallgraphPath:        /Work/pytracer/.__pytracercache__/stats/callgraph.495010.pkl
-PytracerLogName:        pytracer.log.495010
-PytracerLogPath:        /Work/pytracer/pytracer.log.495010
-```
-## Complete example
-
-```bash
-  pytracer clean # if run before
-  pytracer trace --command ./pytracer/test/internal/test_basic.py
-  pytracer parse
-  pytracer info # List the traces and aggregation files available
-  pytracer visualize --filename <stats> --callgraph <callgraph>
-```
-
-## Config file
-
-Before being able to use pytracer, do
-
-```bash
-export PYTRACER_CONFIG=~/Workspace/pytracer/pytracer/data/config/config.json
-```
-
-where the value is the absolute path to the config.json
-
-The configuration file is a `json` file containing several entries:
-
-- `module_to_load`: String list. List of the modules to trace
-- `module_to_exclude`: String list. List of modules to exclude
-- `include_file`: String list. List of the inclusion files. An inclusion file
-restrict the function to trace for a given module.
-- `exlude_file`: String list. List of the inclusion files. An inclusion file
-list the function to do not trace for a given module.
-- `logger`: Suboption for the logger.
-    - `format`: {`print`,`logger`}. Which logger format used.
-    - `output`: String. File where storing the log outputs.
-    - `color`: Boolean. Enable colors.
-    - `level`: {`debug`,`info`,`warning`}. Minimum level of information.
-- `io`: Suboption for the trace.
-    - `type`: {`pickle`}. Specify the format of the trace.
-    - `backtrace`: Boolean. Enable backtracing.
-    - `cache`: Suboption for the trace directory:
-        - `root`: String. Name of the directory to store traces
+See `PYTRACER2_PLAN.md` for the full architecture and roadmap, and
+`TECHNICAL_REVIEW.md` for the review of Pytracer 1 that motivated the
+rewrite.

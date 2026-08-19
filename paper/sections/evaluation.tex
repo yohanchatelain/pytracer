@@ -1,0 +1,377 @@
+\section{Evaluation}
+\label{sec:eval}
+
+We evaluate \pyt{} through eight experiments, each answering one research
+question:
+
+\begin{itemize}
+\item[\textbf{E0}] Does PyTracer\,1 still work on current toolchains
+  (the motivation for the rewrite)? (\S\ref{sec:eval-v1})
+\item[\textbf{E1}] Does \pyt{} detect and correctly rank classical
+  numerical pathologies? (\S\ref{sec:eval-gallery})
+\item[\textbf{E2}] What does each instrumentation tier cost?
+  (\S\ref{sec:eval-overhead})
+\item[\textbf{E3}] What does coverage accounting reveal that a
+  conventional tracer would hide? (\S\ref{sec:eval-coverage})
+\item[\textbf{E4}] How do the alignment strategies behave under
+  control-flow divergence? (\S\ref{sec:eval-alignment})
+\item[\textbf{E5}] How optimistic is the $\sig(\mathrm{mean})$ proxy
+  relative to element-wise significant digits? (\S\ref{sec:eval-basis})
+\item[\textbf{E6}] Does the end-to-end workflow localize a real
+  instability in a scikit-learn pipeline, and do the CI gates fire?
+  (\S\ref{sec:eval-case})
+\item[\textbf{E7}] Is the capture format crash-safe, and what does
+  storage cost? (\S\ref{sec:eval-storage})
+\end{itemize}
+
+\subsection{Setup and perturbation model}
+\label{sec:eval-setup}
+
+All experiments ran in a single Linux x86-64 container with CPython
+3.13.12, NumPy 2.5.1, SciPy 1.18.0, and scikit-learn 1.9.0 (OpenBLAS
+backend). Every number, table, and figure in this section is produced by
+a script in the repository's \texttt{paper/experiments/} directory,
+writing raw CSV results from which the tables and figures are generated
+--- the paper's numbers cannot drift from the measurements.
+
+No stochastic-arithmetic backend is installed in this environment, so
+run-to-run variability is induced by \emph{unseeded random input
+perturbation}: each repetition draws a small random jitter (or, in the
+pathology gallery, fresh random inputs) exactly as the project's
+continuous-integration suite does. We state this plainly, in the spirit
+of the tool's own metric honesty: the experiments measure the
+\emph{conditioning} of the traced computations under input perturbation
+and the correctness of \pyt{}'s attribution machinery, not the
+rounding-level stability of a fixed input. The identical workflow run
+inside a Verificarlo or fuzzy-libmath container --- \pyt{} rotates the MCA
+seed per run through its \texttt{[perturb.env]} mechanism --- measures
+true floating-point instability with no change to any command in this
+section. Detection experiments use 5 repetitions per experiment
+(20 for alignment, 10 for the case study).
+
+\subsection{E0: PyTracer\,1 on modern toolchains}
+\label{sec:eval-v1}
+
+We installed PyTracer\,1 from its final archived revision into fresh
+virtual environments for CPython 3.10--3.13, together with modern
+versions of its (undeclared) dependencies, and probed four stages:
+install, import, CLI startup, and tracing a three-line NumPy program
+(Table~\ref{tab:v1matrix}). Installation succeeds --- the package
+declares no dependencies at all, so there is nothing to conflict --- and
+a bare import immediately exits because a \texttt{PYTRACER\_CONFIG}
+environment variable is demanded at import time. With the shipped default
+configuration supplied, the CLI starts, but \emph{tracing fails on every
+interpreter}: on 3.10 the import-hook machinery trips over a removed
+private NumPy attribute (\texttt{numpy.lib.format.\_MAX\_HEADER\_SIZE}),
+and on 3.11--3.13 the global \texttt{builtins.type} replacement itself
+fails (\texttt{TypeError: type '\_Type' is not subscriptable}) --- the
+highest-risk design element breaking before any tracing begins. The
+rewrite was not a stylistic preference; the original tool is inoperable
+on every currently supported Python.
+
+\begin{table}[t]
+  \centering\small
+  \caption{E0 --- PyTracer\,1 (final archived revision) on modern
+  interpreters, with modern versions of its undeclared dependencies
+  installed and its default configuration supplied. ``Trace'' attempts a
+  three-line NumPy program.}
+  \label{tab:v1matrix}
+  \input{tables/v1matrix}
+\end{table}
+
+\subsection{E1: detection efficacy on the pathology gallery}
+\label{sec:eval-gallery}
+
+\pyt{} ships a gallery of eight classical numerical-accuracy pathologies,
+each pairing an unstable formulation with its stable fix in one script:
+catastrophic cancellation in the textbook variance formula, the naive
+quadratic formula for the small root, running summation versus Shewchuk's
+exact \texttt{fsum}~\citep{shewchuk1997adaptive,kahan1965further}, an
+ill-conditioned Hilbert solve (condition number $\sim$$10^{13}$), the
+finite-difference step-size dilemma, naive \texttt{expm1}/\texttt{log1p},
+and expanded polynomial evaluation near a root~\citep{higham2002accuracy,
+goldberg1991what}. We traced each script with 5 repetitions and full
+array storage, and asked two questions: does the unstable variant measure
+substantially fewer significant bits than its stable twin, and does the
+amplification ranking place it above the twin?
+
+\begin{table}[t]
+  \centering\small
+  \caption{E1 --- detection on the pathology gallery
+  (\texttt{--repeat 5}, element-wise basis where arrays were stored).
+  $\sig_{\min}$ is the minimum output significant bits across runs; Gap
+  is stable $-$ unstable; Amp.\ is the amplification
+  (Eq.~\ref{eq:amp}) of the unstable variant; Rank is
+  unstable\,/\,stable position in the per-script instability ranking.}
+  \label{tab:gallery}
+  \input{tables/gallery}
+\end{table}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.82\linewidth]{gallery}
+  \caption{E1 --- minimum output significant bits for the unstable and
+  stable formulation of each pathology. The gap is the detection signal;
+  the ranking (Table~\ref{tab:gallery}) is the attribution.}
+  \label{fig:gallery}
+\end{figure}
+
+Table~\ref{tab:gallery} and Figure~\ref{fig:gallery} show the result:
+\nDetected{}/\nPathologies{} pathologies detected, with gaps from 4.7 to
+32.9 bits, and the unstable variant ranked above its stable twin in all
+eight cases. Two readings deserve comment. First, the quadratic-roots and
+polynomial cases collapse to $\approx$0 significant bits --- total loss
+--- while their stable rewrites retain 25--33 bits under the same input
+noise: the formulation, not the data, destroys the precision, and the
+amplification column says so directly (32.9 bits destroyed by
+\texttt{naive\_small\_root} versus $-0.0$ by its fix). Second,
+summation-order shows the smallest gap (4.7 bits): the workload sums the
+\emph{same} 20{,}000 values in a per-run shuffled order, so the naive
+running sum varies purely through rounding non-associativity --- a small
+effect honestly measured (48.3 bits retained) against the exactly rounded,
+order-invariant \texttt{fsum} control at the full 53 bits.
+
+\subsection{E2: per-tier overhead}
+\label{sec:eval-overhead}
+
+Table~\ref{tab:overhead} and Figure~\ref{fig:overhead} report worst-case
+microbenchmarks (median of 5 measurements) in which the traced operation
+itself costs $\sim$2\,\textmu s, so per-event cost dominates: many tiny
+\texttt{numpy.sum} calls under T1 (\ovTinyPatch$\times$), the same calls
+through the T2 ufunc proxy (\ovTinyUfunc$\times$), large-array calls where
+summary computation dominates (\ovLargePatch$\times$), an operator loop
+under T3 taint (\ovTaint$\times$), and an end-to-end script under the T4
+monitor alone (\ovMonitor$\times$, subprocess startup included).
+
+\begin{table}[t]
+  \centering\small
+  \caption{E2 --- worst-case microbenchmark overhead per tier (median of
+  5). Events/s is the sustained event rate; B/event the finalized
+  capture size per event.}
+  \label{tab:overhead}
+  \input{tables/overhead}
+\end{table}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.72\linewidth]{overhead}
+  \caption{E2 --- wall-time overhead by tier (log scale). These are
+  deliberate worst cases: the traced operation costs $\sim$2\,\textmu s,
+  so the ratios bound the per-event cost rather than describe typical
+  workloads.}
+  \label{fig:overhead}
+\end{figure}
+
+Three observations. The per-call cost is the summaries: each traced call
+computes moments, norms, and counts over its operands twice (inputs and
+outputs) --- the measurements \emph{are} the product, and
+\texttt{mode~=~"metadata"} exists for users who want call structure
+without them. Taint mode's \ovTaint$\times$ is by design the drill-down
+tier, applied to a region a cheaper tier already localized, never to a
+whole program. And the tier whose job is discovery --- the T4 monitor ---
+costs only \ovMonitor$\times$ end-to-end, which is what makes the
+discover-then-target workflow (\S\ref{sec:design-coverage}) practical.
+Real workloads with meaningful compute per call sit far below these
+ratios (the large-array workload already halves the tiny-call ratio while
+tracing 200$\times$ fewer events).
+
+\subsection{E3: coverage honesty}
+\label{sec:eval-coverage}
+
+We traced three workloads (a NumPy micro-script, an ill-conditioned
+linear solve, and the scikit-learn pipeline of \S\ref{sec:eval-case})
+under three configurations: T1+T2 only (\texttt{patch}), the default
+\texttt{hybrid} (adds the T4 monitor), and \texttt{hybrid} plus the T5
+native census. Table~\ref{tab:coverage} reports what each configuration
+traced and --- the point of the experiment --- what it \emph{admits} it
+did not trace.
+
+\begin{table}[t]
+  \centering\small
+  \caption{E3 --- coverage accounting across tier configurations.
+  ``Untraced seen'' counts numerical callables (and their call counts)
+  that executed with no wrapper --- observable only when the T4 monitor
+  is active. ``Native kernels'' are distinct BLAS/LAPACK symbols recorded
+  by the T5 shim.}
+  \label{tab:coverage}
+  \input{tables/coverage}
+\end{table}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.62\linewidth]{coverage}
+  \caption{E3 --- the scikit-learn pipeline: traced functions vs.\
+  admitted-untraced numerical callables per configuration. The
+  \texttt{patch} configuration misses the same work --- it just cannot
+  report it.}
+  \label{fig:coverage}
+\end{figure}
+
+The \texttt{patch} rows are the cautionary tale: with no monitor, every
+workload reports \emph{zero} untraced callables --- not because coverage
+is complete but because the tracer cannot see what it misses. Turning on
+the monitor reveals 1--4 numerical callables running unobserved
+(\texttt{numpy.mean}, \texttt{numpy.hstack}, estimator constructors);
+adding \texttt{--native} shows the BLAS kernels the linear solve and the
+sklearn pipeline execute below Python. Closing the loop,
+\texttt{suggest-targets} proposed four targets for the sklearn pipeline;
+re-running with them traced the one genuinely patchable numerical
+function among them (\texttt{numpy.hstack}, 5\,$\to$\,6 traced), while
+the three remaining suggestions are estimator class constructors that the
+census correctly reports and the patcher correctly declines to wrap. The
+report also always carries the two structural blind spots as explicit
+notes: operator dispatch and compiled-extension internals.
+
+\subsection{E4: alignment under control-flow divergence}
+\label{sec:eval-alignment}
+
+We traced two adversarial programs with 20 repetitions: one whose branch
+on an unseeded random draw changes which calls execute, and one whose
+traced call count itself is a random loop length, then re-aligned the same
+traces under each strategy (Table~\ref{tab:alignment}).
+
+\begin{table}[t]
+  \centering\small
+  \caption{E4 --- alignment strategies on control-flow-divergent traces
+  (20 runs, identical trace re-analyzed per strategy). \texttt{strict}
+  aborts by design, naming the first divergent callsite.}
+  \label{tab:alignment}
+  \input{tables/alignment}
+\end{table}
+
+\texttt{strict} refuses both traces outright, with an error naming the
+exact callsite and the runs missing it --- the correct behavior for its
+role as determinism check. \texttt{callsite} and \texttt{fuzzy} both
+recover the aligned prefix (3 of 7 call groups on the branch program, 9
+of 25 on the random loop) and report the remainder as divergent rather
+than silently misattributing them --- the failure mode that PyTracer\,1's
+\texttt{zip}-based merging exhibited, where the shortest run silently
+truncated all others. Divergent call groups are not discarded: they feed
+the divergence score that ranks control-flow-unstable functions, and the
+T4 line-count table localizes \emph{where} the flow diverged even in
+untraced code.
+
+\subsection{E5: the summary-proxy gap}
+\label{sec:eval-basis}
+
+Every workload from a subset of the gallery, plus one adversarial
+program, was traced twice with identical settings except
+\texttt{--store-arrays}: \texttt{never} forces the
+$\sig(\mathrm{mean})$ summary basis, \texttt{always} enables the
+element-wise basis. Table~\ref{tab:basis} and Figure~\ref{fig:basis}
+compare the two per function.
+
+\begin{table}[t]
+  \centering\small
+  \caption{E5 --- $\sig(\mathrm{mean})$ summary proxy vs.\ element-wise
+  significant bits for the same functions under the same perturbation.
+  Positive proxy optimism means the proxy overstates stability.}
+  \label{tab:basis}
+  \input{tables/basis}
+\end{table}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.55\linewidth]{basis}
+  \caption{E5 --- element-wise significant bits against the
+  $\sig(\mathrm{mean})$ proxy. Points on the diagonal are cases where
+  the proxy is honest; the permuted-output workload (red) is the failure
+  mode that motivates the two-basis design.}
+  \label{fig:basis}
+\end{figure}
+
+For well-behaved functions the proxy tracks the element-wise measurement
+within a few bits --- and for the mildly ill-conditioned Hilbert solve it
+overstates stability by 3--4 bits. The adversarial case makes the design
+point: a function returning the same multiset of values in a different
+order each run has permutation-invariant summary statistics, so the proxy
+reports \permSummaryBits{} bits --- numerically indistinguishable from
+perfect stability --- while the element-wise measurement finds
+\permElementBits{} bits: the value at any given position is essentially
+random. The gap of \permOptimismBits{} bits is why \pyt{} stores array
+payloads by default where feasible, computes element-wise digits as the
+primary metric, and stamps every row that had to fall back to the proxy
+with \texttt{sig\_basis = "summary"}.
+
+\subsection{E6: end-to-end case study --- a scikit-learn pipeline}
+\label{sec:eval-case}
+
+The case study is a standard pipeline --- \texttt{StandardScaler},
+8-component PCA, logistic regression --- on a fixed synthetic dataset of
+400 samples and 12 features in which one feature nearly duplicates
+another (separation $10^{-4}$), so exactly one pair of covariance
+eigenvalues is nearly degenerate. Each of 10 repetitions applies a
+relative input jitter of $3\times10^{-7}$, chosen to be representable in
+both float64 and float32. We traced the pipeline with the NumPy and
+sklearn plugins, then repeated the identical experiment with the data
+cast to float32 (Table~\ref{tab:case}).
+
+\begin{table}[t]
+  \centering\small
+  \caption{E6 --- scikit-learn case study (10 runs, element-wise basis):
+  minimum and median output significant bits per traced call, float64
+  vs.\ float32 pipeline, and float64 amplification. Rows without values
+  are calls whose outputs are non-numeric (fitted-estimator objects).}
+  \label{tab:case}
+  \input{tables/case}
+\end{table}
+
+\pyt{} localizes the instability precisely: \texttt{numpy.linalg.eigh}
+--- PCA's eigendecomposition --- retains only 4.3 bits with an
+amplification of 12.2 bits, and the instability propagates to
+\texttt{PCA.transform} (10.0 bits). The physics is textbook: the
+near-degenerate eigenpair makes the corresponding eigenvectors extremely
+sensitive to perturbation~\citep{higham2002accuracy}; \pyt{}'s
+contribution is that the ranking finds it automatically in a pipeline the
+user did not annotate, and distinguishes the source (\texttt{eigh},
+high amplification) from downstream victims.
+
+The two CI gates then fire as designed. \texttt{pytracer check
+--min-sig-bits 20 --max-divergence 0.01} exits \checkExit{} (failure):
+this pipeline does not meet a 20-bit floor, and a numerical CI would
+correctly block it. \texttt{pytracer diff} between the float64 and
+float32 experiments with \texttt{--fail-on-regression} exits
+\diffExit{}, reporting three regressions beyond its 1-bit tolerance ---
+\texttt{eigh} drops from 4.3 to 2.1 bits and \texttt{PCA.transform} from
+10.0 to 8.1 --- turning a precision downgrade that changes no test
+assertion into a caught regression.
+
+\subsection{E7: storage footprint and crash-safety}
+\label{sec:eval-storage}
+
+Table~\ref{tab:storage} reports per-run storage on a call-sparse workload
+and an event-heavy one (2{,}000 traced calls). For the heavy trace the
+append-only JSONL capture costs 6.7\,MiB while its finalized Parquet is
+158\,KiB --- \parquetRatio$\times$ smaller --- justifying the two-format
+design: JSONL exists to survive crashes, Parquet to be queried.
+
+\begin{table}[t]
+  \centering\small
+  \caption{E7 --- per-run storage (mean of 5 runs, full array storage).
+  Arrays are Zarr/npy payloads enabling element-wise significance.}
+  \label{tab:storage}
+  \input{tables/storage}
+\end{table}
+
+Crash-safety was tested destructively: a workload that SIGKILLs its own
+process --- no cleanup, no \texttt{atexit} --- on repetitions 4--6 of a
+6-repetition experiment run with \texttt{--continue-on-error}. All
+\crashKilled{} killed runs retain readable JSONL captures (each missing
+at most a trailing partial line), the experiment completes, and analysis
+recovers events from all \crashRunsRecovered{} runs, killed included. The
+same scenario under a capture format with buffered row groups would have
+truncated the killed runs' traces entirely.
+
+\subsection{Threats to validity}
+\label{sec:eval-threats}
+
+The perturbation model is input jitter rather than rounding-level MCA;
+detection results therefore demonstrate correct \emph{attribution of
+conditioning}, and transfer to MCA measurements by construction of the
+workflow rather than by measurement here. Overhead microbenchmarks bound
+worst-case per-event cost on one container and CPU; absolute ratios will
+vary with BLAS, CPU, and workload granularity. The E0 matrix supplies
+modern versions of PyTracer\,1's undeclared dependencies; a period-exact
+2021 environment would run it, which is precisely the point being made.
+Case-study numbers depend on the synthetic dataset's conditioning; the
+scripts expose every constant for independent variation.

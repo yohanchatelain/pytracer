@@ -1,0 +1,56 @@
+\section{Background}
+\label{sec:background}
+
+\paragraph{Stochastic arithmetic and significant digits.}
+IEEE-754 arithmetic commits to one rounding per operation, so a single
+execution reveals nothing about the sensitivity of its result to rounding.
+Monte Carlo Arithmetic (MCA)~\citep{parker1997monte} replaces each
+operation's result with a randomly rounded value at a chosen virtual
+precision; across repeated executions, the empirical distribution of any
+intermediate or final value reflects its numerical quality. The number of
+significant bits of a value $x$ observed across $n$ runs can be estimated
+as $\sig(x) = -\log_2\!\left(\sigma / |\mu|\right)$ for sample mean $\mu$
+and standard deviation $\sigma$, with rigorous confidence intervals given
+by \citet{sohier2021confidence}; \pyt{} delegates this estimation to the
+\texttt{significantdigits} package~\citep{significantdigits}, which
+implements both the centered-normality-hypothesis and general variants.
+Practical MCA implementations include
+Verificarlo~\citep{denis2016verificarlo}, an LLVM compiler pass with
+interchangeable backends, and Verrou~\citep{fevotte2017verrou}, a
+Valgrind-based tool requiring no recompilation; CADNA~\citep{jezequel2008cadna}
+implements the related CESTAC method with three concurrent executions.
+Randomly-rounded system math libraries (``fuzzy'' environments) extend the
+perturbation to \texttt{libm} calls and have been used to quantify
+uncertainty in large neuroimaging pipelines~\citep{kiar2021comparing}.
+
+\paragraph{Profiling versus perturbing.}
+A perturbation engine varies the arithmetic; a profiler observes the
+consequences. Keeping the two separate is a deliberate design position.
+First, perturbation is language- and ABI-specific (an LLVM pass, a
+Valgrind tool, a preloaded libm), whereas observation of a Python program
+is a Python-level concern. Second, agnosticism to the noise model lets the
+same profiler serve MCA, random rounding, input perturbation, or
+domain-specific structured noise~\citep{chatelain2023pytracer}. \pyt{}
+orchestrates the repeated runs (rotating backend seeds through per-run
+environment variables), records what happened at every observed call,
+and computes cross-run metrics; whether the runs differ because of MCA or
+because of jittered inputs is a property of the experiment, recorded in
+its metadata, not of the tool.
+
+\paragraph{Why observing Python numerics is hard.}
+Python's flexibility makes interception deceptively easy in the common
+case and structurally incomplete in general. An ordinary function such as
+\texttt{numpy.linalg.solve} can be wrapped by attribute patching. But
+NumPy \emph{ufuncs} (\texttt{numpy.add}, \texttt{numpy.exp}, \ldots) are C
+objects carrying semantically distinct methods (\texttt{reduce},
+\texttt{accumulate}, \texttt{outer}, \texttt{at}); user code checks
+\texttt{isinstance(f, np.ufunc)}; and --- critically --- operator dispatch
+(\texttt{a + b}) never reads the \texttt{numpy.add} module attribute at
+all, going instead through the ndarray C type slots. Aliases captured
+before patching (\texttt{from numpy import sum}) keep the raw function
+forever. Deeper still, scikit-learn's Cython code calls BLAS through
+\texttt{scipy.linalg.cython\_blas}: those \texttt{dgemm} invocations never
+touch a Python object. Any honest Python tracer must therefore either
+declare these blind spots or eliminate them with progressively more
+invasive mechanisms --- \pyt{} does both, tier by tier, and measures what
+remains (Section~\ref{sec:design}).

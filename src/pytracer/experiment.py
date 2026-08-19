@@ -1,0 +1,177 @@
+"""Experiment orchestration: one experiment = N independent runs of a script.
+
+Directory layout:
+
+    <output_dir>/<experiment_id>/
+      .pytracer-experiment          # ownership marker (clean only deletes marked dirs)
+      config.toml                   # resolved config snapshot
+      experiment.json               # experiment-level metadata
+      runs/run-000/{metadata.json, events.jsonl, events.parquet, monitor.json}
+      analysis/                     # written by pytracer analyze / run
+      report/                       # written by pytracer report / run
+    <output_dir>/latest -> <experiment_id>
+"""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from pathlib import Path
+
+import tomli_w
+
+from pytracer._errors import ExperimentError
+from pytracer.config.schema import PytracerConfig
+
+MARKER = ".pytracer-experiment"
+
+
+@dataclass(slots=True)
+class RunResult:
+    run_id: str
+    run_dir: Path
+    exit_code: int
+
+
+@dataclass(slots=True)
+class ExperimentResult:
+    experiment_id: str
+    experiment_dir: Path
+    runs: list[RunResult] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+    @property
+    def failed_runs(self) -> list[RunResult]:
+        return [r for r in self.runs if r.exit_code != 0]
+
+
+def create_experiment_dir(output_dir: str | Path, config: PytracerConfig) -> tuple[str, Path]:
+    experiment_id = datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%S.%f")[:-3] + "Z"
+    experiment_dir = Path(output_dir) / experiment_id
+    (experiment_dir / "runs").mkdir(parents=True)
+    (experiment_dir / MARKER).touch()
+    (experiment_dir / "config.toml").write_text(tomli_w.dumps(config.to_dict()))
+    _update_latest(Path(output_dir), experiment_id)
+    return experiment_id, experiment_dir
+
+
+def _update_latest(output_dir: Path, experiment_id: str) -> None:
+    latest = output_dir / "latest"
+    try:
+        if latest.is_symlink() or latest.exists():
+            latest.unlink()
+        latest.symlink_to(experiment_id)
+    except OSError:
+        pass  # symlinks may be unsupported; "latest" is a convenience only
+
+
+def run_experiment(
+    *,
+    config: PytracerConfig,
+    script: str,
+    script_args: list[str],
+    target_specs: list[str],
+    repeat: int,
+    continue_on_error: bool = False,
+    env_overrides: dict[str, str] | None = None,
+) -> ExperimentResult:
+    script_path = Path(script).resolve()
+    if not script_path.is_file():
+        raise ExperimentError(f"script not found: {script}")
+    if repeat < 1:
+        raise ExperimentError(f"--repeat must be >= 1, got {repeat}")
+
+    experiment_id, experiment_dir = create_experiment_dir(config.storage.output_dir, config)
+    result = ExperimentResult(experiment_id=experiment_id, experiment_dir=experiment_dir)
+
+    native_shim = None
+    native_libs: list[str] = []
+    if config.trace.native_census:
+        from pytracer.instrumentation.native import ensure_shim, find_real_blas_libs
+
+        native_shim, reason = ensure_shim()
+        if native_shim is None:
+            result.warnings.append(f"native census disabled: {reason}")
+        else:
+            native_libs = find_real_blas_libs()
+
+    (experiment_dir / "experiment.json").write_text(
+        json.dumps(
+            {
+                "experiment_id": experiment_id,
+                "script": str(script_path),
+                "script_args": script_args,
+                "repeat": repeat,
+                "targets": target_specs,
+                "instrumentation": config.trace.instrumentation,
+            },
+            indent=2,
+        )
+    )
+
+    import os
+
+    for k in range(repeat):
+        run_id = f"run-{k:03d}"
+        run_dir = (experiment_dir / "runs" / run_id).resolve()
+        run_dir.mkdir(parents=True)
+        spec = {
+            "experiment_id": experiment_id,
+            "run_id": run_id,
+            "run_dir": str(run_dir),
+            "script": str(script_path),
+            "script_args": script_args,
+            "targets": target_specs,
+            "instrumentation": config.trace.instrumentation,
+            "mode": config.trace.mode,
+            "capture_backtrace": config.trace.capture_backtrace,
+            "store_arrays": config.trace.store_arrays,
+            "array_store_threshold": config.trace.array_store_threshold,
+            "array_backend": config.trace.array_backend,
+        }
+        spec_path = (run_dir / "spec.json").resolve()
+        spec_path.write_text(json.dumps(spec, indent=2))
+
+        env = dict(os.environ)
+        env["PYTRACER_RUN_ID"] = run_id
+        if native_shim is not None:
+            preload = str(native_shim)
+            if env.get("LD_PRELOAD"):
+                preload = f"{preload}:{env['LD_PRELOAD']}"
+            env["LD_PRELOAD"] = preload
+            env["PYTRACER_NATIVE_LOG"] = str(run_dir / "native_kernels.log")
+            if native_libs:
+                env["PYTRACER_NATIVE_REAL_LIBS"] = ":".join(native_libs)
+        for key, template in config.perturb.env.items():
+            env[key] = template.format(run_index=k, run_id=run_id)
+        if env_overrides:
+            env.update(env_overrides)
+
+        proc = subprocess.run(
+            [sys.executable, "-m", "pytracer._bootstrap", str(spec_path)],
+            env=env,
+            cwd=str(script_path.parent),
+        )
+        result.runs.append(RunResult(run_id=run_id, run_dir=run_dir, exit_code=proc.returncode))
+        if proc.returncode != 0 and not continue_on_error:
+            result.warnings.append(
+                f"{run_id} exited with code {proc.returncode}; stopping "
+                f"(use --continue-on-error to keep going)"
+            )
+            break
+
+    return result
+
+
+def find_experiments(output_dir: str | Path) -> list[Path]:
+    root = Path(output_dir)
+    if not root.is_dir():
+        return []
+    return sorted(
+        p
+        for p in root.iterdir()
+        if p.is_dir() and not p.is_symlink() and (p / MARKER).is_file()
+    )

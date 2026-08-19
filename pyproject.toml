@@ -1,0 +1,65 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pytracer"
+version = "2.0.0a0"
+description = "Numerical variability profiler for Python scientific programs"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "Yohan Chatelain", email = "yohan.chatelain@gmail.com" }]
+classifiers = [
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "numpy>=1.26",
+    "wrapt>=1.16",
+    "msgspec>=0.18",
+    "pyarrow>=15",
+    "jinja2>=3.1",
+    "tomli-w>=1.0",
+]
+
+[project.optional-dependencies]
+arrays = ["zarr>=2.18", "numcodecs>=0.12"]
+sig = ["significantdigits>=0.2"]
+gui = ["dash>=2.17", "plotly>=5.22", "pandas>=2.1"]
+dev = [
+    "pytest>=8",
+    "pytest-cov>=5",
+    "ruff>=0.6",
+    "mypy>=1.10",
+]
+
+[project.scripts]
+pytracer = "pytracer.cli.main:main"
+
+[project.urls]
+Homepage = "https://github.com/yohanchatelain/pytracer"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pytracer"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: slow integration tests",
+    "integration: end-to-end tests",
+]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+
+

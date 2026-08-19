@@ -1,0 +1,13 @@
+\begin{tabular}{lrrrrr}
+\toprule
+Traced call & \multicolumn{2}{c}{float64 (bits)} & \multicolumn{2}{c}{float32 (bits)} & Amp.\ \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+ & min & median & min & median & (bits) \\
+\midrule
+\texttt{numpy.linalg.eigh} & 4.26 & 4.26 & 2.14 & 2.14 & 12.22 \\
+\texttt{sklearn.decomposition.\_pca.PCA.transform} & 9.98 & 9.98 & 8.13 & 8.13 & 3.13 \\
+\texttt{numpy.add.reduce} & 0.0 & 21.27 & 0.0 & 21.26 & 13.11 \\
+\texttt{sklearn.decomposition.\_pca.PCA.fit} & -- & -- & -- & -- & -- \\
+\texttt{sklearn.linear\_model.\_logistic.LogisticRegression.fit} & -- & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular}

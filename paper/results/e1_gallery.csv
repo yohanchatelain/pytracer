@@ -1,0 +1,9 @@
+script,unstable,stable,sig_unstable_bits,sig_stable_bits,gap_bits,ci_min_gap,amp_unstable_bits,amp_stable_bits,rank_unstable,rank_stable,sig_basis,detected
+cancellation.py,naive_variance,stable_variance,0.1,5.88,5.79,3.0,25.09,19.3,1,2,element,True
+quadratic_roots.py,naive_small_root,stable_small_root,0.0,32.89,32.89,10.0,32.89,-0.0,1,2,summary,True
+summation_order.py,naive_running_sum,exact_fsum,48.3,52.96,4.66,3.0,-48.3,-52.96,1,2,element,True
+ill_conditioned_solve.py,solve_hilbert,solve_well_conditioned,19.39,38.94,19.55,10.0,20.03,0.48,1,2,element,True
+finite_differences.py,forward_diff_tiny_h,central_diff_optimal_h,9.96,36.81,26.85,5.0,30.97,4.11,1,2,summary,True
+expm1_log1p.py,naive_expm1,library_expm1,12.46,26.83,14.37,5.0,14.37,-0.0,2,4,summary,True
+expm1_log1p.py,naive_log1p,library_log1p,12.01,26.83,14.83,5.0,14.83,-0.0,1,3,summary,True
+polynomial_eval.py,expanded_poly,factored_poly,0.08,25.46,25.37,10.0,41.47,16.1,1,2,summary,True
