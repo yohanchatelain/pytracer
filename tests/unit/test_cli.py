@@ -16,9 +16,11 @@ def test_help(tmp_path):
 
 
 def test_version(tmp_path):
+    import pytracer
+
     proc = run_cli(["--version"], tmp_path)
     assert proc.returncode == 0
-    assert "2.0.0a0" in proc.stdout
+    assert pytracer.__version__ in proc.stdout
 
 
 def test_init_and_config_show(tmp_path):

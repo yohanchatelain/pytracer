@@ -4,7 +4,7 @@ Importing this package has no side effects: no configuration is read, no
 files are created, no logging is configured.
 """
 
-__version__ = "2.0.0a0"
+__version__ = "2.0.0"
 
 __all__ = ["__version__", "trace_function", "taint", "PytracerError"]
 

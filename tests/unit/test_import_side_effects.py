@@ -22,7 +22,7 @@ def test_import_creates_nothing_and_needs_nothing(tmp_path):
     )
     assert proc.returncode == 0, proc.stderr
     version, listing = proc.stdout.strip().splitlines()
-    assert version == "2.0.0a0"
+    assert version == "2.0.0"
     assert listing == "[]"  # nothing created in cwd
 
 
