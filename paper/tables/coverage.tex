@@ -1,0 +1,18 @@
+\begin{tabular}{llrrrr}
+\toprule
+Workload & Configuration & Traced & \multicolumn{2}{c}{Untraced seen} & Native \\
+\cmidrule(lr){4-5}
+ & & fns & callables & calls & kernels \\
+\midrule
+numpy micro & patch & 2 & 0 & 0 & 0 \\
+ & hybrid & 2 & 1 & 3 & 0 \\
+ & hybrid+native & 2 & 1 & 3 & 0 \\
+linear solve & patch & 3 & 0 & 0 & 0 \\
+ & hybrid & 3 & 3 & 12 & 0 \\
+ & hybrid+native & 3 & 3 & 12 & 1 \\
+sklearn pipeline & patch & 5 & 0 & 0 & 0 \\
+ & hybrid & 5 & 4 & 12 & 0 \\
+ & hybrid+native & 5 & 4 & 12 & 1 \\
+ & hybrid+suggested & 6 & 3 & 9 & 0 \\
+\bottomrule
+\end{tabular}

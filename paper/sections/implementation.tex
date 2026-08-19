@@ -1,0 +1,47 @@
+\section{Implementation}
+\label{sec:implementation}
+
+\pyt{} is roughly 6{,}000 lines of Python (plus a 190-line C shim for the
+native census) organized as \texttt{instrumentation}, \texttt{trace},
+\texttt{storage}, \texttt{analysis}, \texttt{report}, \texttt{dashboard},
+and \texttt{cli} packages. Core dependencies are deliberately few: NumPy,
+\texttt{wrapt}, \texttt{msgspec}, PyArrow, and Jinja2; SciPy,
+scikit-learn, Zarr, \texttt{significantdigits}, and Dash are optional ---
+a tracer must not constrain the versions of the libraries it studies.
+Python $\geq$ 3.12 is required by the PEP\,669 monitor.
+
+Several implementation rules are enforced by CI rather than convention.
+\texttt{import pytracer} in an empty directory with no configuration
+succeeds silently and creates nothing (PyTracer\,1 opened cache
+directories, log files, and reconfigured the root logger at import time).
+No \texttt{sys.exit} exists outside the \texttt{cli} package; the library
+raises \texttt{PytracerError} subclasses, and a tracing failure degrades
+to ``this call not recorded'' rather than terminating the traced
+application. Every artifact carries a schema version. The
+\texttt{@pytracer.trace\_function} decorator lets users instrument their
+own functions explicitly; it is a no-op outside \texttt{pytracer run}, so
+decorated code runs unmodified everywhere.
+
+Transparency of the wrappers is tested, not assumed: the conformance
+suite asserts that patched functions preserve results bit-for-bit against
+unpatched runs, that \texttt{isinstance(numpy.add, np.ufunc)} holds under
+the T2 proxy, that unpatching restores the exact original attributes
+(including inherited methods patched onto subclasses), and that the
+occurrence counters used for alignment are deterministic under threads.
+The examples gallery doubles as a detection regression suite: CI asserts
+that the unstable variant of every classical pathology loses
+significantly more bits than its stable twin --- the tool must keep
+detecting what it exists to detect.
+
+The T5 shim is compiled on demand with the system C compiler and
+interposes both the standard BLAS/LAPACK symbols and the prefixed ILP64
+symbols of NumPy/SciPy wheels; \texttt{pytracer doctor} reports which
+BLAS is loaded and whether interposition is feasible, alongside checks
+for optional dependencies, config validity, target resolvability, and the
+presence of a perturbation backend.
+
+Reports are generated as Markdown, self-contained HTML, and JSON; the
+optional Dash dashboard adds an overview, a per-call explorer with
+element-wise drill-down, a call timeline colored by amplification, and
+the coverage view. \texttt{pytracer export} emits a Chrome-tracing/%
+Perfetto timeline with significance annotations.

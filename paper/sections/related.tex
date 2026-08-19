@@ -1,0 +1,49 @@
+\section{Related Work}
+\label{sec:related}
+
+\paragraph{Perturbation engines.}
+Verificarlo~\citep{denis2016verificarlo} instruments floating-point
+operations at LLVM compile time with interchangeable backends (MCA,
+cancellation detection); Verrou~\citep{fevotte2017verrou} achieves the
+same dynamically under Valgrind without recompilation;
+CADNA~\citep{jezequel2008cadna} implements CESTAC with synchronous
+triplicated execution. Fuzzy system libraries randomize \texttt{libm}
+itself, enabling container-level perturbation of unmodified pipelines,
+an approach used to quantify condition-level uncertainty in neuroimaging
+analyses~\citep{kiar2021comparing}. \pyt{} sits deliberately above all of
+these: they make runs vary, it explains where the variation came from.
+File-based localization~\citep{salari2020spot} attributes pipeline
+variability at the granularity of intermediate files; \pyt{} works at the
+granularity of function calls within one process.
+
+\paragraph{Numerical debugging and repair.}
+FpDebug~\citep{benz2012fpdebug} shadows every operation with
+high-precision values under Valgrind;
+Herbgrind~\citep{sanchezstern2018herbgrind} tracks error back to root
+causes in binaries; Herbie~\citep{panchekha2015herbie} rewrites
+floating-point expressions for accuracy, and
+FPTaylor~\citep{solovyev2015rigorous} bounds round-off error of small
+expressions rigorously; FPBench~\citep{damouche2017fpbench} standardizes
+their benchmarks. These tools analyze expressions or compiled binaries;
+none observes the Python/C boundary where scientific Python programs
+actually spend their numerical effort, and none addresses the coverage
+question --- what fraction of a NumPy/sklearn workload the analysis saw
+--- that \pyt{} makes a first-class output.
+
+\paragraph{Tracing numerical behavior in context.}
+VeriTracer~\citep{chatelain2019veritracer} added temporal, contextualized
+traces of significance to Verificarlo at the C/Fortran level.
+PyTracer~\citep{chatelain2023pytracer} brought instability profiling to
+Python via import hooks and is this work's direct predecessor;
+Section~\ref{sec:eval-v1} quantifies its current state, and
+Sections~\ref{sec:design}--\ref{sec:implementation} describe how \pyt{}
+replaces its global \texttt{builtins} patching with tiered, contracted
+instrumentation, its pickle trace format with schema-versioned columnar
+storage, and its silent truncation with explicit alignment. The PEP\,669
+monitoring API~\citep{pep669} that \pyt{} builds on was designed for
+low-overhead tooling and, to our knowledge, \pyt{} is the first numerical
+QA tool built on it. NumPy's array protocols
+(\texttt{\_\_array\_ufunc\_\_}, \texttt{\_\_array\_function\_\_})
+\citep{harris2020numpy} are the mechanism behind tier T3, used elsewhere
+for units, autodiff, and lazy evaluation; \pyt{} repurposes them for
+alias-proof observation.

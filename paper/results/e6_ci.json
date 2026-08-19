@@ -1,0 +1,28 @@
+{
+ "check_exit_code": 1,
+ "check_output": "FAIL: 3 stability violation(s)\n  - numpy.add.reduce: min_output_sig_bits = 0.0 violates limit 20.0\n  - numpy.linalg.eigh: min_output_sig_bits = 4.263123352099529 violates limit 20.0\n  - sklearn.decomposition._pca.PCA.transform: min_output_sig_bits = 9.977017481134537 violates limit 20.0",
+ "diff_exit_code": 1,
+ "diff_output": "function                                       sig A   sig B   delta  note\n--------------------------------------------------------------------------\nnumpy.add.reduce                                 0.0     0.0     0.0  REGRESSION divergence-change\nnumpy.linalg.eigh                                4.3     2.1    -2.1  REGRESSION\nsklearn.decomposition._pca.PCA.fit                 -       -       -  \nsklearn.decomposition._pca.PCA.transform        10.0     8.1    -1.8  REGRESSION\nsklearn.linear_model._logistic.LogisticRegression.fit       -       -       -  \n\n3 regression(s) beyond 1.0 bits",
+ "alignment": {
+  "alignment_mode": "callsite",
+  "runs": 10,
+  "run_ids": [
+   "run-000",
+   "run-001",
+   "run-002",
+   "run-003",
+   "run-004",
+   "run-005",
+   "run-006",
+   "run-007",
+   "run-008",
+   "run-009"
+  ],
+  "total_call_groups": 27,
+  "matched_call_groups": 27,
+  "divergent_call_groups": 0,
+  "truncated_runs": [],
+  "divergent_calls": []
+ },
+ "repeat": 10
+}

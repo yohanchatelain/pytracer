@@ -1,0 +1,18 @@
+\begin{tabular}{llrrr}
+\toprule
+Workload & Function & $\sig$(summary) & $\sig$(element) & Proxy optimism \\
+ & & (bits) & (bits) & (bits) \\
+\midrule
+permuted output & \texttt{permuted\_pipeline} & 52.75 & 1.89 & 50.86 \\
+ & \texttt{stable\_pipeline} & 53.0 & 52.71 & 0.29 \\
+cancellation & \texttt{naive\_variance} & 1.0 & 0.0 & 1.0 \\
+ & \texttt{stable\_variance} & 6.96 & 6.28 & 0.68 \\
+summation order & \texttt{exact\_fsum} & 52.96 & 52.96 & 0.0 \\
+ & \texttt{naive\_running\_sum} & 47.3 & 48.92 & -1.61 \\
+ & \texttt{pairwise\_sum} & 52.62 & 51.96 & 0.66 \\
+ill-conditioned solve & \texttt{solve\_hilbert} & 23.05 & 19.66 & 3.4 \\
+ & \texttt{solve\_well\_conditioned} & 42.19 & 39.36 & 2.83 \\
+finite differences & \texttt{central\_diff\_optimal\_h} & 37.1 & 36.81 & 0.29 \\
+ & \texttt{forward\_diff\_tiny\_h} & 10.25 & 10.25 & -0.0 \\
+\bottomrule
+\end{tabular}

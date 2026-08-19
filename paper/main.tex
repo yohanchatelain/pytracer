@@ -1,0 +1,66 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1.1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{textcomp}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage[hidelinks]{hyperref}
+
+% headline numbers generated from paper/results/*.csv — do not edit
+\input{tables/macros}
+
+\graphicspath{{figures/}}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  columns=fullflexible,
+  frame=single,
+  framerule=0.2pt,
+  xleftmargin=1em,
+  keepspaces=true,
+}
+
+\newcommand{\pytracer}{\textsc{Pytracer}}
+\newcommand{\pyt}{\textsc{Pytracer~2}}
+\newcommand{\pytone}{\textsc{Pytracer~1}}
+\newcommand{\sig}{\operatorname{sig}}
+
+\title{Pytracer 2: Honest Tiered Instrumentation for\\
+Numerical Variability Profiling in Python}
+
+\author{%
+  Yohan Chatelain\\
+  \small\texttt{yohan.chatelain@gmail.com}%
+}
+
+\date{Draft of \today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\input{sections/abstract}
+\end{abstract}
+
+\input{sections/intro}
+\input{sections/background}
+\input{sections/design}
+\input{sections/implementation}
+\input{sections/evaluation}
+\input{sections/related}
+\input{sections/conclusion}
+
+\bibliographystyle{plainnat}
+\bibliography{refs}
+
+\end{document}

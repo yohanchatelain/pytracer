@@ -1,0 +1,6 @@
+function,min_sig_f64,median_sig_f64,min_sig_f32,median_sig_f32,amp_bits_f64,divergence,sig_basis,n_call_groups
+numpy.linalg.eigh,4.26,4.26,2.14,2.14,12.22,0.0,element,1
+sklearn.decomposition._pca.PCA.transform,9.98,9.98,8.13,8.13,3.13,0.0,element,1
+numpy.add.reduce,0.0,21.27,0.0,21.26,13.11,0.0,element,23
+sklearn.decomposition._pca.PCA.fit,,,,,,0.0,element,1
+sklearn.linear_model._logistic.LogisticRegression.fit,,,,,,0.0,element,1
