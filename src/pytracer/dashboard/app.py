@@ -41,8 +41,9 @@ def build_app(experiment_dir: str | Path):
     data = ExperimentData(experiment_dir)
     app = Dash(
         __name__,
-        title="Pytracer",
+        title="Pytracer · Numerical Variability Profiler",
         assets_folder=str(Path(__file__).parent / "assets"),
+        suppress_callback_exceptions=True,
     )
     app.layout = build_layout(data)
     register_callbacks(app, data)

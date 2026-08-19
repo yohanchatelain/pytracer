@@ -213,14 +213,23 @@ def register_callbacks(app, data: ExperimentData) -> None:
         Output("explorer-functions", "value"),
         Input("amp-chart", "clickData"),
         Input("callgraph-graph", "clickData"),
+        Input("functions-table", "active_cell"),
+        State("functions-table", "data"),
         State("explorer-functions", "value"),
         prevent_initial_call=True,
     )
-    def open_in_explorer(amp_click, graph_click, current):
+    def open_in_explorer(amp_click, graph_click, active_cell, table_data, current):
         from dash import ctx
 
         if ctx.triggered_id == "amp-chart":
             function = (amp_click or {}).get("points", [{}])[0].get("y")
+        elif ctx.triggered_id == "functions-table":
+            if not active_cell or not table_data:
+                raise PreventUpdate
+            row_idx = active_cell.get("row")
+            if row_idx is None or row_idx >= len(table_data):
+                raise PreventUpdate
+            function = table_data[row_idx].get("function")
         else:
             point = (graph_click or {}).get("points", [{}])[0]
             function = point.get("customdata")

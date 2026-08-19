@@ -75,16 +75,22 @@ def header_bar(data: ExperimentData):
     script = experiment.get("script", "")
     return html.Div([
         html.Div([
-            html.Span("Pytracer", className="brand"),
-            html.Span("numerical variability profiler", className="brand-sub"),
+            html.Img(src="/assets/logo.png", className="brand-logo", alt="Pytracer"),
+            html.Div([
+                html.Div([
+                    html.Span("Pytracer", className="brand"),
+                    html.Span("v2.0.0", className="brand-version"),
+                ], className="brand-title-row"),
+                html.Span("numerical variability profiler", className="brand-sub"),
+            ], className="brand-text"),
         ], className="brand-box"),
         html.Div([
             html.Code(script, className="script-chip") if script else None,
             html.Span(
-                f"experiment {experiment.get('experiment_id', '?')} · "
+                f"exp {experiment.get('experiment_id', '?')} · "
                 f"{alignment.get('runs', '?')} runs · "
-                f"alignment: {alignment.get('alignment_mode', '?')} · "
-                f"instrumentation: {experiment.get('instrumentation', '?')}",
+                f"mode: {alignment.get('alignment_mode', '?')} · "
+                f"tier: {experiment.get('instrumentation', '?')}",
                 className="header-meta"),
         ], className="header-right"),
     ], className="pt-header")
