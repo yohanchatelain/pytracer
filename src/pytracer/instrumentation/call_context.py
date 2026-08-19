@@ -83,7 +83,7 @@ class CallContext:
                     and not filename.startswith("<frozen importlib")
                 ):
                     return SourceRef(file=filename, lineno=frame.f_lineno)
-                frame = frame.f_back
+                frame = frame.f_back  # type: ignore[assignment]
         finally:
             del frame
         return None

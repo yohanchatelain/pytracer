@@ -10,6 +10,7 @@ from __future__ import annotations
 import functools
 import inspect
 import time
+from typing import Any
 
 from pytracer.instrumentation.call_context import CallContext
 from pytracer.trace.event import SCHEMA_VERSION, NumericSummary, SourceRef, TraceEvent
@@ -178,7 +179,7 @@ class Recorder:
                 occurrence = ctx.next_occurrence(callsite_key)
                 call_id = ctx.next_call_id()
                 parent = ctx.current_parent()
-                common = dict(
+                common: dict[str, Any] = dict(
                     call_id=call_id,
                     parent=parent,
                     occurrence=occurrence,

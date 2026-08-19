@@ -76,6 +76,7 @@ class ArrayStore:
                 if isinstance(value, np.ndarray):
                     self.n_skipped += 1
                 return None
+            assert isinstance(value, np.ndarray)
             self._dir.mkdir(parents=True, exist_ok=True)
             safe_arg = _SANITIZE.sub("_", arg_name or "arg")
             stem = f"{call_id:06d}-{phase}-{safe_arg}"
@@ -83,7 +84,7 @@ class ArrayStore:
                 import zarr
 
                 name = f"{stem}.zarr"
-                zarr.save(str(self._dir / name), np.ascontiguousarray(value))
+                zarr.save(str(self._dir / name), np.ascontiguousarray(value))  # type: ignore[arg-type]
             else:
                 name = f"{stem}.npy"
                 np.save(self._dir / name, value, allow_pickle=False)

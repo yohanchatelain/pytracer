@@ -57,3 +57,8 @@ markers = [
     "slow: slow integration tests",
     "integration: end-to-end tests",
 ]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+

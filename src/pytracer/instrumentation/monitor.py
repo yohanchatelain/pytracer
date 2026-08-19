@@ -28,7 +28,7 @@ class Monitor:
         self.c_calls: Counter[str] = Counter()
         self.active = False
         self.available = hasattr(sys, "monitoring")
-        self._tool_id = None
+        self._tool_id: int | None = None
 
     def _in_scope(self, filename: str) -> bool:
         return (

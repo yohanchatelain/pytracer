@@ -60,7 +60,10 @@ def find_real_blas_libs() -> list[str]:
             module = __import__(module_name)
         except ImportError:
             continue
-        libs_dir = Path(module.__file__).parent.parent / f"{module_name}.libs"
+        file_path = getattr(module, "__file__", None)
+        if not file_path:
+            continue
+        libs_dir = Path(file_path).parent.parent / f"{module_name}.libs"
         if libs_dir.is_dir():
             libs.extend(
                 str(p) for p in sorted(libs_dir.glob("*openblas*"))

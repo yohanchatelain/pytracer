@@ -118,18 +118,27 @@ def _call_signature(call: CallRecord) -> tuple:
     )
 
 
+# Callsite location identity for fuzzy LCS alignment
+SiteKey = tuple[str, str, str | None, str | None, int | None]
+
+
 def _fuzzy_align(
     run_ids: list[str],
     calls_per_run: list[list[CallRecord]],
     truncated_runs: list[str] | None,
 ) -> Alignment:
     n_runs = len(run_ids)
-    Site = tuple  # (module, qualname, ufunc_method, file, lineno)
-    sites: dict[Site, list[list[CallRecord]]] = {}
-    site_order: list[Site] = []
+    sites: dict[SiteKey, list[list[CallRecord]]] = {}
+    site_order: list[SiteKey] = []
     for run_index, calls in enumerate(calls_per_run):
         for call in calls:
-            site = call.key[:5]
+            site: SiteKey = (
+                call.module,
+                call.qualname,
+                call.ufunc_method,
+                call.source.file if call.source else None,
+                call.source.lineno if call.source else None,
+            )
             if site not in sites:
                 sites[site] = [[] for _ in range(n_runs)]
                 site_order.append(site)

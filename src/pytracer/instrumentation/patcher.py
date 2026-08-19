@@ -14,6 +14,7 @@ from __future__ import annotations
 import fnmatch
 import importlib
 import inspect
+import typing
 from dataclasses import dataclass, field
 
 import wrapt
@@ -91,16 +92,17 @@ def _resolve_one(spec: str, report: ResolutionReport, seen: set[tuple[int, str]]
         if module is None or used != len(parts) - 1:
             report.errors.append(f"{spec}: cannot import module {'.'.join(parts[:-1])!r}")
             return
+        mod_name = getattr(module, "__name__", "") or str(module)
         matches = 0
         for name in sorted(vars(module)):
             if name.startswith("_") or not fnmatch.fnmatch(name, pattern):
                 continue
             obj = vars(module)[name]
             if _classify(obj) is not None:
-                _add_target(f"{module.__name__}.{name}", module, name, obj, report, seen)
+                _add_target(f"{mod_name}.{name}", module, name, obj, report, seen)
                 matches += 1
         if matches == 0:
-            report.errors.append(f"{spec}: no matching callables in {module.__name__}")
+            report.errors.append(f"{spec}: no matching callables in {mod_name}")
         return
 
     module, used = _import_prefix(parts)
@@ -211,4 +213,4 @@ class Patcher:
                 kwargs=kwargs,
             )
 
-        return wrapt.FunctionWrapper(target.original, _traced)
+        return wrapt.FunctionWrapper(typing.cast(typing.Any, target.original), _traced)

@@ -39,7 +39,9 @@ class TracedUfunc(wrapt.ObjectProxy):
         )
 
     def __call__(self, *args, **kwargs):
-        inplace = kwargs.get("out") is not None
+        inplace = (kwargs.get("out") is not None) or (
+            len(args) > getattr(self.__wrapped__, "nin", 1)
+        )
         return self._self_record("__call__", self.__wrapped__, args, kwargs, inplace)
 
     def reduce(self, *args, **kwargs):
