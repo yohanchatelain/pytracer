@@ -13,8 +13,6 @@ Expected: `forward_diff_tiny_h` shows few significant bits;
 `central_diff_optimal_h` tracks the input perturbation.
 """
 
-import math
-
 import numpy as np
 
 import pytracer
