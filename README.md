@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="images/logo.png" alt="Pytracer Logo" width="260">
+  <img src="images/logo.png" alt="Pytracer Logo" width="240">
 </p>
 
 <h1 align="center">Pytracer</h1>
@@ -17,170 +17,142 @@
 
 ---
 
-**Pytracer is an observability and profiling layer for numerical stability.** It runs your Python scientific workloads under perturbed arithmetic (e.g. stochastic arithmetic via [Verificarlo](https://github.com/verificarlo/verificarlo), [Verrou](https://github.com/edf-hpc/verrou), or fuzzy libmath), records input/output distributions across repeated executions, aligns call sequences, and pinpoints **which functions destroy significant digits, amplify numerical noise, or cause control-flow divergence**.
+**Pytracer** profiles numerical stability across repeated executions of Python scientific workloads (under stochastic arithmetic such as [Verificarlo](https://github.com/verificarlo/verificarlo) / [Verrou](https://github.com/edf-hpc/verrou), seed rotation, or input perturbation). It captures function and array boundaries across 5 instrumentation tiers, aligns call sequences across runs, and ranks functions by **digit-loss amplification** ($\min \text{sig}_{\text{in}} - \min \text{sig}_{\text{out}}$) to pinpoint the exact callsites that destroy floating-point precision or trigger control-flow divergence.
 
-> **Note**: This is Pytracer 2, a clean-slate rewrite designed for modern Python (≥ 3.12). Legacy Pytracer 1 traces and configuration are archived in the repository history.
+## Table of Contents
+
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Python API](#python-api)
+- [CLI Cheat Sheet](#cli-cheat-sheet)
+- [Documentation (`docs/`)](#documentation)
+- [Development](#development)
+- [Citation](#citation)
+- [License](#license)
+
+---
+
+## Installation
+
+Requires **Python $\ge$ 3.12** ([`uv`](https://github.com/astral-sh/uv) recommended):
+
+```bash
+uv venv && source .venv/bin/activate
+uv pip install -e ".[all]"
+```
+
+Optional extras can be installed selectively: `pytracer[arrays]` (Zarr storage), `pytracer[plugins]` (scikit-learn), `pytracer[sig]` (`significantdigits`), `pytracer[gui]` (Dash/Plotly dashboard), or `pytracer[dev]`.
 
 ---
 
 ## Quick Start
 
-### 1. Installation
-
-Pytracer recommends [**`uv`**](https://github.com/astral-sh/uv) for fast, reliable environment management:
-
 ```bash
-# Create and activate virtual environment
-uv venv
-source .venv/bin/activate
+# 1. Run 5 independent repetitions on a script (pass script arguments after --)
+pytracer run examples/cancellation.py --repeat 5
 
-# Install pytracer in editable mode with all extras
-uv pip install -e ".[all]"
-```
+# 2. Inspect reports (Markdown, HTML, and machine-readable JSON)
+cat .pytracer/runs/latest/report/report.md
+cat .pytracer/runs/latest/analysis/top_unstable.json
 
-### 2. Run Tracing & Generate Report
+# 3. Gate CI on minimum significant bits (24 bits ≈ float32) and NaN/Inf absence
+pytracer check .pytracer/runs/latest --min-sig-bits 24 --no-nan --no-inf
 
-```bash
-# Run 5 independent perturbed repetitions on a numerical pathology example
-uv run pytracer run examples/cancellation.py --repeat 5
-
-# Open the generated standalone HTML report
-open .pytracer/runs/latest/report/report.html
-```
-
-### 3. Launch Interactive Dashboard
-
-```bash
-uv run pytracer dashboard .pytracer/runs/latest
+# 4. Launch the interactive Dash/Plotly web dashboard
+pytracer dashboard .pytracer/runs/latest
 ```
 
 ---
 
-## How It Works
+## Python API
 
-```
-Instrumentation Tiers (T1–T5) ──► Event Stream ──► Append-Safe JSONL ──► Parquet Archive
-                                                            │
-                                                            ▼
-Reports & Dashboard ◄── Aggregation & Digit Attribution ◄── Call Alignment (LCS)
-```
+Importing `pytracer` has zero side effects and acts as a no-op outside `pytracer run`:
 
-- **Subprocess Isolation**: Every repetition executes in an independent, fresh subprocess; instrumentation hooks attach before user scripts import.
-- **5-Tier Instrumentation Stack**:
-  - **T1 (Functions & Methods)**: Boundary patching with transparent `wrapt` wrappers.
-  - **T2 (NumPy Ufuncs)**: Dedicated proxy intercepting `__call__`, `reduce`, `accumulate`, `outer`, `at`, and `out=` in-place writes while preserving `isinstance(..., np.ufunc)`.
-  - **T3 (Tracer Arrays / Taint Mode)**: `TracedArray` protocol wrapping for `a + b`, `@` matmul syntax, and unpatched third-party code.
-  - **T4 (PEP 669 Runtime Monitor)**: `sys.monitoring` census of untraced C-callables and per-line branch divergence.
-  - **T5 (Native BLAS Shim)**: Zero-overhead C shim via `LD_PRELOAD` interposing GEMM/GESV across LP64/ILP64 libraries.
-- **Sequence Alignment**: Deterministic callsite hashing and Longest Common Subsequence (LCS) matching to prevent cascade misalignment during loop divergence.
-- **Digit-Loss Attribution**: Evaluates **amplification bits** ($\min \text{sig}_{\text{in}} - \min \text{sig}_{\text{out}}$) to separate true precision destroyers from victim functions.
+```python
+import numpy as np
+import pytracer
+
+@pytracer.trace_function
+def custom_step(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """Explicitly traced (Tier T1) when executed under `pytracer run`."""
+    return np.linalg.solve(a, b)
+
+def operator_pipeline(x: np.ndarray) -> np.ndarray:
+    """Wrap array in TracedArray (Tier T3) to trace +, -, @, and ufuncs."""
+    tx = pytracer.taint(x)
+    return (tx @ tx.T) + 1e-6
+```
 
 ---
 
-## Metric & Coverage Honesty
+## CLI Cheat Sheet
 
-- **Element-wise vs Summary Proxy**:
-  - `element`: Element-wise significant bits evaluated across captured `.npy` / `.zarr` array payloads (`store_arrays = "auto"`).
-  - `summary`: `sig(mean)` proxy when payloads are omitted; prominently marked in reports so scalar summaries are never confused with full array stability.
-- **Declared Blind Spots**: Pytracer explicitly reports calls observed versus calls traced, and documents C extensions and operator dispatch blind spots in its coverage ledger.
+All commands accept `-c / --config PATH` (defaults to `./pytracer.toml` if present). See **[`docs/cli-and-config.md`](docs/cli-and-config.md)** for all flags.
 
----
-
-## CLI Reference
-
-| Command | Description |
+| Command | Purpose |
 |---|---|
-| `pytracer init` | Generate a default `pytracer.toml` configuration |
-| `pytracer run SCRIPT [opts]` | Execute repeated runs under tracing (`--repeat N`, `--target`, `--plugins`) |
-| `pytracer analyze EXP_DIR` | Recompute sequence alignment and statistical aggregations |
-| `pytracer report EXP_DIR` | (Re)generate HTML, Markdown, and JSON summary reports |
-| `pytracer check EXP_DIR` | CI gating: exit nonzero on precision loss (`--min-sig-bits`, `--max-divergence`) |
-| `pytracer diff EXP_A EXP_B` | A/B regression detection between two experiments |
-| `pytracer dashboard EXP_DIR` | Multi-tab interactive Dash app (Explorer, Call Graph, Timeline, Coverage) |
-| `pytracer export EXP_DIR` | Export execution spans to Chrome / [Perfetto](https://ui.perfetto.dev) trace format |
-| `pytracer suggest-targets EXP` | Suggest target candidates from the T4 C-callable census |
-| `pytracer plugins list` | List available domain target plugins (`numpy`, `scipy`, `sklearn`) |
-| `pytracer doctor` | Verify interpreter, sys.monitoring, BLAS, and compiler environment |
+| `pytracer init [--force]` | Write a starter `pytracer.toml` in the current directory |
+| `pytracer run SCRIPT [opts] [-- ARGS...]` | Run `N` isolated repetitions (`--repeat N`), align, analyze, and report |
+| `pytracer analyze EXP_DIR` | (Re)compute sequence alignment (`strict`, `callsite`, `fuzzy`) and aggregations |
+| `pytracer report EXP_DIR` | (Re)generate `markdown`, `html`, and `json` reports |
+| `pytracer check EXP_DIR [opts]` | CI gate: exit `1` on precision loss, divergence, or NaN/Inf instability |
+| `pytracer diff EXP_A EXP_B` | Compare baseline (`A`) vs. candidate (`B`) experiments (`--fail-on-regression`) |
+| `pytracer dashboard EXP_DIR` | Launch interactive web UI (`--compare EXP_B` for A/B view) |
+| `pytracer export EXP_DIR` | Export call spans to Chrome / [Perfetto](https://ui.perfetto.dev) trace JSON |
+| `pytracer suggest-targets EXP_DIR` | Suggest `targets = [...]` from the Tier 4 `sys.monitoring` C-callable census |
+| `pytracer plugins {list,targets} [NAME]` | List built-in plugins (`numpy`, `scipy`, `sklearn`) or their traced targets |
+| `pytracer config {show,validate}` | Print resolved config as JSON or validate `pytracer.toml` |
+| `pytracer doctor` | Check Python version, `sys.monitoring`, BLAS/compiler, and `VFC_*` environment |
 | `pytracer clean` | Remove `.pytracer/runs/` experiment directories |
 
 ---
 
-## Configuration (`pytracer.toml`)
+## Documentation
 
-```toml
-[trace]
-plugins = ["numpy", "scipy"]
-targets = ["numpy.linalg.*", "scipy.linalg.solve"]
-instrumentation = "hybrid"      # hybrid | patch | monitor | taint
-mode = "summary"                # summary | metadata
-capture_backtrace = true
-store_arrays = "auto"           # auto | always | never
-array_store_threshold = 100000
-array_backend = "auto"          # auto | zarr | npy
+Detailed guides live in **[`docs/`](docs/README.md)** to keep this README concise:
 
-[storage]
-output_dir = ".pytracer/runs"
-
-[analysis]
-alignment = "callsite"          # callsite | fuzzy | strict
-
-[report]
-formats = ["markdown", "html", "json"]
-
-# Dynamic environment substitution per run for perturbation engines
-# [perturb.env]
-# VFC_BACKENDS = "libinterflop_mca.so --mode=mca --seed={run_index}"
-```
-
----
-
-## Examples Gallery
-
-The `examples/` directory contains paired implementations of classical numerical accuracy pathologies and their stable remediations:
-
-- **Catastrophic Cancellation**: Naive variance vs Welford's algorithm (`cancellation.py`).
-- **Quadratic Formula**: Standard formula vs stable alternate root formula.
-- **Ill-Conditioning**: Hilbert matrix solve vs Tikhonov regularization.
-- **Summation Order**: Non-associative naive sum vs Kahan compensated summation.
-- **Finite Differences**: Step-size dilemma vs central difference / complex step.
-- **Verificarlo MCA**: Ready-to-run Monte Carlo Arithmetic profiling workflow (`examples/verificarlo/`).
-
----
-
-## Overhead
-
-Measured with `uv run python benchmarks/bench.py`:
-
-| Workload | Tier | Overhead | Throughput |
-|---|---|---|---|
-| 20k tiny `numpy.sum` calls | T1 | ~110x (~190 µs/call) | ~12k–16k events/s |
-| 2M-element `numpy.sum` calls | T1 | ~13x–28x | Summary stats dominate |
-| Operator loop under taint | T3 | ~260x–300x | Drill-down tier by design |
+| Document | Contents |
+|---|---|
+| **[CLI & Configuration Reference](docs/cli-and-config.md)** | Full CLI flag reference, `pytracer.toml` schema, `pytracer-thresholds.toml`, and Verificarlo/Verrou perturbation templates |
+| **[Architecture & Metrics](docs/architecture-and-metrics.md)** | 5-tier instrumentation (`T1`–`T5`), call-sequence alignment (`strict`, `callsite`, `fuzzy` LCS), `element` vs. `summary` significant bits, amplification bits, and blind spots |
+| **[Agent & Data Format Guide](docs/agent-and-data-guide.md)** | Non-interactive diagnostic workflows for AI agents & CI, exit codes, `.pytracer/runs/<id>/` directory layout, and JSON/Parquet schemas |
+| **[Interactive Dashboard Guide](docs/dashboard.md)** | Overview, Explorer, Call Graph, Timeline, Coverage, and Runs tabs, plus `--compare` A/B mode |
+| **[Examples Gallery](examples/README.md)** | Paired unstable vs. stable implementations of classical numerical pathologies (`examples/*.py` and `examples/verificarlo/`) |
 
 ---
 
 ## Development
 
 ```bash
-# Install all dependencies with uv
-uv pip install -e ".[all]"
+uv run ruff check src tests examples   # Lint
+uv run mypy src                        # Type-check
+uv run pytest -q                       # Unit & integration test suite
+uv run python benchmarks/bench.py      # Micro-benchmarks
+```
 
-# Run code linter
-uv run ruff check src tests
+---
 
-# Run static type checker
-uv run mypy src
+## Citation
 
-# Run test suite
-uv run pytest -q
+If you use Pytracer in your research, please cite the published paper:
 
-# Run micro-benchmarks
-uv run python benchmarks/bench.py --markdown
+> Yohan Chatelain, Nigel Yong, Gregory Kiar, and Tristan Glatard. “PyTracer: Automatically Profiling Numerical Instabilities in Python.” *IEEE Transactions on Computers*, 72(6):1792–1803, 2023. [https://doi.org/10.1109/TC.2022.3225929](https://doi.org/10.1109/TC.2022.3225929)
+
+```bibtex
+@article{chatelain2023pytracer,
+  author  = {Chatelain, Yohan and Yong, Nigel and Kiar, Gregory and Glatard, Tristan},
+  title   = {{PyTracer}: Automatically Profiling Numerical Instabilities in {Python}},
+  journal = {IEEE Transactions on Computers},
+  volume  = {72},
+  number  = {6},
+  pages   = {1792--1803},
+  year    = {2023},
+  doi     = {10.1109/TC.2022.3225929}
+}
 ```
 
 ---
 
 ## License
 
-Pytracer is licensed under the [MIT License](LICENSE).
-
+Pytracer is released under the [MIT License](LICENSE).
