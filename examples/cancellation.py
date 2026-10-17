@@ -11,6 +11,8 @@ Under a stochastic-arithmetic environment (Verificarlo, fuzzy), drop the RNG
 and the same structure localizes true floating-point instability.
 """
 
+import os
+
 import numpy as np
 
 import pytracer
@@ -27,7 +29,9 @@ def stable_variance(x):
 
 
 def main():
-    rng = np.random.default_rng()  # deliberately unseeded: per-run variability
+    run_id = os.environ.get("PYTRACER_RUN_ID", "")
+    seed = int(run_id.split("-")[-1]) if run_id.startswith("run-") else None
+    rng = np.random.default_rng(seed)  # per-run variability (deterministic per run_id)
     x = 1e8 + rng.standard_normal(10_000)
 
     naive = naive_variance(x)

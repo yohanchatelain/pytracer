@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use Pytracer, please cite the published paper."
+title: "PyTracer: Automatically Profiling Numerical Instabilities in Python"
+type: article
+authors:
+  - family-names: Chatelain
+    given-names: Yohan
+  - family-names: Yong
+    given-names: Nigel
+  - family-names: Kiar
+    given-names: Gregory
+  - family-names: Glatard
+    given-names: Tristan
+journal: IEEE Transactions on Computers
+volume: 72
+issue: 6
+pages: 1792--1803
+year: 2023
+doi: 10.1109/TC.2022.3225929

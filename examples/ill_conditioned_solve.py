@@ -13,6 +13,8 @@ Expected: `solve_hilbert` shows near-zero significant bits with large
 amplification; `solve_well_conditioned` tracks the input perturbation.
 """
 
+import os
+
 import numpy as np
 
 import pytracer
@@ -35,7 +37,9 @@ def solve_well_conditioned(b):
 
 
 def main():
-    rng = np.random.default_rng()  # unseeded: per-run perturbation of b
+    run_id = os.environ.get("PYTRACER_RUN_ID", "")
+    seed = int(run_id.split("-")[-1]) if run_id.startswith("run-") else None
+    rng = np.random.default_rng(seed)  # per-run perturbation of b
     n = 10
     b = np.ones(n) * (1.0 + rng.standard_normal(n) * 1e-12)
 

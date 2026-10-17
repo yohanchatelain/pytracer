@@ -1,0 +1,36 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build PyPI sdist and wheel
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip build twine
+      - name: Build sdist and wheel
+        run: |
+          python -m build
+          twine check dist/*
+      - name: Upload distribution artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pypi-dist
+          path: dist/*
+      - name: Attach assets to GitHub Release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" dist/* --clobber

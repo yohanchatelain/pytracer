@@ -18,6 +18,7 @@ Expected: `exact_fsum` at 53 bits; `naive_running_sum` far below it.
 """
 
 import math
+import os
 
 import numpy as np
 
@@ -43,7 +44,9 @@ def exact_fsum(x):
 
 
 def main():
-    rng = np.random.default_rng()  # unseeded: per-run shuffle only
+    run_id = os.environ.get("PYTRACER_RUN_ID", "")
+    seed = int(run_id.split("-")[-1]) if run_id.startswith("run-") else None
+    rng = np.random.default_rng(seed)  # per-run shuffle (deterministic per run_id)
     x = np.concatenate([
         np.array([1e14, -1e14]),
         np.random.default_rng(12345).standard_normal(20_000) * 1e4,

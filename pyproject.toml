@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pytracer"
-version = "2.0.0"
+version = "2.0.1"
 description = "Numerical variability profiler for Python scientific programs"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -59,6 +59,13 @@ Homepage = "https://github.com/yohanchatelain/pytracer"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pytracer"]
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "/paper",
+    "/.claude",
+    "/.github",
+]
 
 [tool.ruff]
 line-length = 100
