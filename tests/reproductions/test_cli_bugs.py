@@ -12,8 +12,6 @@ import os
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from pytracer.analysis.check import Thresholds, check_experiment
 from pytracer.cli.main import build_parser
 from pytracer.config.schema import PytracerConfig

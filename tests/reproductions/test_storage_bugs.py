@@ -9,6 +9,7 @@ Covers:
 - BUG-STORE-006: Zarr 2 vs 3 format incompatibilities and phantom numcodecs dependency
 """
 
+import importlib.util
 import tempfile
 import tomllib
 from pathlib import Path
@@ -58,6 +59,7 @@ def test_bug_store_001_parquet_payload_ref_omitted():
         )
 
 
+@pytest.mark.skipif(importlib.util.find_spec("zarr") is None, reason="zarr not installed")
 def test_bug_store_002_zarr3_contains_array_error_drops_payload():
     """Under Zarr 3.x, zarr.save() raises ContainsArrayError when writing to a path where an
 

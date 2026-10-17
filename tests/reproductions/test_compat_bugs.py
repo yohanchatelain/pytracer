@@ -6,6 +6,7 @@ Covers:
 - BUG-COMPAT-003: pytracer doctor reports Python < 3.12 as WARN instead of FAIL
 """
 
+import importlib.util
 import sys
 import tomllib
 import warnings
@@ -13,17 +14,19 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from dash import dash_table
 
 from pytracer.cli import doctor
 
 
+@pytest.mark.skipif(importlib.util.find_spec("dash") is None, reason="dash not installed")
 def test_bug_compat_001_dash_table_deprecation_strict_warnings():
     """In Dash 4.x, dash_table.DataTable is formally deprecated in favor of dash-ag-grid.
 
     Initializing dash_table.DataTable via pytracer's data_table helper must not emit
     DeprecationWarning under strict warning compliance (-W error::DeprecationWarning).
     """
+    from dash import dash_table
+
     from pytracer.dashboard.layout import data_table
 
     with warnings.catch_warnings(record=True) as recorded:
