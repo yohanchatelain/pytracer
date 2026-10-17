@@ -13,6 +13,8 @@ Expected: `expanded_poly` shows near-zero significant bits with large
 amplification; `factored_poly` tracks the input perturbation.
 """
 
+import os
+
 import numpy as np
 
 import pytracer
@@ -32,7 +34,9 @@ def factored_poly(x):
 
 
 def main():
-    rng = np.random.default_rng()  # unseeded: per-run perturbation of x
+    run_id = os.environ.get("PYTRACER_RUN_ID", "")
+    seed = int(run_id.split("-")[-1]) if run_id.startswith("run-") else None
+    rng = np.random.default_rng(seed)  # per-run perturbation of x
     x = (1.0 + 1e-4) * (1.0 + rng.standard_normal() * 1e-12)
 
     e = expanded_poly(x)

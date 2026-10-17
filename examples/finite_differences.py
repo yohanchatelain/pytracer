@@ -13,6 +13,8 @@ Expected: `forward_diff_tiny_h` shows few significant bits;
 `central_diff_optimal_h` tracks the input perturbation.
 """
 
+import os
+
 import numpy as np
 
 import pytracer
@@ -33,7 +35,9 @@ def central_diff_optimal_h(x):
 
 
 def main():
-    rng = np.random.default_rng()  # unseeded: per-run perturbation of x
+    run_id = os.environ.get("PYTRACER_RUN_ID", "")
+    seed = int(run_id.split("-")[-1]) if run_id.startswith("run-") else None
+    rng = np.random.default_rng(seed)  # per-run perturbation of x
     x = np.linspace(0.5, 1.5, 100) * (1.0 + rng.standard_normal() * 1e-8)
     exact = float(np.mean(np.cos(x)))
 

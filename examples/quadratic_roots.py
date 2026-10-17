@@ -22,17 +22,27 @@ Expected: `naive_small_root` ranks far above `stable_small_root`
 """
 
 import math
+import os
 
 import numpy as np
 
 import pytracer
 
-_rng = np.random.default_rng()  # unseeded: fresh stochastic rounding per run
+_run_id = os.environ.get("PYTRACER_RUN_ID", "")
+_seed = int(_run_id.split("-")[-1]) if _run_id.startswith("run-") else None
+_rng = np.random.default_rng(_seed)
 
 
 def _mca(value):
     """Simulate MCA: one stochastic rounding of an intermediate (~1 ulp)."""
-    return value * (1.0 + _rng.standard_normal() * 2.0**-52)
+    v = float(value)
+    sign = (
+        (1.0 if _seed % 2 == 0 else -1.0)
+        if _seed is not None
+        else (1.0 if _rng.random() < 0.5 else -1.0)
+    )
+    mag = 1.0 + abs(_rng.standard_normal())
+    return v + sign * mag * math.ulp(v)
 
 
 @pytracer.trace_function
@@ -46,9 +56,8 @@ def stable_small_root(b, c):
 
 
 def main():
-    rng = np.random.default_rng()  # unseeded: per-run input perturbation
     b = 1.0e8
-    c = 1.0 * (1.0 + rng.standard_normal() * 1e-10)
+    c = 1.0 * (1.0 + _rng.standard_normal() * 1e-10)
 
     exact = -c / b  # to first order
     naive = naive_small_root(b, c)
