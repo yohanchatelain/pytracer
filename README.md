@@ -180,7 +180,27 @@ uv run python benchmarks/bench.py --markdown
 
 ---
 
+## Citation
+
+If you use Pytracer, please cite the published paper:
+
+> Yohan Chatelain, Nigel Yong, Gregory Kiar, and Tristan Glatard. “PyTracer: Automatically Profiling Numerical Instabilities in Python.” *IEEE Transactions on Computers*, 72(6):1792–1803, 2023. [https://doi.org/10.1109/TC.2022.3225929](https://doi.org/10.1109/TC.2022.3225929)
+
+```bibtex
+@article{chatelain2023pytracer,
+  author  = {Chatelain, Yohan and Yong, Nigel and Kiar, Gregory and Glatard, Tristan},
+  title   = {{PyTracer}: Automatically Profiling Numerical Instabilities in {Python}},
+  journal = {IEEE Transactions on Computers},
+  volume  = {72},
+  number  = {6},
+  pages   = {1792--1803},
+  year    = {2023},
+  doi     = {10.1109/TC.2022.3225929}
+}
+```
+
+---
+
 ## License
 
 Pytracer is licensed under the [MIT License](LICENSE).
-
