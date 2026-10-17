@@ -12,6 +12,8 @@ import inspect
 import time
 from typing import Any
 
+import numpy as np
+
 from pytracer.instrumentation.call_context import CallContext
 from pytracer.trace.event import SCHEMA_VERSION, NumericSummary, SourceRef, TraceEvent
 from pytracer.trace.summary import summarize_value
@@ -123,8 +125,21 @@ class Recorder:
         self.writer.write_event(event)
 
     @staticmethod
-    def _bind_arguments(bind_with, args, kwargs) -> dict[str, object]:
+    def _bind_arguments(bind_with, args, kwargs, instance: Any = None) -> dict[str, object]:
         if bind_with is not None:
+            if instance is not None and not inspect.ismethod(bind_with):
+                try:
+                    sig = _cached_signature(bind_with)
+                    bound = sig.bind(instance, *args, **kwargs)
+                    arguments = dict(bound.arguments)
+                    first_param = next(iter(sig.parameters), None)
+                    if first_param and arguments.get(first_param) is instance:
+                        arguments.pop(first_param, None)
+                    else:
+                        arguments.pop("self", None)
+                    return arguments
+                except (ValueError, TypeError):
+                    pass
             try:
                 sig = _cached_signature(bind_with)
                 bound = sig.bind(*args, **kwargs)
@@ -154,6 +169,7 @@ class Recorder:
         wrapped,
         args,
         kwargs,
+        instance: Any = None,
         ufunc_method: str | None = None,
         inplace: bool = False,
         bind_with=_BIND_WITH_WRAPPED,
@@ -190,7 +206,10 @@ class Recorder:
                     source=source,
                     inplace=inplace,
                 )
-                for name, value in self._bind_arguments(bind_with, args, kwargs).items():
+                bound_args = self._bind_arguments(
+                    bind_with, args, kwargs, instance=instance
+                )
+                for name, value in bound_args.items():
                     self._emit(phase="input", arg_name=name, value=value, **common)
         except Exception:
             # Never let recording break the traced call: run it untraced.
@@ -215,7 +234,20 @@ class Recorder:
 
         try:
             with ctx.guard():
-                for name, value in self._output_items(result):
+                output_items = self._output_items(result)
+                if (inplace or ufunc_method == "at") and (
+                    result is None or output_items == [("Ret", None)]
+                ):
+                    target = kwargs.get("out")
+                    if target is None:
+                        nin = getattr(wrapped, "nin", None)
+                        if nin is not None and len(args) > nin and args[nin] is not None:
+                            target = args[nin]
+                        elif args and isinstance(args[0], np.ndarray):
+                            target = args[0]
+                    if target is not None:
+                        output_items = self._output_items(target)
+                for name, value in output_items:
                     self._emit(phase="output", arg_name=name, value=value, **common)
         except Exception:
             pass

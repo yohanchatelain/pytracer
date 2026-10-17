@@ -38,23 +38,46 @@ class TracedUfunc(wrapt.ObjectProxy):
             inplace=inplace,
         )
 
+    @staticmethod
+    def _has_out(val) -> bool:
+        if val is None:
+            return False
+        if isinstance(val, tuple):
+            return any(v is not None for v in val)
+        return True
+
     def __call__(self, *args, **kwargs):
-        inplace = (kwargs.get("out") is not None) or (
-            len(args) > getattr(self.__wrapped__, "nin", 1)
-        )
-        return self._self_record("__call__", self.__wrapped__, args, kwargs, inplace)
+        nin = getattr(self.__wrapped__, "nin", 1)
+        has_pos_out = len(args) > nin and any(self._has_out(a) for a in args[nin:])
+        has_kw_out = self._has_out(kwargs.get("out"))
+        inplace = bool(has_pos_out or has_kw_out)
+        return self._self_record("__call__", self.__wrapped__, args, kwargs, inplace=inplace)
 
     def reduce(self, *args, **kwargs):
-        return self._self_record("reduce", self.__wrapped__.reduce, args, kwargs)
+        inplace = self._has_out(kwargs.get("out")) or (
+            len(args) > 3 and self._has_out(args[3])
+        )
+        return self._self_record("reduce", self.__wrapped__.reduce, args, kwargs, inplace=inplace)
 
     def reduceat(self, *args, **kwargs):
-        return self._self_record("reduceat", self.__wrapped__.reduceat, args, kwargs)
+        inplace = self._has_out(kwargs.get("out")) or (
+            len(args) > 4 and self._has_out(args[4])
+        )
+        return self._self_record(
+            "reduceat", self.__wrapped__.reduceat, args, kwargs, inplace=inplace
+        )
 
     def accumulate(self, *args, **kwargs):
-        return self._self_record("accumulate", self.__wrapped__.accumulate, args, kwargs)
+        inplace = self._has_out(kwargs.get("out")) or (
+            len(args) > 3 and self._has_out(args[3])
+        )
+        return self._self_record(
+            "accumulate", self.__wrapped__.accumulate, args, kwargs, inplace=inplace
+        )
 
     def outer(self, *args, **kwargs):
-        return self._self_record("outer", self.__wrapped__.outer, args, kwargs)
+        inplace = self._has_out(kwargs.get("out"))
+        return self._self_record("outer", self.__wrapped__.outer, args, kwargs, inplace=inplace)
 
     def at(self, *args, **kwargs):
         return self._self_record("at", self.__wrapped__.at, args, kwargs, inplace=True)

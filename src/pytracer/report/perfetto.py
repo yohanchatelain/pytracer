@@ -38,8 +38,9 @@ def _call_spans(events: list[TraceEvent]) -> list[dict]:
         span["end"] = max(span["end"], ev.ts_ns)
         if ev.phase == "exception":
             span["exception"] = ev.note
-        elif ev.summary is not None and ev.arg_name:
-            span["args"][f"{ev.phase}:{ev.arg_name}"] = {
+        elif ev.summary is not None:
+            arg_key = ev.arg_name or ("Ret" if ev.phase == "output" else "Arg")
+            span["args"][f"{ev.phase}:{arg_key}"] = {
                 "dtype": ev.summary.dtype,
                 "shape": list(ev.summary.shape),
                 "mean": ev.summary.mean,

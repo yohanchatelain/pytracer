@@ -145,6 +145,21 @@ void dgemm_(const char *ta, const char *tb, const int *m, const int *n,
     fn(ta, tb, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc, lta, ltb);
 }
 
+typedef void (*f_sgemm32_t)(const char *, const char *, const int *,
+                            const int *, const int *, const float *,
+                            const float *, const int *, const float *,
+                            const int *, const float *, float *, const int *,
+                            size_t, size_t);
+void sgemm_(const char *ta, const char *tb, const int *m, const int *n,
+            const int *k, const float *alpha, const float *a, const int *lda,
+            const float *b, const int *ldb, const float *beta, float *c,
+            const int *ldc, size_t lta, size_t ltb) {
+    static f_sgemm32_t fn = NULL;
+    if (!fn) fn = (f_sgemm32_t)resolve("sgemm_", (void *)sgemm_);
+    log_call("sgemm_", *m, *n, *k);
+    fn(ta, tb, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc, lta, ltb);
+}
+
 typedef void (*f_dgesv32_t)(const int *, const int *, double *, const int *,
                             int *, double *, const int *, int *);
 void dgesv_(const int *n, const int *nrhs, double *a, const int *lda,
@@ -170,6 +185,22 @@ void scipy_dgemm_64_(const char *ta, const char *tb, const int64_t *m,
     static f_dgemm64_t fn = NULL;
     if (!fn) fn = (f_dgemm64_t)resolve("scipy_dgemm_64_", (void *)scipy_dgemm_64_);
     log_call("scipy_dgemm_64_", (long long)*m, (long long)*n, (long long)*k);
+    fn(ta, tb, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc, lta, ltb);
+}
+
+typedef void (*f_sgemm64_t)(const char *, const char *, const int64_t *,
+                            const int64_t *, const int64_t *, const float *,
+                            const float *, const int64_t *, const float *,
+                            const int64_t *, const float *, float *,
+                            const int64_t *, size_t, size_t);
+void scipy_sgemm_64_(const char *ta, const char *tb, const int64_t *m,
+                     const int64_t *n, const int64_t *k, const float *alpha,
+                     const float *a, const int64_t *lda, const float *b,
+                     const int64_t *ldb, const float *beta, float *c,
+                     const int64_t *ldc, size_t lta, size_t ltb) {
+    static f_sgemm64_t fn = NULL;
+    if (!fn) fn = (f_sgemm64_t)resolve("scipy_sgemm_64_", (void *)scipy_sgemm_64_);
+    log_call("scipy_sgemm_64_", (long long)*m, (long long)*n, (long long)*k);
     fn(ta, tb, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc, lta, ltb);
 }
 

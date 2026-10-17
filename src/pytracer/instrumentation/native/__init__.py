@@ -16,8 +16,16 @@ from pathlib import Path
 
 NATIVE_LOG_FILENAME = "native_kernels.log"
 
-_GEMM_SYMBOLS = ("cblas_dgemm", "cblas_sgemm", "dgemm_",
-                 "scipy_cblas_dgemm64_", "scipy_cblas_sgemm64_", "scipy_dgemm_64_")
+_GEMM_SYMBOLS = (
+    "cblas_dgemm",
+    "cblas_sgemm",
+    "dgemm_",
+    "sgemm_",
+    "scipy_cblas_dgemm64_",
+    "scipy_cblas_sgemm64_",
+    "scipy_dgemm_64_",
+    "scipy_sgemm_64_",
+)
 
 
 def shim_source() -> Path:

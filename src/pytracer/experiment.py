@@ -77,7 +77,9 @@ def run_experiment(
     repeat: int,
     continue_on_error: bool = False,
     env_overrides: dict[str, str] | None = None,
+    cwd: str | Path | None = None,
 ) -> ExperimentResult:
+    proc_cwd = str(Path(cwd).resolve()) if cwd is not None else str(Path.cwd())
     script_path = Path(script).resolve()
     if not script_path.is_file():
         raise ExperimentError(f"script not found: {script}")
@@ -153,7 +155,7 @@ def run_experiment(
         proc = subprocess.run(
             [sys.executable, "-m", "pytracer._bootstrap", str(spec_path)],
             env=env,
-            cwd=str(script_path.parent),
+            cwd=proc_cwd,
         )
         result.runs.append(RunResult(run_id=run_id, run_dir=run_dir, exit_code=proc.returncode))
         if proc.returncode != 0 and not continue_on_error:

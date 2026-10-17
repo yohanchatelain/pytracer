@@ -12,19 +12,44 @@ from pytracer import __version__
 from pytracer._errors import PytracerError
 
 
+class _ConfigAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        setattr(namespace, self.dest, values)
+        namespace.config_path = Path(values) if values is not None else None
+
+
 def build_parser() -> argparse.ArgumentParser:
+    config_parser = argparse.ArgumentParser(add_help=False)
+    config_parser.add_argument(
+        "-c", "--config",
+        dest="config",
+        action=_ConfigAction,
+        default=argparse.SUPPRESS,
+        help="Path to pytracer TOML configuration file",
+    )
+
     parser = argparse.ArgumentParser(
         prog="pytracer",
         description="Numerical variability profiler for Python scientific programs",
     )
+    parser.add_argument(
+        "-c", "--config",
+        dest="config",
+        action=_ConfigAction,
+        default=None,
+        help="Path to pytracer TOML configuration file",
+    )
+    parser.set_defaults(config=None, config_path=None)
     parser.add_argument("--version", action="version", version=f"pytracer {__version__}")
     sub = parser.add_subparsers(dest="command")
 
-    p_init = sub.add_parser("init", help="write a default pytracer.toml")
+    p_init = sub.add_parser("init", parents=[config_parser], help="write a default pytracer.toml")
     p_init.add_argument("--force", action="store_true", help="overwrite an existing file")
 
     p_run = sub.add_parser(
-        "run", help="trace a script over repeated runs, analyze, and report"
+        "run",
+        parents=[config_parser],
+        help="trace a script over repeated runs, analyze, and report",
     )
     p_run.add_argument("script", help="Python script to trace")
     p_run.add_argument("--repeat", type=int, default=1, help="number of independent runs")
@@ -50,33 +75,48 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_run.add_argument("--continue-on-error", action="store_true")
     p_run.add_argument("--no-report", action="store_true", help="skip analysis and report")
+    p_run.add_argument("--cwd", default=None, help="working directory for script execution")
     # Script arguments are passed after a literal `--`; they are split off
     # before parsing (argparse.REMAINDER would swallow pytracer's own options).
 
-    p_analyze = sub.add_parser("analyze", help="align and aggregate an experiment")
+    p_analyze = sub.add_parser(
+        "analyze", parents=[config_parser], help="align and aggregate an experiment"
+    )
     p_analyze.add_argument("experiment_dir")
     p_analyze.add_argument("--alignment", choices=["strict", "callsite", "fuzzy"],
                            default="callsite")
 
-    p_report = sub.add_parser("report", help="generate reports for an analyzed experiment")
+    p_report = sub.add_parser(
+        "report", parents=[config_parser], help="generate reports for an analyzed experiment"
+    )
     p_report.add_argument("experiment_dir")
     p_report.add_argument("--formats", nargs="*", default=None,
                           choices=["markdown", "html", "json"])
 
-    p_config = sub.add_parser("config", help="show or validate configuration")
+    p_config = sub.add_parser(
+        "config", parents=[config_parser], help="show or validate configuration"
+    )
     p_config.add_argument("action", choices=["show", "validate"])
 
-    p_plugins = sub.add_parser("plugins", help="list plugins or their targets")
+    p_plugins = sub.add_parser(
+        "plugins", parents=[config_parser], help="list plugins or their targets"
+    )
     p_plugins.add_argument("action", choices=["list", "targets"])
     p_plugins.add_argument("name", nargs="?", help="plugin name (for targets)")
 
-    sub.add_parser("doctor", help="check the environment and configuration")
+    sub.add_parser(
+        "doctor", parents=[config_parser], help="check the environment and configuration"
+    )
 
-    p_clean = sub.add_parser("clean", help="delete pytracer experiment directories")
+    p_clean = sub.add_parser(
+        "clean", parents=[config_parser], help="delete pytracer experiment directories"
+    )
     p_clean.add_argument("--output-dir", default=None)
 
     p_check = sub.add_parser(
-        "check", help="gate on stability thresholds (nonzero exit on violation)"
+        "check",
+        parents=[config_parser],
+        help="gate on stability thresholds (nonzero exit on violation)",
     )
     p_check.add_argument("experiment_dir")
     p_check.add_argument("--min-sig-bits", type=float, default=None)
@@ -88,7 +128,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="thresholds TOML (default: ./pytracer-thresholds.toml when present)",
     )
 
-    p_diff = sub.add_parser("diff", help="compare two experiments (A/B)")
+    p_diff = sub.add_parser("diff", parents=[config_parser], help="compare two experiments (A/B)")
     p_diff.add_argument("experiment_a")
     p_diff.add_argument("experiment_b")
     p_diff.add_argument(
@@ -101,12 +141,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     p_suggest = sub.add_parser(
-        "suggest-targets", help="suggest --target entries from the monitor census"
+        "suggest-targets",
+        parents=[config_parser],
+        help="suggest --target entries from the monitor census",
     )
     p_suggest.add_argument("experiment_dir")
     p_suggest.add_argument("--top", type=int, default=15)
 
-    p_dash = sub.add_parser("dashboard", help="interactive dashboard (needs [gui] extra)")
+    p_dash = sub.add_parser(
+        "dashboard",
+        parents=[config_parser],
+        help="interactive dashboard (needs [gui] extra)",
+    )
     p_dash.add_argument("experiment_dir")
     p_dash.add_argument(
         "--compare", default=None, help="second experiment directory for A/B comparison"
@@ -115,7 +161,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_dash.add_argument("--port", type=int, default=8050)
     p_dash.add_argument("--debug", action="store_true")
 
-    p_export = sub.add_parser("export", help="export the experiment timeline")
+    p_export = sub.add_parser(
+        "export", parents=[config_parser], help="export the experiment timeline"
+    )
     p_export.add_argument("experiment_dir")
     p_export.add_argument("--format", choices=["perfetto"], default="perfetto")
     p_export.add_argument("-o", "--output", default=None)
@@ -123,10 +171,11 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _load_config():
+def _load_config(args: argparse.Namespace | None = None):
     from pytracer.config.loader import load_config
 
-    return load_config()
+    path = getattr(args, "config_path", None) or getattr(args, "config", None)
+    return load_config(path=path)
 
 
 def cmd_init(args) -> int:
@@ -144,7 +193,7 @@ def cmd_run(args) -> int:
     from pytracer.report.model import build_report_data
     from pytracer.report.render import terminal_summary, write_reports
 
-    config = _load_config()
+    config = _load_config(args)
     if args.plugins is not None:
         config.trace.plugins = args.plugins
     if args.target:
@@ -180,6 +229,7 @@ def cmd_run(args) -> int:
         target_specs=specs,
         repeat=args.repeat,
         continue_on_error=args.continue_on_error,
+        cwd=getattr(args, "cwd", None),
     )
     for warning in result.warnings:
         print(f"warning: {warning}", file=sys.stderr)
@@ -225,7 +275,7 @@ def cmd_report(args) -> int:
     from pytracer.report.model import build_report_data
     from pytracer.report.render import terminal_summary, write_reports
 
-    config = _load_config()
+    config = _load_config(args)
     formats = args.formats or config.report.formats
     data = build_report_data(args.experiment_dir)
     written = write_reports(args.experiment_dir, data, formats)
@@ -236,7 +286,7 @@ def cmd_report(args) -> int:
 
 
 def cmd_config(args) -> int:
-    config = _load_config()
+    config = _load_config(args)
     if args.action == "show":
         print(json.dumps(config.to_dict(), indent=2))
     else:
@@ -263,10 +313,11 @@ def cmd_plugins(args) -> int:
     return 0
 
 
-def cmd_doctor(_args) -> int:
+def cmd_doctor(args) -> int:
     from pytracer.cli.doctor import exit_code, format_checks, run_checks
 
-    checks = run_checks()
+    cfg = getattr(args, "config_path", None) or getattr(args, "config", None)
+    checks = run_checks(config_path=cfg)
     print("Pytracer doctor")
     print(format_checks(checks))
     return exit_code(checks)
@@ -275,7 +326,7 @@ def cmd_doctor(_args) -> int:
 def cmd_clean(args) -> int:
     from pytracer.experiment import find_experiments
 
-    config = _load_config()
+    config = _load_config(args)
     output_dir = Path(args.output_dir or config.storage.output_dir)
     experiments = find_experiments(output_dir)
     for experiment in experiments:

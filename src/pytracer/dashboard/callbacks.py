@@ -261,21 +261,21 @@ def register_callbacks(app, data: ExperimentData) -> None:
         Input("callgraph-graph", "clickData"),
         Input("functions-table", "active_cell"),
         State("functions-table", "data"),
+        State("functions-table", "derived_viewport_data"),
         State("explorer-functions", "value"),
         prevent_initial_call=True,
     )
-    def open_in_explorer(amp_click, graph_click, active_cell, table_data, current):
+    def open_in_explorer(
+        amp_click, graph_click, active_cell, table_data, viewport_data, current
+    ):
         from dash import ctx
 
         if ctx.triggered_id == "amp-chart":
             function = (amp_click or {}).get("points", [{}])[0].get("y")
         elif ctx.triggered_id == "functions-table":
-            if not active_cell or not table_data:
+            function = resolve_active_table_function(active_cell, table_data, viewport_data)
+            if not function:
                 raise PreventUpdate
-            row_idx = active_cell.get("row")
-            if row_idx is None or row_idx >= len(table_data):
-                raise PreventUpdate
-            function = table_data[row_idx].get("function")
         else:
             point = (graph_click or {}).get("points", [{}])[0]
             function = point.get("customdata")
@@ -288,4 +288,19 @@ def register_callbacks(app, data: ExperimentData) -> None:
 
     # keep dcc import referenced (dash requires component registration)
     _ = dcc
+
+
+def resolve_active_table_function(
+    active_cell: dict | None,
+    table_data: list[dict] | None,
+    viewport_data: list[dict] | None = None,
+) -> str | None:
+    """Resolve the function name clicked in a sorted/filtered Dash DataTable."""
+    rows = viewport_data if viewport_data is not None else table_data
+    if not active_cell or not rows:
+        return None
+    row_idx = active_cell.get("row")
+    if row_idx is None or row_idx < 0 or row_idx >= len(rows):
+        return None
+    return rows[row_idx].get("function")
 

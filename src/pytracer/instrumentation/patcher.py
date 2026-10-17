@@ -88,21 +88,42 @@ def _resolve_one(spec: str, report: ResolutionReport, seen: set[tuple[int, str]]
         if any("*" in p for p in parts[:-1]):
             report.errors.append(f"{spec}: wildcards are only supported in the last component")
             return
-        module, used = _import_prefix(parts[:-1])
-        if module is None or used != len(parts) - 1:
-            report.errors.append(f"{spec}: cannot import module {'.'.join(parts[:-1])!r}")
+        prefix_parts = parts[:-1]
+        module, used = _import_prefix(prefix_parts)
+        if module is None:
+            report.errors.append(f"{spec}: cannot import module {'.'.join(prefix_parts)!r}")
             return
-        mod_name = getattr(module, "__name__", "") or str(module)
+        remainder = prefix_parts[used:]
+        parent: object = module
+        for i, name in enumerate(remainder):
+            try:
+                parent = getattr(parent, name)
+            except AttributeError:
+                path = ".".join(prefix_parts[: used + i])
+                report.errors.append(f"{spec}: {path!r} has no attribute {name!r}")
+                return
+        prefix = ".".join(prefix_parts)
         matches = 0
-        for name in sorted(vars(module)):
+        names = sorted(dir(parent)) if isinstance(parent, type) else sorted(vars(parent))
+        for name in names:
             if name.startswith("_") or not fnmatch.fnmatch(name, pattern):
                 continue
-            obj = vars(module)[name]
+            if isinstance(parent, type):
+                try:
+                    static_val = inspect.getattr_static(parent, name)
+                    if isinstance(static_val, property):
+                        continue
+                except AttributeError:
+                    continue
+            try:
+                obj = getattr(parent, name)
+            except Exception:
+                continue
             if _classify(obj) is not None:
-                _add_target(f"{mod_name}.{name}", module, name, obj, report, seen)
+                _add_target(f"{prefix}.{name}", parent, name, obj, report, seen)
                 matches += 1
         if matches == 0:
-            report.errors.append(f"{spec}: no matching callables in {mod_name}")
+            report.errors.append(f"{spec}: no matching callables in {prefix}")
         return
 
     module, used = _import_prefix(parts)
@@ -211,6 +232,7 @@ class Patcher:
                 wrapped=wrapped,
                 args=args,
                 kwargs=kwargs,
+                instance=instance,
             )
 
         return wrapt.FunctionWrapper(typing.cast(typing.Any, target.original), _traced)

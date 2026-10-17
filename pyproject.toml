@@ -25,7 +25,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-arrays = ["zarr>=2.18", "numcodecs>=0.12"]
+arrays = ["zarr>=2.18"]
+plugins = [
+    "scikit-learn>=1.4.0",
+]
 sig = ["significantdigits>=0.2"]
 gui = ["dash>=2.17", "plotly>=5.22", "pandas>=2.1"]
 dev = [
@@ -36,7 +39,7 @@ dev = [
 ]
 all = [
     "zarr>=2.18",
-    "numcodecs>=0.12",
+    "scikit-learn>=1.4.0",
     "significantdigits>=0.2",
     "dash>=2.17",
     "plotly>=5.22",

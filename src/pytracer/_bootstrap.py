@@ -62,7 +62,7 @@ def run_from_spec(spec: dict) -> int:
         meta.unresolved_targets = report.errors
         patcher.patch(report.resolved)
 
-    monitor = Monitor(scope_dir=Path(script).resolve().parent, run_dir=run_dir)
+    monitor = Monitor(scope_dir=Path.cwd().resolve(), run_dir=run_dir)
     if instrumentation in ("hybrid", "monitor", "taint"):
         monitor.start()
         if not monitor.available:

@@ -46,6 +46,8 @@ def _round(value, digits=2):
 
 
 def data_table(dash_table, rows, columns, table_id, page_size=12, **overrides):
+    import warnings
+
     kwargs = {
         "sort_action": "native",
         "filter_action": "native" if len(rows) > page_size else "none",
@@ -53,12 +55,14 @@ def data_table(dash_table, rows, columns, table_id, page_size=12, **overrides):
         **TABLE_STYLE,
         **overrides,
     }
-    return dash_table.DataTable(
-        id=table_id,
-        data=[{c: _round(r.get(c)) for c in columns} for r in rows],
-        columns=[{"name": c.replace("_", " "), "id": c} for c in columns],
-        **kwargs,
-    )
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=DeprecationWarning)
+        return dash_table.DataTable(
+            id=table_id,
+            data=[{c: _round(r.get(c)) for c in columns} for r in rows],
+            columns=[{"name": c.replace("_", " "), "id": c} for c in columns],
+            **kwargs,
+        )
 
 
 def kpi(label, value, tone=None):

@@ -80,7 +80,7 @@ def format_diff(result: DiffResult, tolerance_bits: float = 1.0) -> str:
             note = "REGRESSION"
         elif row.sig_delta is not None and row.sig_delta > tolerance_bits:
             note = "improved"
-        if row.divergence_b != row.divergence_a:
+        if abs(row.divergence_b - row.divergence_a) > 1e-12:
             note = (note + " divergence-change").strip()
         lines.append(
             f"{row.function:<44s} {fmt(row.sig_a)} {fmt(row.sig_b)} "

@@ -25,4 +25,5 @@ def trace_function(wrapped, instance, args, kwargs):
         wrapped=wrapped,
         args=args,
         kwargs=kwargs,
+        instance=instance,
     )

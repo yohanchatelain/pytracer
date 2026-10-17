@@ -469,10 +469,13 @@ class ExperimentData:
             amp_a = fa.get("max_amplification_bits") if fa else None
             amp_b = fb.get("max_amplification_bits") if fb else None
 
+            div_a = fa.get("divergence_score", 0.0) if fa else 0.0
+            div_b = fb.get("divergence_score", 0.0) if fb else 0.0
+
             delta_sig: float | None = None
             if sig_a is not None and sig_b is not None:
                 delta_sig = round(sig_b - sig_a, 2)
-                if delta_sig < -3.0:
+                if delta_sig < -3.0 or abs(div_b - div_a) > 1e-12:
                     status = "regression"
                 elif delta_sig > 3.0:
                     status = "improvement"

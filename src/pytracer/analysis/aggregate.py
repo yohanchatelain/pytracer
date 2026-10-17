@@ -36,6 +36,8 @@ def sig_bits(values: list[float]) -> float | None:
     clean = [v for v in values if v is not None and math.isfinite(v)]
     if len(clean) < 2:
         return None
+    if len(clean) < len(values):
+        return 0.0
     n = len(clean)
     mean = sum(clean) / n
     var = sum((v - mean) ** 2 for v in clean) / n
@@ -181,8 +183,10 @@ def aggregate(alignment: Alignment, run_dirs: list[Path] | None = None) -> Aggre
                 if element is not None:
                     f["element_based"] = True
 
-                nan_var = len({s.nan_count for s in summaries}) > 1
-                inf_var = len({s.inf_count for s in summaries}) > 1
+                nan_var = any(s.nan_count > 0 for s in summaries)
+                inf_var = any(s.inf_count > 0 for s in summaries)
+                if (nan_var or inf_var) and sig is not None and len({s.nan_count for s in summaries}) > 1:
+                    sig = 0.0
                 f["nan"] |= nan_var
                 f["inf"] |= inf_var
                 if sig is not None:

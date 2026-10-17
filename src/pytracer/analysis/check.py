@@ -109,7 +109,7 @@ def check_experiment(experiment_dir: str | Path, thresholds: Thresholds) -> list
 
         min_sig = limits.get("min_sig_bits")
         sig = row.get("min_output_sig_bits")
-        if min_sig is not None and sig is not None and sig < min_sig:
+        if min_sig is not None and (sig is None or sig < min_sig):
             violations.append(Violation(function, "min_output_sig_bits", sig, min_sig))
 
         max_div = limits.get("max_divergence")

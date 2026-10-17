@@ -31,17 +31,23 @@ def _unwrap(value):
         return tuple(_unwrap(v) for v in value)
     if isinstance(value, list):
         return [_unwrap(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _unwrap(v) for k, v in value.items()}
     return value
 
 
 def rewrap(value):
-    """Wrap ndarray results (and tuples thereof) as TracedArray views."""
+    """Wrap ndarray results (and collections thereof) as TracedArray views."""
     if isinstance(value, TracedArray):
         return value
     if isinstance(value, np.ndarray):
         return value.view(TracedArray)
     if isinstance(value, tuple):
         return tuple(rewrap(v) for v in value)
+    if isinstance(value, list):
+        return [rewrap(v) for v in value]
+    if isinstance(value, dict):
+        return {k: rewrap(v) for k, v in value.items()}
     return value
 
 
@@ -63,7 +69,7 @@ class TracedArray(np.ndarray):
                 args=unwrapped_inputs,
                 kwargs=unwrapped_kwargs,
                 ufunc_method=method,
-                inplace=unwrapped_kwargs.get("out") is not None,
+                inplace=unwrapped_kwargs.get("out") is not None or method == "at",
                 bind_with=None,  # ufuncs have no introspectable signature
             )
         return rewrap(result)

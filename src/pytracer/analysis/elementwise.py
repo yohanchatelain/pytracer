@@ -25,21 +25,26 @@ def elementwise_sig(stack: np.ndarray) -> dict | None:
     """
     if stack.ndim < 1 or stack.shape[0] < 2:
         return None
-    runs = np.atleast_2d(stack.reshape(stack.shape[0], -1)).astype(np.float64, copy=False)
+    reshaped = np.atleast_2d(stack.reshape(stack.shape[0], -1))
+    if np.iscomplexobj(reshaped):
+        runs = reshaped.astype(np.complex128, copy=False)
+    else:
+        runs = reshaped.astype(np.float64, copy=False)
 
     with np.errstate(all="ignore"):
         mean = runs.mean(axis=0)
+        abs_mean = np.abs(mean)
         std = runs.std(axis=0)
-        sig = np.full(mean.shape, np.nan)
+        sig = np.full(abs_mean.shape, np.nan)
 
-        finite = np.isfinite(mean) & np.isfinite(std)
+        finite = np.isfinite(abs_mean) & np.isfinite(std)
         exact = finite & (std == 0.0)
         sig[exact] = SIG_CAP_BITS
-        zero_mean = finite & (std > 0.0) & (mean == 0.0)
+        zero_mean = finite & (std > 0.0) & (abs_mean == 0.0)
         sig[zero_mean] = 0.0
-        measurable = finite & (std > 0.0) & (mean != 0.0)
+        measurable = finite & (std > 0.0) & (abs_mean != 0.0)
         sig[measurable] = np.clip(
-            -np.log2(std[measurable] / np.abs(mean[measurable])), 0.0, SIG_CAP_BITS
+            -np.log2(std[measurable] / abs_mean[measurable]), 0.0, SIG_CAP_BITS
         )
 
     valid = sig[np.isfinite(sig)]

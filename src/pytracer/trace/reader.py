@@ -24,14 +24,15 @@ def iter_events(path: str | Path) -> tuple[list[TraceEvent], bool]:
     lines = raw.split(b"\n")
     events: list[TraceEvent] = []
     truncated = False
-    last_index = len(lines) - 1
+    non_empty_indices = [idx for idx, line in enumerate(lines) if line.strip()]
+    last_valid_idx = non_empty_indices[-1] if non_empty_indices else -1
     for i, line in enumerate(lines):
         if not line.strip():
             continue
         try:
             events.append(_decoder.decode(line))
         except msgspec.DecodeError as e:
-            if i >= last_index - 1:
+            if i == last_valid_idx:
                 truncated = True
                 break
             raise PytracerError(f"{path}: corrupt event at line {i + 1}: {e}") from e
@@ -102,7 +103,12 @@ def assemble_calls(events: list[TraceEvent]) -> list[CallRecord]:
             if ev.payload_ref:
                 rec.input_refs[name] = ev.payload_ref
         elif ev.phase == "output":
-            name = ev.arg_name or "Ret"
+            base_name = ev.arg_name or "Ret"
+            name = base_name
+            counter = 1
+            while name in rec.outputs:
+                name = f"{base_name}_{counter}" if base_name != "Ret" else f"Ret{counter}"
+                counter += 1
             rec.outputs[name] = ev.summary
             if ev.payload_ref:
                 rec.output_refs[name] = ev.payload_ref

@@ -149,15 +149,75 @@ blockquote { border-left: 3px solid #999; margin: 1rem 0; padding: 0.2rem 1rem;
   code, blockquote { background: #1e2128; color: #c8ccd4; }
 }
 </style></head><body>
-<pre style="white-space: pre-wrap; font-family: inherit;">{{ markdown }}</pre>
+<div class="pytracer-report-body">{{ html_body | safe }}</div>
 </body></html>
 """
+
+
+def _inline_md_to_html(text: str) -> str:
+    import html as _html
+    import re
+
+    escaped = _html.escape(text)
+    escaped = re.sub(r"`([^`]+)`", r"<code>\1</code>", escaped)
+    escaped = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", escaped)
+    return escaped
+
+
+def _markdown_to_html(md: str) -> str:
+    lines = md.splitlines()
+    out: list[str] = []
+    i = 0
+    n = len(lines)
+    while i < n:
+        line = lines[i]
+        stripped = line.strip()
+        if not stripped:
+            i += 1
+            continue
+        if stripped.startswith("# "):
+            out.append(f"<h1>{_inline_md_to_html(stripped[2:])}</h1>")
+            i += 1
+        elif stripped.startswith("## "):
+            out.append(f"<h2>{_inline_md_to_html(stripped[3:])}</h2>")
+            i += 1
+        elif stripped.startswith("> "):
+            out.append(f"<blockquote>{_inline_md_to_html(stripped[2:])}</blockquote>")
+            i += 1
+        elif stripped.startswith("- "):
+            out.append("<ul>")
+            while i < n and lines[i].strip().startswith("- "):
+                item = lines[i].strip()[2:]
+                out.append(f"<li>{_inline_md_to_html(item)}</li>")
+                i += 1
+            out.append("</ul>")
+        elif stripped.startswith("|") and stripped.endswith("|"):
+            headers = [c.strip() for c in stripped.strip("|").split("|")]
+            i += 1
+            if i < n and set(lines[i].strip()) <= {"|", "-", " ", ":"}:
+                i += 1
+            out.append("<table><thead><tr>")
+            for h in headers:
+                out.append(f"<th>{_inline_md_to_html(h)}</th>")
+            out.append("</tr></thead><tbody>")
+            while i < n and lines[i].strip().startswith("|") and lines[i].strip().endswith("|"):
+                cells = [c.strip() for c in lines[i].strip().strip("|").split("|")]
+                out.append("<tr>")
+                for c in cells:
+                    out.append(f"<td>{_inline_md_to_html(c)}</td>")
+                out.append("</tr>")
+                i += 1
+            out.append("</tbody></table>")
+        else:
+            out.append(f"<p>{_inline_md_to_html(stripped)}</p>")
+            i += 1
+    return "\n".join(out)
 
 
 def render_html(data: dict) -> str:
     env = Environment(autoescape=True)
     template = env.from_string(_HTML_TEMPLATE)
-    return template.render(markdown=render_markdown(data))
+    return template.render(html_body=_markdown_to_html(render_markdown(data)))
 
 
 def render_json(data: dict) -> str:

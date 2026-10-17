@@ -12,6 +12,7 @@ On interpreters without sys.monitoring the monitor is a no-op and says so.
 
 from __future__ import annotations
 
+import inspect
 import json
 import sys
 from collections import Counter
@@ -22,20 +23,50 @@ MONITOR_FILENAME = "monitor.json"
 
 class Monitor:
     def __init__(self, scope_dir: str | Path, run_dir: str | Path):
-        self.scope_dir = str(Path(scope_dir).resolve())
+        p = Path(scope_dir).resolve()
+        subdirs = {
+            "benchmarks",
+            "benchmark",
+            "tests",
+            "test",
+            "scripts",
+            "bin",
+            "examples",
+            "experiments",
+            "reproductions",
+        }
+        if p.name in subdirs and p.parent != p and str(p.parent) != "/":
+            self.scope_dir = str(p.parent)
+        else:
+            self.scope_dir = str(p)
         self.run_dir = Path(run_dir)
         self.line_counts: Counter[str] = Counter()
         self.c_calls: Counter[str] = Counter()
         self.active = False
+        self.started = False
         self.available = hasattr(sys, "monitoring")
         self._tool_id: int | None = None
 
     def _in_scope(self, filename: str) -> bool:
+        fn = str(filename)
         return (
-            filename.startswith(self.scope_dir)
-            and "site-packages" not in filename
-            and ".pytracer" not in filename
+            fn.startswith(self.scope_dir)
+            and "site-packages" not in fn
+            and ".venv" not in fn
+            and ".pytracer" not in fn
         )
+
+    def _record_call(self, callable_obj) -> None:
+        if hasattr(callable_obj, "__code__"):
+            return None  # Python function: structure comes from wrappers
+        call_attr = inspect.getattr_static(type(callable_obj), "__call__", None)
+        if hasattr(call_attr, "__code__"):
+            return None  # Python callable instance
+        mod = getattr(callable_obj, "__module__", None) or ""
+        name = getattr(callable_obj, "__qualname__", None) or getattr(
+            callable_obj, "__name__", repr(type(callable_obj))
+        )
+        self.c_calls[f"{mod}.{name}" if mod else name] += 1
 
     def start(self) -> None:
         if not self.available:
@@ -57,19 +88,14 @@ class Monitor:
         def on_call(code, instruction_offset, callable_obj, arg0):
             if not self._in_scope(code.co_filename):
                 return mon.DISABLE
-            if hasattr(callable_obj, "__code__"):
-                return None  # Python function: structure comes from wrappers
-            mod = getattr(callable_obj, "__module__", None) or ""
-            name = getattr(callable_obj, "__qualname__", None) or getattr(
-                callable_obj, "__name__", repr(type(callable_obj))
-            )
-            self.c_calls[f"{mod}.{name}" if mod else name] += 1
+            self._record_call(callable_obj)
             return None
 
         mon.register_callback(self._tool_id, mon.events.LINE, on_line)
         mon.register_callback(self._tool_id, mon.events.CALL, on_call)
         mon.set_events(self._tool_id, mon.events.LINE | mon.events.CALL)
         self.active = True
+        self.started = True
 
     def stop(self) -> None:
         if self.active and self._tool_id is not None:
@@ -83,8 +109,8 @@ class Monitor:
 
     def _write(self) -> None:
         payload = {
-            "available": self.available,
-            "line_counts": dict(self.line_counts),
-            "c_calls": dict(self.c_calls),
+            "available": self.available and self.started,
+            "line_counts": dict(self.line_counts) if self.started else {},
+            "c_calls": dict(self.c_calls) if self.started else {},
         }
         (self.run_dir / MONITOR_FILENAME).write_text(json.dumps(payload, indent=2))

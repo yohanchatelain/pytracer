@@ -93,8 +93,12 @@ def array_fingerprint(array: np.ndarray, max_bytes: int = MAX_FINGERPRINT_BYTES)
         header = f"{array.dtype}|{array.shape}|".encode()
         if array.nbytes <= max_bytes:
             data = np.ascontiguousarray(array).tobytes()
-        elif array.flags.c_contiguous or array.flags.f_contiguous:
-            flat = array.reshape(-1)  # view: array is contiguous
+        elif array.flags.c_contiguous:
+            flat = array.reshape(-1)  # view: array is C-contiguous
+            step = max(1, int(np.ceil(array.nbytes / max_bytes)))
+            data = np.ascontiguousarray(flat[::step]).tobytes()
+        elif array.flags.f_contiguous:
+            flat = array.reshape(-1, order="F")  # view: array is Fortran-contiguous
             step = max(1, int(np.ceil(array.nbytes / max_bytes)))
             data = np.ascontiguousarray(flat[::step]).tobytes()
         else:

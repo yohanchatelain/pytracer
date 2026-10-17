@@ -7,7 +7,7 @@ written.
 
 Backends (``array_backend`` config):
 - "npy":  numpy .npy files — zero extra dependencies, uncompressed.
-- "zarr": zstd-compressed Zarr stores — needs the [arrays] extra.
+- "zarr": compressed Zarr stores (V2 format for portability) — needs the [arrays] extra.
 - "auto": zarr when importable, else npy (default).
 
 ``load_array`` dispatches on the payload_ref suffix, so runs written with
@@ -81,10 +81,25 @@ class ArrayStore:
             safe_arg = _SANITIZE.sub("_", arg_name or "arg")
             stem = f"{call_id:06d}-{phase}-{safe_arg}"
             if self.backend == "zarr":
+                import shutil
                 import zarr
 
                 name = f"{stem}.zarr"
-                zarr.save(str(self._dir / name), np.ascontiguousarray(value))  # type: ignore[arg-type]
+                target_path_obj = self._dir / name
+                if target_path_obj.exists():
+                    if target_path_obj.is_dir():
+                        shutil.rmtree(target_path_obj)
+                    else:
+                        target_path_obj.unlink()
+                target_path = str(target_path_obj)
+                save_kwargs = {}
+                is_zarr3 = (
+                    hasattr(zarr, "ZarrFormat")
+                    or int(getattr(zarr, "__version__", "2").split(".")[0]) >= 3
+                )
+                if is_zarr3:
+                    save_kwargs["zarr_format"] = 2
+                zarr.save(target_path, np.ascontiguousarray(value), **save_kwargs)  # type: ignore[arg-type]
             else:
                 name = f"{stem}.npy"
                 np.save(self._dir / name, value, allow_pickle=False)

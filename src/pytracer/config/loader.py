@@ -43,23 +43,37 @@ formats = ["markdown", "html", "json"]
 """
 
 
-def load_config(directory: str | Path | None = None) -> PytracerConfig:
-    """Load configuration from pytracer.toml in *directory* (default: cwd).
+def load_config(
+    path: str | Path | None = None,
+    directory: str | Path | None = None,
+) -> PytracerConfig:
+    """Load configuration from a TOML file or directory (default: cwd).
 
-    Returns built-in defaults when no config file exists.
+    Returns built-in defaults when no config file exists in the directory.
+    Raises ConfigError if an explicitly specified file does not exist.
     """
-    base = Path(directory) if directory is not None else Path.cwd()
-    path = base / CONFIG_FILENAME
-    if not path.is_file():
-        return PytracerConfig()
+    target = path if path is not None else directory
+    if target is None:
+        target_path = Path.cwd() / CONFIG_FILENAME
+        if not target_path.is_file():
+            return PytracerConfig()
+    else:
+        target_path = Path(target)
+        if target_path.is_dir():
+            target_path = target_path / CONFIG_FILENAME
+            if not target_path.is_file():
+                return PytracerConfig()
+        else:
+            if not target_path.is_file():
+                raise ConfigError(f"{target_path}: configuration file not found")
     try:
-        with open(path, "rb") as fo:
+        with open(target_path, "rb") as fo:
             data = tomllib.load(fo)
     except tomllib.TOMLDecodeError as e:
-        raise ConfigError(f"{path}: invalid TOML: {e}") from e
+        raise ConfigError(f"{target_path}: invalid TOML: {e}") from e
     except OSError as e:
-        raise ConfigError(f"{path}: cannot read: {e}") from e
-    return config_from_dict(data, source=str(path))
+        raise ConfigError(f"{target_path}: cannot read: {e}") from e
+    return config_from_dict(data, source=str(target_path))
 
 
 def write_default_config(directory: str | Path | None = None, force: bool = False) -> Path:

@@ -15,8 +15,25 @@ from pathlib import Path
 OK, WARN, FAIL = "ok", "warn", "fail"
 
 
+class CheckStatus:
+    OK = OK
+    WARN = WARN
+    FAIL = FAIL
+
+
 def _check(name: str, status: str, detail: str) -> dict:
     return {"name": name, "status": status, "detail": detail}
+
+
+def check_python() -> dict:
+    py = sys.version_info
+    if py >= (3, 12):
+        return _check("python", OK, f"Python {sys.version.split()[0]}")
+    return _check(
+        "python",
+        FAIL,
+        f"Python {sys.version.split()[0]} is unsupported. Pytracer requires Python >= 3.12.",
+    )
 
 
 def _version_of(dist: str) -> str | None:
@@ -26,22 +43,14 @@ def _version_of(dist: str) -> str | None:
         return None
 
 
-def run_checks(directory: str | Path | None = None) -> list[dict]:
+def run_checks(
+    directory: str | Path | None = None,
+    config_path: str | Path | None = None,
+) -> list[dict]:
     checks: list[dict] = []
     base = Path(directory) if directory else Path.cwd()
 
-    py = sys.version_info
-    if py >= (3, 12):
-        checks.append(_check("python", OK, f"Python {sys.version.split()[0]}"))
-    else:
-        checks.append(
-            _check(
-                "python",
-                WARN,
-                f"Python {sys.version.split()[0]}: sys.monitoring (T4) needs 3.12+; "
-                "the monitor tier will be disabled",
-            )
-        )
+    checks.append(check_python())
 
     for dist in ("numpy", "wrapt", "msgspec"):
         v = _version_of(dist)
@@ -83,23 +92,42 @@ def run_checks(directory: str | Path | None = None) -> list[dict]:
     else:
         checks.append(_check("writable", FAIL, f"{base} is not writable"))
 
-    config_path = base / "pytracer.toml"
-    if config_path.is_file():
-        try:
-            from pytracer.config.loader import load_config
+    if config_path is not None:
+        cfg_file = Path(config_path)
+        if cfg_file.is_file():
+            try:
+                from pytracer.config.loader import load_config
 
-            config = load_config(base)
-            checks.append(
-                _check(
-                    "config",
-                    OK,
-                    f"pytracer.toml valid (plugins: {config.trace.plugins})",
+                config = load_config(path=cfg_file)
+                checks.append(
+                    _check(
+                        "config",
+                        OK,
+                        f"{cfg_file} valid (plugins: {config.trace.plugins})",
+                    )
                 )
-            )
-        except Exception as e:
-            checks.append(_check("config", FAIL, f"pytracer.toml invalid: {e}"))
+            except Exception as e:
+                checks.append(_check("config", FAIL, f"{cfg_file} invalid: {e}"))
+        else:
+            checks.append(_check("config", FAIL, f"{cfg_file}: configuration file not found"))
     else:
-        checks.append(_check("config", OK, "no pytracer.toml (defaults apply)"))
+        cfg_file = base / "pytracer.toml"
+        if cfg_file.is_file():
+            try:
+                from pytracer.config.loader import load_config
+
+                config = load_config(directory=base)
+                checks.append(
+                    _check(
+                        "config",
+                        OK,
+                        f"pytracer.toml valid (plugins: {config.trace.plugins})",
+                    )
+                )
+            except Exception as e:
+                checks.append(_check("config", FAIL, f"pytracer.toml invalid: {e}"))
+        else:
+            checks.append(_check("config", OK, "no pytracer.toml (defaults apply)"))
 
     perturb = [k for k in os.environ if k.startswith(("VFC_", "VERROU_"))]
     if perturb or os.environ.get("LD_PRELOAD"):
