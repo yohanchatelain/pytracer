@@ -98,7 +98,7 @@ def header_bar(data: ExperimentData, data_compare: ExperimentData | None = None)
             html.Div([
                 html.Div([
                     html.Span("Pytracer", className="brand"),
-                    html.Span("v2.0.0", className="brand-version"),
+                    html.Span("v2.0.1", className="brand-version"),
                 ], className="brand-title-row"),
                 html.Span("numerical variability profiler", className="brand-sub"),
             ], className="brand-text"),

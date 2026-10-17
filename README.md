@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/yohanchatelain/pytracer/releases"><img src="https://img.shields.io/badge/release-v2.0.0-blue.svg" alt="Release"></a>
+  <a href="https://github.com/yohanchatelain/pytracer/releases"><img src="https://img.shields.io/badge/release-v2.0.1-blue.svg" alt="Release"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg" alt="Python Version"></a>
   <a href="https://github.com/astral-sh/uv"><img src="https://img.shields.io/badge/package%20manager-uv-purple.svg" alt="uv"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License"></a>
