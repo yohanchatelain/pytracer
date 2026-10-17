@@ -185,7 +185,8 @@ def aggregate(alignment: Alignment, run_dirs: list[Path] | None = None) -> Aggre
 
                 nan_var = any(s.nan_count > 0 for s in summaries)
                 inf_var = any(s.inf_count > 0 for s in summaries)
-                if (nan_var or inf_var) and sig is not None and len({s.nan_count for s in summaries}) > 1:
+                has_nan_spread = len({s.nan_count for s in summaries}) > 1
+                if (nan_var or inf_var) and sig is not None and has_nan_spread:
                     sig = 0.0
                 f["nan"] |= nan_var
                 f["inf"] |= inf_var

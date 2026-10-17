@@ -18,7 +18,6 @@ import tempfile
 from pathlib import Path
 
 import numpy as np
-import pytest
 
 from pytracer.instrumentation.monitor import Monitor
 from pytracer.instrumentation.native import _GEMM_SYMBOLS, shim_source

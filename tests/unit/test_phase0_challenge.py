@@ -318,6 +318,9 @@ def test_pyproject_packaging_declarations():
     assert not any("numcodecs" in d for d in opt_deps.get("all", []))
 
 
+@pytest.mark.skipif(
+    __import__("importlib").util.find_spec("zarr") is None, reason="zarr not installed"
+)
 def test_zarr_v2_storage_format(tmp_path):
     """Verify ArrayStore writes arrays and handles Zarr format correctly."""
     store = ArrayStore(tmp_path, backend="zarr")

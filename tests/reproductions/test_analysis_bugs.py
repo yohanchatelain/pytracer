@@ -16,7 +16,6 @@ import warnings
 from pathlib import Path
 
 import numpy as np
-import pytest
 
 from pytracer.analysis.aggregate import aggregate
 from pytracer.analysis.align import align

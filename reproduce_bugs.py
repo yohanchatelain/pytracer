@@ -724,7 +724,9 @@ def main() -> int:
         description="pytracer Bug Reproduction & Fix Verification Suite Runner",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--filter", "--bug", default=None, help="Filter by Bug ID, subsystem, or keyword")
+    parser.add_argument(
+        "--filter", "--bug", default=None, help="Filter by Bug ID, subsystem, or keyword"
+    )
     parser.add_argument(
         "--severity",
         default=None,

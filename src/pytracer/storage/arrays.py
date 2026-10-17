@@ -82,6 +82,7 @@ class ArrayStore:
             stem = f"{call_id:06d}-{phase}-{safe_arg}"
             if self.backend == "zarr":
                 import shutil
+
                 import zarr
 
                 name = f"{stem}.zarr"
